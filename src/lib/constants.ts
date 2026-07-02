@@ -60,6 +60,16 @@ export const SOCIETY_SIDEBAR_ITEMS = [
   { label: 'Settings', href: '/society/settings', icon: 'Settings' },
 ];
 
+export const WORKER_SIDEBAR_ITEMS = [
+  { label: 'Dashboard', href: '/society/dashboard', icon: 'LayoutDashboard' },
+  { label: 'Assigned Tasks', href: '/society/complaints', icon: 'MessageSquareWarning' },
+  { label: "Today's Route", href: '/society/route', icon: 'MapPin' },
+  { label: 'Inventory Suggested', href: '/society/inventory', icon: 'Wrench' },
+  { label: 'Performance', href: '/society/performance', icon: 'Star' },
+  { label: 'Emergency Tasks', href: '/society/emergency', icon: 'AlertTriangle' },
+  { label: 'Settings', href: '/society/settings', icon: 'Settings' },
+];
+
 export const HOSTEL_SIDEBAR_ITEMS = [
   { label: 'Dashboard', href: '/hostel/dashboard', icon: 'LayoutDashboard' },
   { label: 'AI Assistant', href: '/hostel/ai-assistant', icon: 'Bot' },
@@ -70,6 +80,21 @@ export const HOSTEL_SIDEBAR_ITEMS = [
   { label: 'Parcels', href: '/hostel/parcels', icon: 'Package' },
   { label: 'Community', href: '/hostel/community', icon: 'Users' },
   { label: 'Marketplace', href: '/hostel/marketplace', icon: 'Store' },
+  { label: 'Settings', href: '/hostel/settings', icon: 'Settings' },
+];
+
+export const WARDEN_SIDEBAR_ITEMS = [
+  { label: 'Dashboard', href: '/hostel/dashboard', icon: 'LayoutDashboard' },
+  { label: 'Student Directory', href: '/hostel/students', icon: 'UserCheck' },
+  { label: 'Hostel Analytics', href: '/hostel/analytics', icon: 'BarChart3' },
+  { label: 'Mess Management', href: '/hostel/mess', icon: 'UtensilsCrossed' },
+  { label: 'Laundry Management', href: '/hostel/laundry', icon: 'WashingMachine' },
+  { label: 'Leave Requests', href: '/hostel/leaves', icon: 'FileCheck' },
+  { label: 'Visitors Logs', href: '/hostel/visitors', icon: 'Shield' },
+  { label: 'Announcements', href: '/hostel/announcements', icon: 'Megaphone' },
+  { label: 'Room Allocation', href: '/hostel/rooms', icon: 'Bed' },
+  { label: 'Parcel Locker', href: '/hostel/parcels', icon: 'Package' },
+  { label: 'Reports Export', href: '/hostel/reports', icon: 'FileText' },
   { label: 'Settings', href: '/hostel/settings', icon: 'Settings' },
 ];
 
