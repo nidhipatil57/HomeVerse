@@ -3,7 +3,7 @@
 // ==========================================
 
 // --- Auth & Users ---
-export type UserRole = 'resident' | 'admin' | 'warden' | 'security' | 'committee';
+export type UserRole = 'resident' | 'worker' | 'student' | 'warden' | 'admin' | 'security' | 'committee';
 export type PortalType = 'society' | 'hostel';
 
 export interface User {

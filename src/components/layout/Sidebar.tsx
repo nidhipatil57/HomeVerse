@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Building2,
@@ -26,6 +26,17 @@ import {
   ClipboardCheck,
   Package,
   GraduationCap,
+  // New icons
+  Briefcase,
+  MapPin,
+  Wrench,
+  Star,
+  AlertTriangle,
+  Shield,
+  FileCheck,
+  Bed,
+  FileText,
+  UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -33,11 +44,13 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ThemeToggle } from "./ThemeToggle";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/store/useAuth";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, Bot, MessageSquareWarning, Users, IndianRupee,
   Heart, BarChart3, Store, Megaphone, Settings,
   UtensilsCrossed, WashingMachine, ClipboardCheck, Package, GraduationCap,
+  Briefcase, MapPin, Wrench, Star, AlertTriangle, Shield, FileCheck, Bed, FileText, UserCheck,
 };
 
 interface SidebarProps {
@@ -46,12 +59,73 @@ interface SidebarProps {
   portalType: "society" | "hostel";
 }
 
-export function Sidebar({ items, portalName, portalType }: SidebarProps) {
+export function Sidebar({ items, portalName: initialPortalName, portalType: initialPortalType }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout, initialize } = useAuth();
+  const [mounted, setMounted] = useState(false);
 
-  const PortalIcon = portalType === "society" ? Building2 : GraduationCap;
-  const gradientClass = portalType === "society" ? "gradient-primary" : "from-emerald-600 to-teal-600 bg-gradient-to-br";
+  useEffect(() => {
+    initialize();
+    setMounted(true);
+  }, [initialize]);
+
+  // Dynamic portal details based on active user role
+  const activePortalType = mounted && user ? user.portal : initialPortalType;
+  const activeUserRole = mounted && user ? user.role : "resident";
+
+  let portalName = initialPortalName;
+  if (mounted && user) {
+    if (user.role === "worker") {
+      portalName = "Worker Portal";
+    } else if (user.role === "warden") {
+      portalName = "Warden Portal";
+    } else if (user.role === "student") {
+      portalName = "Student Portal";
+    } else {
+      portalName = user.portal === "society" ? "Society Portal" : "Hostel Portal";
+    }
+  }
+
+  const PortalIcon = activePortalType === "society" ? Building2 : GraduationCap;
+  
+  // Decide portal theme gradient
+  let gradientClass = "gradient-primary"; // default society resident
+  if (activePortalType === "hostel") {
+    gradientClass = activeUserRole === "warden" 
+      ? "from-amber-600 to-orange-600 bg-gradient-to-br" 
+      : "from-emerald-600 to-teal-600 bg-gradient-to-br";
+  } else if (activePortalType === "society") {
+    if (activeUserRole === "worker") {
+      gradientClass = "from-blue-600 to-indigo-600 bg-gradient-to-br";
+    }
+  }
+
+  const initials = mounted && user?.name
+    ? user.name
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "NK";
+
+  const displayName = mounted && user?.name ? user.name : "Nidhi Kumar";
+  
+  let displaySubtitle = "A-301 · Resident";
+  if (mounted && user) {
+    const parts = [];
+    if (user.unit) parts.push(user.unit);
+    if (user.workerCategory) parts.push(user.workerCategory);
+    parts.push(user.role.charAt(0).toUpperCase() + user.role.slice(1));
+    displaySubtitle = parts.join(" · ");
+  }
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
 
   return (
     <motion.aside
@@ -177,7 +251,7 @@ export function Sidebar({ items, portalName, portalType }: SidebarProps) {
         >
           <Avatar className="w-8 h-8 shrink-0">
             <AvatarFallback className="text-xs font-semibold gradient-primary text-white">
-              NK
+              {initials}
             </AvatarFallback>
           </Avatar>
           <AnimatePresence mode="wait">
@@ -188,15 +262,20 @@ export function Sidebar({ items, portalName, portalType }: SidebarProps) {
                 exit={{ opacity: 0 }}
                 className="flex-1 min-w-0"
               >
-                <p className="text-sm font-medium truncate">Nidhi Kumar</p>
+                <p className="text-sm font-medium truncate">{displayName}</p>
                 <p className="text-xs text-muted-foreground truncate">
-                  A-301 · Resident
+                  {displaySubtitle}
                 </p>
               </motion.div>
             )}
           </AnimatePresence>
           {!collapsed && (
-            <Button variant="ghost" size="icon" className="rounded-lg w-8 h-8 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-lg w-8 h-8 shrink-0"
+              onClick={handleLogout}
+            >
               <LogOut className="w-3.5 h-3.5 text-muted-foreground" />
             </Button>
           )}
