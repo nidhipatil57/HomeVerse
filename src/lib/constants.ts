@@ -76,6 +76,7 @@ export const HOSTEL_SIDEBAR_ITEMS = [
   { label: 'Mess Menu', href: '/hostel/mess', icon: 'UtensilsCrossed' },
   { label: 'Laundry', href: '/hostel/laundry', icon: 'WashingMachine' },
   { label: 'Complaints', href: '/hostel/complaints', icon: 'MessageSquareWarning' },
+  { label: 'Leave Requests', href: '/hostel/leaves', icon: 'FileCheck' },
   { label: 'Attendance', href: '/hostel/attendance', icon: 'ClipboardCheck' },
   { label: 'Parcels', href: '/hostel/parcels', icon: 'Package' },
   { label: 'Community', href: '/hostel/community', icon: 'Users' },
@@ -85,6 +86,7 @@ export const HOSTEL_SIDEBAR_ITEMS = [
 
 export const WARDEN_SIDEBAR_ITEMS = [
   { label: 'Dashboard', href: '/hostel/dashboard', icon: 'LayoutDashboard' },
+  { label: 'Room Complaints', href: '/hostel/complaints', icon: 'MessageSquareWarning' },
   { label: 'Student Directory', href: '/hostel/students', icon: 'UserCheck' },
   { label: 'Hostel Analytics', href: '/hostel/analytics', icon: 'BarChart3' },
   { label: 'Mess Management', href: '/hostel/mess', icon: 'UtensilsCrossed' },

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { HOSTEL_SIDEBAR_ITEMS, WARDEN_SIDEBAR_ITEMS } from "@/lib/constants";
 import { useAuth } from "@/lib/store/useAuth";
+import { useCommunityStore } from "@/lib/store/useCommunityStore";
 
 export default function HostelLayout({
   children,
@@ -11,12 +12,14 @@ export default function HostelLayout({
   children: React.ReactNode;
 }) {
   const { user, initialize } = useAuth();
+  const initializeDb = useCommunityStore(state => state.initializeDb);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     initialize();
+    initializeDb();
     setMounted(true);
-  }, [initialize]);
+  }, [initialize, initializeDb]);
 
   const items = mounted && user?.role === "warden" ? WARDEN_SIDEBAR_ITEMS : HOSTEL_SIDEBAR_ITEMS;
   const portalName = mounted && user?.role === "warden" ? "Warden Portal" : "Hostel Portal";
