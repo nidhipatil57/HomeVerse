@@ -1,12 +1,20 @@
 "use client";
 
 import { motion } from "motion/react";
-import { BarChart3, TrendingUp, Droplets, Zap, Users, MessageSquareWarning, Bot } from "lucide-react";
+import { BarChart3, TrendingUp, Zap, Users, MessageSquareWarning, Bot } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
-import { utilityData, complaintsByCategory } from "@/data/mock-dashboard";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, LineChart, Line } from "recharts";
+import dynamic from "next/dynamic";
+
+const UtilityTrendsLineChart = dynamic(() => import("@/components/charts/UtilityTrendsLineChart"), {
+  ssr: false,
+  loading: () => <div className="h-[280px] flex items-center justify-center bg-secondary/10 animate-pulse rounded-xl" />
+});
+
+const ComplaintsByCategoryBarChart = dynamic(() => import("@/components/charts/ComplaintsByCategoryBarChart"), {
+  ssr: false,
+  loading: () => <div className="h-[280px] flex items-center justify-center bg-secondary/10 animate-pulse rounded-xl" />
+});
 
 export default function AnalyticsPage() {
   return (
@@ -43,31 +51,14 @@ export default function AnalyticsPage() {
         <Card className="border-border/50">
           <CardHeader><CardTitle className="text-base font-semibold">Utility Trends</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={utilityData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
-                <YAxis tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
-                <RechartsTooltip contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }} />
-                <Line type="monotone" dataKey="electricity" stroke="#eab308" strokeWidth={2} dot={{ r: 4 }} name="Electricity (kWh)" />
-                <Line type="monotone" dataKey="water" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 4 }} name="Water (KL)" />
-              </LineChart>
-            </ResponsiveContainer>
+            <UtilityTrendsLineChart />
           </CardContent>
         </Card>
 
         <Card className="border-border/50">
           <CardHeader><CardTitle className="text-base font-semibold">Complaints by Category</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={complaintsByCategory} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis type="number" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" width={80} />
-                <RechartsTooltip contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }} />
-                <Bar dataKey="count" fill="var(--primary)" radius={[0, 6, 6, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ComplaintsByCategoryBarChart />
           </CardContent>
         </Card>
       </div>

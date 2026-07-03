@@ -7,72 +7,150 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   Building2, User, Mail, Phone, Lock, Eye, EyeOff,
   ArrowRight, ArrowLeft, GraduationCap, Shield, Users, Check,
-  Briefcase, UserCheck, School, Hash, BookOpen, Clock, FileText, Image as ImageIcon
+  Briefcase, UserCheck, BookOpen, FileText, Image as ImageIcon,
+  CheckCircle2, AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/lib/store/useAuth";
+import { useCommunityStore } from "@/lib/store/useCommunityStore";
+import { MOCK_SOCIETIES, MOCK_HOSTELS, validateFlatNumber } from "@/data/mock-communities";
 
 const workerCategories = [
-  "Electrician", "Plumber", "Housekeeping", "Security Guard",
-  "Gardener", "Lift Technician", "Maintenance Staff", "Carpenter", "Cleaner"
+  "Maid", "Cook", "Electrician", "Plumber", "Carpenter", "Security Guard",
+  "Housekeeping", "Lift Technician", "Painter", "Gardener"
+];
+
+const maidSpecializations = [
+  "House Cleaning", "Utensil Washing", "Cooking", "Laundry", "Ironing",
+  "Baby Care", "Elder Care", "Deep Cleaning"
 ];
 
 export default function RegisterPage() {
   const router = useRouter();
   const { registerUser, initialize } = useAuth();
+  const users = useCommunityStore((state) => state.users);
+  const initializeDb = useCommunityStore((state) => state.initializeDb);
 
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    initializeDb();
+  }, [initialize, initializeDb]);
 
-  // Flow State
-  const [step, setStep] = useState(0); // 0: Ecosystem, 1: Role, 2: Basic Info, 3: Details, 4: Complete
+  // Wizard Steps: 0 (Ecosystem), 1 (Role), 2 (Basic Info & Code Verification), 3 (Details), 4 (Complete)
+  const [step, setStep] = useState(0);
   const [ecosystem, setEcosystem] = useState<"society" | "hostel" | null>(null);
   const [role, setRole] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
+  // Step 2 Verification state
+  const [communityCode, setCommunityCode] = useState("");
+  const [verifiedCommunity, setVerifiedCommunity] = useState<any>(null);
+  const [generatedUsername, setGeneratedUsername] = useState("");
+
   // Form Fields State
   const [formData, setFormData] = useState({
     name: "",
-    email: "",
     phone: "",
     password: "",
     confirmPassword: "",
     profilePhoto: "",
     
-    // Society Resident
-    societyName: "",
+    // Resident specific
     building: "",
     flatNumber: "",
     ownerOrTenant: "Owner",
     familyMembers: "",
     vehicleDetails: "",
 
-    // Society Worker
-    workerCategory: "Electrician",
+    // Worker specific
+    workerCategory: "Maid",
+    selectedSpecializations: [] as string[],
     employeeId: "",
     workingShift: "Morning",
 
-    // Hostel Student
-    collegeName: "",
-    hostelName: "",
-    block: "",
-    floor: "",
-    roomNumber: "",
-    rollNumber: "",
+    // Student specific
+    gender: "Male",
     course: "",
     year: "1st Year",
-
-    // Hostel Warden
-    assignedBlock: "",
+    branch: "",
+    parentContact: "",
+    hostelWing: "",
   });
 
-  const updateField = (field: string, value: string) => {
+  const updateField = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  // Real-time Community Code verification
+  useEffect(() => {
+    setError("");
+    const code = communityCode.trim().toUpperCase();
+    if (!code) {
+      setVerifiedCommunity(null);
+      setGeneratedUsername("");
+      return;
+    }
+
+    if (ecosystem === "society") {
+      const match = MOCK_SOCIETIES.find((s) => s.code === code);
+      if (match) {
+        setVerifiedCommunity(match);
+        // Set default building
+        updateField("building", match.buildings[0]);
+      } else {
+        setVerifiedCommunity(null);
+        setGeneratedUsername("");
+      }
+    } else {
+      const match = MOCK_HOSTELS.find((h) => h.code === code);
+      if (match) {
+        setVerifiedCommunity(match);
+        updateField("hostelWing", match.wings[0]);
+      } else {
+        setVerifiedCommunity(null);
+        setGeneratedUsername("");
+      }
+    }
+  }, [communityCode, ecosystem]);
+
+  // Username auto-generation with duplicate checking
+  useEffect(() => {
+    if (!verifiedCommunity || !formData.name.trim()) {
+      setGeneratedUsername("");
+      return;
+    }
+
+    const domain = verifiedCommunity.domain;
+    const nameClean = formData.name.trim().toLowerCase().replace(/[^a-z0-9 ]/g, "");
+    const parts = nameClean.split(" ");
+    const firstName = parts[0] || "user";
+    
+    let baseName = firstName;
+    // Special Warden format: warden@domain or rahul@domain (Rahul is warden)
+    if (role === "warden") {
+      baseName = firstName === "warden" ? "warden" : firstName;
+    }
+
+    let emailVal = `${baseName}@${domain}`;
+    let counter = 2;
+
+    // Resolve duplicates inside existing Zustand users list
+    while (users.some((u) => u.email.toLowerCase() === emailVal.toLowerCase())) {
+      if (role === "warden" && baseName === "warden") {
+        emailVal = `warden${counter}@${domain}`;
+      } else {
+        // Appending a number intelligently
+        const numStr = counter < 10 ? `0${counter}` : `${counter}`;
+        emailVal = `${baseName}${numStr}@${domain}`;
+      }
+      counter++;
+    }
+
+    setGeneratedUsername(emailVal);
+  }, [formData.name, verifiedCommunity, role, users]);
 
   const handleEcosystemSelect = (eco: "society" | "hostel") => {
     setEcosystem(eco);
@@ -89,8 +167,11 @@ export default function RegisterPage() {
 
   const validateBasicInfo = () => {
     if (!formData.name.trim()) return "Full name is required";
-    if (!formData.email.trim() || !formData.email.includes("@")) return "A valid email is required";
     if (!formData.phone.trim()) return "Mobile number is required";
+    if (!communityCode.trim()) return "Community Code is required";
+    if (!verifiedCommunity) {
+      return `Invalid Community Code. Please contact your ${ecosystem === "society" ? "society" : "hostel"} administrator.`;
+    }
     if (formData.password.length < 6) return "Password must be at least 6 characters";
     if (formData.password !== formData.confirmPassword) return "Passwords do not match";
     return null;
@@ -99,23 +180,39 @@ export default function RegisterPage() {
   const validateDetails = () => {
     if (ecosystem === "society") {
       if (role === "resident") {
-        if (!formData.societyName.trim()) return "Society name is required";
-        if (!formData.building.trim()) return "Building / Wing is required";
+        if (!formData.building) return "Please select a building / wing";
         if (!formData.flatNumber.trim()) return "Flat number is mandatory";
+
+        // Structured Wing & Flat boundary verification
+        const flatStr = formData.flatNumber.trim();
+        const valid = validateFlatNumber(flatStr, verifiedCommunity.floors, verifiedCommunity.flatsPerFloor);
+        if (!valid) {
+          const flatIndex = parseInt(flatStr, 10) % 100;
+          const floor = Math.floor(parseInt(flatStr, 10) / 100);
+          if (isNaN(floor) || floor < 1 || floor > verifiedCommunity.floors) {
+            return `Flat number is invalid. ${verifiedCommunity.name} only has ${verifiedCommunity.floors} floors.`;
+          }
+          if (flatIndex < 1 || flatIndex > verifiedCommunity.flatsPerFloor) {
+            return `Flat ${flatStr} is invalid. ${verifiedCommunity.name} only has ${verifiedCommunity.flatsPerFloor} flats per floor (e.g., flats ending in 01 to 0${verifiedCommunity.flatsPerFloor}).`;
+          }
+          return `Flat number is invalid. Please enter in [Floor][FlatIndex] format (e.g. 104, 1002).`;
+        }
       } else if (role === "worker") {
-        if (!formData.societyName.trim()) return "Society name is required";
+        if (formData.workerCategory === "Maid" && formData.selectedSpecializations.length === 0) {
+          return "Please choose at least one specialization for the Maid category.";
+        }
+      } else if (role === "security") {
         if (!formData.employeeId.trim()) return "Employee ID is required";
       }
     } else if (ecosystem === "hostel") {
       if (role === "student") {
-        if (!formData.collegeName.trim()) return "College name is required";
-        if (!formData.hostelName.trim()) return "Hostel name is required";
-        if (!formData.roomNumber.trim()) return "Room number is required";
-        if (!formData.rollNumber.trim()) return "Roll number is required";
+        if (!formData.course.trim()) return "Course details are required";
+        if (!formData.branch.trim()) return "Branch is required";
+        if (!formData.parentContact.trim()) return "Parent contact number is required";
+        if (!formData.hostelWing) return "Please choose an assigned hostel wing";
       } else if (role === "warden") {
-        if (!formData.hostelName.trim()) return "Hostel name is required";
         if (!formData.employeeId.trim()) return "Employee ID is required";
-        if (!formData.assignedBlock.trim()) return "Assigned Hostel Block is required";
+        if (!formData.hostelWing) return "Please choose an assigned hostel wing";
       }
     }
     return null;
@@ -137,31 +234,61 @@ export default function RegisterPage() {
         return;
       }
       
-      // Call Zustand Register
       try {
+        const generatedFloor = role === "resident" 
+          ? Math.floor(parseInt(formData.flatNumber, 10) / 100) 
+          : undefined;
+
+        // Auto-assign student hostel based on gender
+        let calculatedHostel = undefined;
+        if (role === "student") {
+          calculatedHostel = formData.gender === "Female" ? "Girls Hostel" : "Boys Hostel";
+        } else if (role === "warden") {
+          calculatedHostel = formData.gender === "Female" ? "Girls Hostel" : "Boys Hostel";
+        }
+
         const registrationData = {
           name: formData.name,
-          email: formData.email,
+          email: generatedUsername,
           phone: formData.phone,
           role: role as any,
           portal: ecosystem as any,
-          avatar: formData.profilePhoto || undefined,
-          unit: role === "resident" ? formData.flatNumber : role === "student" ? formData.roomNumber : undefined,
-          building: role === "resident" ? formData.building : role === "student" ? formData.block : role === "warden" ? formData.assignedBlock : formData.building,
+          avatar: formData.profilePhoto || "/avatars/avatar-default.jpg",
           
-          // Additional custom fields
-          societyName: formData.societyName,
-          hostelName: formData.hostelName,
-          collegeName: formData.collegeName,
-          ownerOrTenant: formData.ownerOrTenant,
-          familyMembers: formData.familyMembers ? parseInt(formData.familyMembers) : undefined,
-          vehicleDetails: formData.vehicleDetails,
+          // Structural references
+          communityCode: communityCode.toUpperCase(),
+          unit: role === "resident" ? formData.flatNumber : undefined, // Student unit is allocated by Warden
+          building: role === "resident" 
+            ? formData.building 
+            : role === "student" 
+              ? formData.hostelWing 
+              : role === "warden" 
+                ? formData.hostelWing 
+                : role === "security"
+                  ? formData.building
+                  : undefined,
+
+          // Organization info
+          societyName: ecosystem === "society" ? verifiedCommunity.name : undefined,
+          collegeName: ecosystem === "hostel" ? verifiedCommunity.name : undefined,
+          hostelName: calculatedHostel,
+          ownerOrTenant: role === "resident" ? formData.ownerOrTenant : undefined,
+          floorNumber: generatedFloor,
+          familyMembers: (role === "resident" && formData.familyMembers) ? parseInt(formData.familyMembers) : undefined,
+          vehicleDetails: role === "resident" ? formData.vehicleDetails : undefined,
+
+          // Worker / Security specializations
           workerCategory: role === "worker" ? formData.workerCategory : undefined,
-          employeeId: (role === "worker" || role === "warden") ? formData.employeeId : undefined,
-          workingShift: role === "worker" ? formData.workingShift : undefined,
-          rollNumber: role === "student" ? formData.rollNumber : undefined,
+          specializations: (role === "worker" && formData.workerCategory === "Maid") ? formData.selectedSpecializations : undefined,
+          employeeId: (role === "worker" || role === "warden" || role === "security") ? formData.employeeId : undefined,
+          workingShift: role === "security" ? formData.workingShift : undefined,
+          
+          // Student details
+          gender: (role === "student" || role === "warden") ? formData.gender : undefined,
           course: role === "student" ? formData.course : undefined,
           year: role === "student" ? formData.year : undefined,
+          branch: role === "student" ? formData.branch : undefined,
+          parentContact: role === "student" ? formData.parentContact : undefined,
         };
 
         const success = await registerUser(registrationData);
@@ -179,6 +306,14 @@ export default function RegisterPage() {
   const handleBack = () => {
     setError("");
     setStep((prev) => Math.max(0, prev - 1));
+  };
+
+  const toggleSpecialization = (spec: string) => {
+    const current = formData.selectedSpecializations;
+    const updated = current.includes(spec)
+      ? current.filter((s) => s !== spec)
+      : [...current, spec];
+    updateField("selectedSpecializations", updated);
   };
 
   return (
@@ -208,7 +343,7 @@ export default function RegisterPage() {
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 {[0, 1, 2, 3].map((sIndex) => {
-                  const labels = ["Ecosystem", "Role", "Basic Info", "Details"];
+                  const labels = ["Ecosystem", "Role", "Verification", "Details"];
                   return (
                     <div key={sIndex} className="flex items-center gap-1.5">
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
@@ -231,7 +366,8 @@ export default function RegisterPage() {
           )}
 
           {error && (
-            <div className="p-3 mb-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+            <div className="p-3 mb-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 shrink-0" />
               {error}
             </div>
           )}
@@ -263,7 +399,7 @@ export default function RegisterPage() {
                       </div>
                       <p className="font-bold text-foreground">🏢 Society Portal</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Apartments, wings, residents, and electrician/plumber workers.
+                        Apartments, wings, residents, and local trade providers.
                       </p>
                     </button>
 
@@ -277,7 +413,7 @@ export default function RegisterPage() {
                       </div>
                       <p className="font-bold text-foreground">🏠 Hostel Portal</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        College hostels, student roommates, laundry, wardens.
+                        College accommodation, roommate search, laundry locks.
                       </p>
                     </button>
                   </div>
@@ -291,7 +427,7 @@ export default function RegisterPage() {
                     <h2 className="text-xl font-bold font-[family-name:var(--font-heading)]">Select Your Role</h2>
                     <p className="text-sm text-muted-foreground">How will you participate in the community?</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
                     {ecosystem === "society" ? (
                       <>
                         <button
@@ -314,11 +450,22 @@ export default function RegisterPage() {
                             <Briefcase className="w-5 h-5 text-white" />
                           </div>
                           <p className="font-bold text-foreground">Worker / Staff</p>
-                          <p className="text-xs text-muted-foreground mt-1">Plumbers, Electricians, Security</p>
+                          <p className="text-xs text-muted-foreground mt-1">Local Trades & Plumbers</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRoleSelect("security")}
+                          className="p-5 rounded-2xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 group"
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-amber-500 flex items-center justify-center mb-4 shadow-md group-hover:scale-105 transition-transform">
+                            <Shield className="w-5 h-5 text-white" />
+                          </div>
+                          <p className="font-bold text-foreground">Security</p>
+                          <p className="text-xs text-muted-foreground mt-1">Guard & Gate Control</p>
                         </button>
                       </>
                     ) : (
-                      <>
+                      <div className="grid grid-cols-2 gap-4 col-span-1 sm:col-span-3">
                         <button
                           type="button"
                           onClick={() => handleRoleSelect("student")}
@@ -328,7 +475,7 @@ export default function RegisterPage() {
                             <GraduationCap className="w-5 h-5 text-white" />
                           </div>
                           <p className="font-bold text-foreground">Student</p>
-                          <p className="text-xs text-muted-foreground mt-1">College Roommates</p>
+                          <p className="text-xs text-muted-foreground mt-1">Campus Residents</p>
                         </button>
                         <button
                           type="button"
@@ -339,19 +486,21 @@ export default function RegisterPage() {
                             <UserCheck className="w-5 h-5 text-white" />
                           </div>
                           <p className="font-bold text-foreground">Warden</p>
-                          <p className="text-xs text-muted-foreground mt-1">Hostel Management</p>
+                          <p className="text-xs text-muted-foreground mt-1">Hostel Administrator</p>
                         </button>
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* STEP 2: BASIC INFO */}
+              {/* STEP 2: BASIC INFO & VERIFICATION */}
               {step === 2 && (
                 <div className="space-y-4">
-                  <h2 className="text-xl font-bold font-[family-name:var(--font-heading)]">Create Your Profile</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Please provide your core credentials</p>
+                  <div>
+                    <h2 className="text-xl font-bold font-[family-name:var(--font-heading)]">Create Profile & Verify Code</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">Link your profile to a verified campus/residential group</p>
+                  </div>
 
                   <div className="space-y-3 mt-4">
                     <div>
@@ -359,7 +508,7 @@ export default function RegisterPage() {
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
-                          placeholder="e.g. Nidhi Kumar"
+                          placeholder="e.g. Sara Shah"
                           value={formData.name}
                           onChange={(e) => updateField("name", e.target.value)}
                           className="pl-10 rounded-xl h-11"
@@ -369,15 +518,14 @@ export default function RegisterPage() {
 
                     <div className="grid sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs font-semibold text-muted-foreground block mb-1">Email Address</label>
+                        <label className="text-xs font-semibold text-muted-foreground block mb-1">Community Code</label>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
-                            type="email"
-                            placeholder="nidhi@example.com"
-                            value={formData.email}
-                            onChange={(e) => updateField("email", e.target.value)}
-                            className="pl-10 rounded-xl h-11"
+                            placeholder="e.g. SUN123 or VESIT26"
+                            value={communityCode}
+                            onChange={(e) => setCommunityCode(e.target.value)}
+                            className="pl-10 rounded-xl h-11 uppercase font-semibold tracking-wider"
                           />
                         </div>
                       </div>
@@ -386,7 +534,7 @@ export default function RegisterPage() {
                         <div className="relative">
                           <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
-                            placeholder="+91 99999 99999"
+                            placeholder="+91 XXXXX XXXXX"
                             value={formData.phone}
                             onChange={(e) => updateField("phone", e.target.value)}
                             className="pl-10 rounded-xl h-11"
@@ -394,6 +542,38 @@ export default function RegisterPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Community Verification Status Alert */}
+                    {communityCode && (
+                      <div className={`p-3 rounded-xl border text-xs font-medium transition-all ${
+                        verifiedCommunity
+                          ? "bg-green-500/10 border-green-500/20 text-green-500"
+                          : "bg-destructive/10 border-destructive/20 text-destructive"
+                      }`}>
+                        {verifiedCommunity ? (
+                          <div className="flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Community Verified: <strong>{verifiedCommunity.name}</strong></span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <AlertCircle className="w-4 h-4" />
+                            <span>Invalid Community Code. Please contact your administrator.</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Auto Generated Username Display */}
+                    {generatedUsername && (
+                      <div className="p-3 bg-secondary/40 border border-border/30 rounded-xl space-y-1">
+                        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Your Auto-Generated Username</span>
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-primary" />
+                          <span className="font-bold text-foreground select-all text-sm">{generatedUsername}</span>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid sm:grid-cols-2 gap-3">
                       <div>
@@ -435,15 +615,14 @@ export default function RegisterPage() {
               )}
 
               {/* STEP 3: DETAILS */}
-              {step === 3 && (
+              {step === 3 && verifiedCommunity && (
                 <div className="space-y-4">
                   <div>
-                    <h2 className="text-xl font-bold font-[family-name:var(--font-heading)]">Community Details</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">Customize your profile as a <span className="font-semibold text-primary capitalize">{role}</span></p>
+                    <h2 className="text-xl font-bold font-[family-name:var(--font-heading)]">Verification Details</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">Customize registration profile for <span className="font-semibold text-primary capitalize">{role}</span></p>
                   </div>
 
                   <div className="space-y-3 mt-4">
-                    {/* PROFILE PICTURE PLACEHOLDER */}
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground block mb-1">Profile Photo (Optional)</label>
                       <div className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-border/70 hover:bg-secondary/20 cursor-pointer transition-colors relative">
@@ -464,68 +643,60 @@ export default function RegisterPage() {
                       <>
                         <div className="grid sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Society Name</label>
-                            <Input
-                              placeholder="e.g. Harmony Heights"
-                              value={formData.societyName}
-                              onChange={(e) => updateField("societyName", e.target.value)}
-                              className="rounded-xl h-11"
-                            />
-                          </div>
-                          <div>
                             <label className="text-xs font-semibold text-muted-foreground block mb-1">Building / Wing</label>
-                            <Input
-                              placeholder="e.g. Tower B"
+                            <select
                               value={formData.building}
                               onChange={(e) => updateField("building", e.target.value)}
-                              className="rounded-xl h-11"
-                            />
+                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
+                            >
+                              {verifiedCommunity.buildings.map((b: string) => (
+                                <option key={b} value={b}>{b}</option>
+                              ))}
+                            </select>
                           </div>
-                        </div>
-
-                        <div className="grid sm:grid-cols-2 gap-3">
                           <div>
                             <label className="text-xs font-semibold text-muted-foreground block mb-1">Flat Number <span className="text-red-500">*</span></label>
                             <Input
-                              placeholder="e.g. B-402 (Mandatory)"
+                              placeholder="e.g. 302"
                               value={formData.flatNumber}
                               onChange={(e) => updateField("flatNumber", e.target.value)}
                               className="rounded-xl h-11"
                             />
                           </div>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-3">
                           <div>
                             <label className="text-xs font-semibold text-muted-foreground block mb-1">Ownership Type</label>
                             <select
                               value={formData.ownerOrTenant}
                               onChange={(e) => updateField("ownerOrTenant", e.target.value)}
-                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
                             >
                               <option value="Owner">Owner</option>
                               <option value="Tenant">Tenant</option>
                             </select>
                           </div>
-                        </div>
-
-                        <div className="grid sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Family Members (Optional)</label>
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Family Members Count</label>
                             <Input
                               type="number"
-                              placeholder="e.g. 4"
+                              placeholder="e.g. 3"
                               value={formData.familyMembers}
                               onChange={(e) => updateField("familyMembers", e.target.value)}
                               className="rounded-xl h-11"
                             />
                           </div>
-                          <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Vehicle Details (Optional)</label>
-                            <Input
-                              placeholder="e.g. MH-12-AB-1234"
-                              value={formData.vehicleDetails}
-                              onChange={(e) => updateField("vehicleDetails", e.target.value)}
-                              className="rounded-xl h-11"
-                            />
-                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block mb-1">Vehicle License Plate (Optional)</label>
+                          <Input
+                            placeholder="e.g. MH-12-PQ-9876"
+                            value={formData.vehicleDetails}
+                            onChange={(e) => updateField("vehicleDetails", e.target.value)}
+                            className="rounded-xl h-11"
+                          />
                         </div>
                       </>
                     )}
@@ -535,51 +706,96 @@ export default function RegisterPage() {
                       <>
                         <div className="grid sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Society Name</label>
-                            <Input
-                              placeholder="e.g. Harmony Heights"
-                              value={formData.societyName}
-                              onChange={(e) => updateField("societyName", e.target.value)}
-                              className="rounded-xl h-11"
-                            />
-                          </div>
-                          <div>
                             <label className="text-xs font-semibold text-muted-foreground block mb-1">Worker Category</label>
                             <select
                               value={formData.workerCategory}
                               onChange={(e) => updateField("workerCategory", e.target.value)}
-                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
                             >
                               {workerCategories.map((cat) => (
                                 <option key={cat} value={cat}>{cat}</option>
                               ))}
                             </select>
                           </div>
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Employee/ID Badge</label>
+                            <Input
+                              placeholder="e.g. EMP-9812"
+                              value={formData.employeeId}
+                              onChange={(e) => updateField("employeeId", e.target.value)}
+                              className="rounded-xl h-11"
+                            />
+                          </div>
                         </div>
 
+                        {/* Maid Specializations section */}
+                        {formData.workerCategory === "Maid" && (
+                          <div className="p-4 bg-secondary/20 rounded-2xl border border-border/30">
+                            <label className="text-xs font-bold text-foreground block mb-2">Maid Specializations (Select all that apply) <span className="text-red-500">*</span></label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {maidSpecializations.map((spec) => {
+                                const selected = formData.selectedSpecializations.includes(spec);
+                                return (
+                                  <button
+                                    key={spec}
+                                    type="button"
+                                    onClick={() => toggleSpecialization(spec)}
+                                    className={`flex items-center gap-2 p-2 rounded-xl text-left border transition-all text-xs ${
+                                      selected
+                                        ? "bg-primary/10 border-primary text-foreground font-semibold"
+                                        : "bg-card border-border hover:bg-secondary/40 text-muted-foreground"
+                                    }`}
+                                  >
+                                    <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${
+                                      selected ? "bg-primary border-primary text-white" : "border-muted-foreground/30 bg-transparent"
+                                    }`}>
+                                      {selected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                                    </div>
+                                    <span>{spec}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* 2.5. SOCIETY SECURITY */}
+                    {role === "security" && (
+                      <>
                         <div className="grid sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Employee ID</label>
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Employee ID Badge <span className="text-red-500">*</span></label>
                             <Input
-                              placeholder="e.g. EMP-9304"
+                              placeholder="e.g. SEC-9040"
                               value={formData.employeeId}
                               onChange={(e) => updateField("employeeId", e.target.value)}
                               className="rounded-xl h-11"
                             />
                           </div>
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Working Shift</label>
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Shift <span className="text-red-500">*</span></label>
                             <select
                               value={formData.workingShift}
                               onChange={(e) => updateField("workingShift", e.target.value)}
                               className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
                             >
-                              <option value="Morning (9 AM - 5 PM)">Morning (9 AM - 5 PM)</option>
-                              <option value="Evening (5 PM - 1 AM)">Evening (5 PM - 1 AM)</option>
-                              <option value="Night (1 AM - 9 AM)">Night (1 AM - 9 AM)</option>
-                              <option value="General Shift">General Shift</option>
+                              <option value="Morning">Morning</option>
+                              <option value="Afternoon">Afternoon</option>
+                              <option value="Night">Night</option>
                             </select>
                           </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned Gate / Block (Optional)</label>
+                          <Input
+                            placeholder="e.g. Gate 1, Tower A"
+                            value={formData.building}
+                            onChange={(e) => updateField("building", e.target.value)}
+                            className="rounded-xl h-11"
+                          />
                         </div>
                       </>
                     )}
@@ -589,53 +805,51 @@ export default function RegisterPage() {
                       <>
                         <div className="grid sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">College Name</label>
-                            <div className="relative">
-                              <School className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input
-                                placeholder="e.g. NIT Delhi"
-                                value={formData.collegeName}
-                                onChange={(e) => updateField("collegeName", e.target.value)}
-                                className="pl-10 rounded-xl h-11"
-                              />
-                            </div>
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Gender</label>
+                            <select
+                              value={formData.gender}
+                              onChange={(e) => updateField("gender", e.target.value)}
+                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
+                            >
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                            </select>
                           </div>
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Hostel Name</label>
-                            <Input
-                              placeholder="e.g. Vidya Bhawan"
-                              value={formData.hostelName}
-                              onChange={(e) => updateField("hostelName", e.target.value)}
-                              className="rounded-xl h-11"
-                            />
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Hostel Wing</label>
+                            <select
+                              value={formData.hostelWing}
+                              onChange={(e) => updateField("hostelWing", e.target.value)}
+                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
+                            >
+                              {verifiedCommunity.wings.map((w: string) => (
+                                <option key={w} value={w}>{w}</option>
+                              ))}
+                            </select>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid sm:grid-cols-3 gap-3">
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Block</label>
-                            <Input
-                              placeholder="e.g. A"
-                              value={formData.block}
-                              onChange={(e) => updateField("block", e.target.value)}
-                              className="rounded-xl h-11"
-                            />
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Academic Year</label>
+                            <select
+                              value={formData.year}
+                              onChange={(e) => updateField("year", e.target.value)}
+                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
+                            >
+                              <option value="1st Year">1st Year</option>
+                              <option value="2nd Year">2nd Year</option>
+                              <option value="3rd Year">3rd Year</option>
+                              <option value="4th Year">4th Year</option>
+                              <option value="PostGraduate">PostGrad</option>
+                            </select>
                           </div>
-                          <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Floor</label>
+                          <div className="col-span-2">
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Branch / Major</label>
                             <Input
-                              placeholder="e.g. 2"
-                              value={formData.floor}
-                              onChange={(e) => updateField("floor", e.target.value)}
-                              className="rounded-xl h-11"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Room No.</label>
-                            <Input
-                              placeholder="e.g. 204"
-                              value={formData.roomNumber}
-                              onChange={(e) => updateField("roomNumber", e.target.value)}
+                              placeholder="e.g. Computer Science"
+                              value={formData.branch}
+                              onChange={(e) => updateField("branch", e.target.value)}
                               className="rounded-xl h-11"
                             />
                           </div>
@@ -643,44 +857,23 @@ export default function RegisterPage() {
 
                         <div className="grid sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Roll / ID Number</label>
-                            <div className="relative">
-                              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input
-                                placeholder="e.g. 2024-CSE-092"
-                                value={formData.rollNumber}
-                                onChange={(e) => updateField("rollNumber", e.target.value)}
-                                className="pl-10 rounded-xl h-11"
-                              />
-                            </div>
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Course Name</label>
+                            <Input
+                              placeholder="e.g. B.Tech / B.E."
+                              value={formData.course}
+                              onChange={(e) => updateField("course", e.target.value)}
+                              className="rounded-xl h-11"
+                            />
                           </div>
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Course / Branch</label>
-                            <div className="relative">
-                              <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input
-                                placeholder="e.g. Computer Science"
-                                value={formData.course}
-                                onChange={(e) => updateField("course", e.target.value)}
-                                className="pl-10 rounded-xl h-11"
-                              />
-                            </div>
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Parent Contact Number</label>
+                            <Input
+                              placeholder="e.g. +91 XXXXX XXXXX"
+                              value={formData.parentContact}
+                              onChange={(e) => updateField("parentContact", e.target.value)}
+                              className="rounded-xl h-11"
+                            />
                           </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-semibold text-muted-foreground block mb-1">Academic Year</label>
-                          <select
-                            value={formData.year}
-                            onChange={(e) => updateField("year", e.target.value)}
-                            className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
-                          >
-                            <option value="1st Year">1st Year</option>
-                            <option value="2nd Year">2nd Year</option>
-                            <option value="3rd Year">3rd Year</option>
-                            <option value="4th Year">4th Year</option>
-                            <option value="PostGraduate">PostGraduate / Research</option>
-                          </select>
                         </div>
                       </>
                     )}
@@ -688,35 +881,40 @@ export default function RegisterPage() {
                     {/* 4. HOSTEL WARDEN */}
                     {role === "warden" && (
                       <>
-                        <div>
-                          <label className="text-xs font-semibold text-muted-foreground block mb-1">Hostel Name</label>
-                          <Input
-                            placeholder="e.g. Vidya Bhawan Hostel"
-                            value={formData.hostelName}
-                            onChange={(e) => updateField("hostelName", e.target.value)}
-                            className="rounded-xl h-11"
-                          />
-                        </div>
-
                         <div className="grid sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Employee ID</label>
-                            <Input
-                              placeholder="e.g. WDN-1082"
-                              value={formData.employeeId}
-                              onChange={(e) => updateField("employeeId", e.target.value)}
-                              className="rounded-xl h-11"
-                            />
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Gender</label>
+                            <select
+                              value={formData.gender}
+                              onChange={(e) => updateField("gender", e.target.value)}
+                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
+                            >
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                            </select>
                           </div>
                           <div>
-                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned Block</label>
-                            <Input
-                              placeholder="e.g. Block A & B"
-                              value={formData.assignedBlock}
-                              onChange={(e) => updateField("assignedBlock", e.target.value)}
-                              className="rounded-xl h-11"
-                            />
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned Hostel Wing</label>
+                            <select
+                              value={formData.hostelWing}
+                              onChange={(e) => updateField("hostelWing", e.target.value)}
+                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
+                            >
+                              {verifiedCommunity.wings.map((w: string) => (
+                                <option key={w} value={w}>{w}</option>
+                              ))}
+                            </select>
                           </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block mb-1">Employee ID Badge</label>
+                          <Input
+                            placeholder="e.g. WDN-1082"
+                            value={formData.employeeId}
+                            onChange={(e) => updateField("employeeId", e.target.value)}
+                            className="rounded-xl h-11"
+                          />
                         </div>
                       </>
                     )}
@@ -739,20 +937,20 @@ export default function RegisterPage() {
                   
                   <div className="p-4 rounded-2xl bg-secondary/30 text-left text-xs space-y-2 border border-border/30">
                     <div className="flex justify-between"><span className="text-muted-foreground">Registered As:</span><span className="font-semibold text-foreground">{formData.name}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Ecosystem:</span><span className="font-semibold text-foreground capitalize">{ecosystem} Portal</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Community:</span><span className="font-semibold text-foreground">{verifiedCommunity?.name}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Your Username:</span><span className="font-bold text-primary">{generatedUsername}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Active Role:</span><span className="font-semibold text-foreground capitalize">{role}</span></div>
-                    {formData.societyName && <div className="flex justify-between"><span className="text-muted-foreground">Society Name:</span><span className="font-semibold text-foreground">{formData.societyName}</span></div>}
-                    {formData.hostelName && <div className="flex justify-between"><span className="text-muted-foreground">Hostel Name:</span><span className="font-semibold text-foreground">{formData.hostelName}</span></div>}
-                    {formData.flatNumber && <div className="flex justify-between"><span className="text-muted-foreground">Flat Unit:</span><span className="font-semibold text-foreground">{formData.flatNumber}</span></div>}
-                    {formData.roomNumber && <div className="flex justify-between"><span className="text-muted-foreground">Room Unit:</span><span className="font-semibold text-foreground">{formData.roomNumber}</span></div>}
+                    {role === "resident" && <div className="flex justify-between"><span className="text-muted-foreground">Flat Unit:</span><span className="font-semibold text-foreground">{formData.building} · {formData.flatNumber}</span></div>}
+                    {role === "student" && <div className="flex justify-between"><span className="text-muted-foreground">Hostel Wing:</span><span className="font-semibold text-foreground">{formData.hostelWing} (Unallocated)</span></div>}
                   </div>
 
-                  <Link href={ecosystem === "society" ? "/society/dashboard" : "/hostel/dashboard"}>
-                    <Button className="w-full h-12 rounded-xl gradient-primary text-white border-0 shadow-lg text-base font-semibold mt-4">
-                      Enter HomeVerse
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  </Link>
+                  <Button
+                    onClick={() => router.replace(ecosystem === "society" ? "/society/dashboard" : "/hostel/dashboard")}
+                    className="w-full h-12 rounded-xl gradient-primary text-white border-0 shadow-lg text-base font-semibold mt-4"
+                  >
+                    Enter HomeVerse
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
                 </div>
               )}
             </motion.div>

@@ -16,7 +16,7 @@ import { useAuth, MOCK_USERS } from "@/lib/store/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginAsMock, user, initialize } = useAuth();
+  const { login, loginAsMock, logout, user, initialize } = useAuth();
   const [selectedEcosystem, setSelectedEcosystem] = useState<"society" | "hostel" | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [email, setEmail] = useState("");
@@ -27,16 +27,25 @@ export default function LoginPage() {
 
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    logout(); // Force logout when landing on login page to destroy any active session
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const portalParam = params.get("portal");
+      if (portalParam === "society" || portalParam === "hostel") {
+        setSelectedEcosystem(portalParam);
+      }
+    }
+  }, [initialize, logout]);
 
   // Set default role when ecosystem changes
   useEffect(() => {
     if (selectedEcosystem === "society") {
       setSelectedRole("resident");
-      setEmail("nidhi@society.com");
+      setEmail("nidhi@sunshinecomplex.com");
     } else if (selectedEcosystem === "hostel") {
       setSelectedRole("student");
-      setEmail("aarav@hostel.com");
+      setEmail("aarav@vesit.edu");
     }
     setPassword("password");
     setError("");
@@ -44,10 +53,11 @@ export default function LoginPage() {
 
   const handleRoleChange = (role: string) => {
     setSelectedRole(role);
-    if (role === "resident") setEmail("nidhi@society.com");
-    else if (role === "worker") setEmail("ramesh@society.com");
-    else if (role === "student") setEmail("aarav@hostel.com");
-    else if (role === "warden") setEmail("pillai@hostel.com");
+    if (role === "resident") setEmail("nidhi@sunshinecomplex.com");
+    else if (role === "worker") setEmail("ramesh@sunshinecomplex.com");
+    else if (role === "security") setEmail("rahul@sunshinecomplex.com");
+    else if (role === "student") setEmail("aarav@vesit.edu");
+    else if (role === "warden") setEmail("pillai@vesit.edu");
     setPassword("password");
   };
 
@@ -63,7 +73,7 @@ export default function LoginPage() {
       const portal = selectedEcosystem === "society" ? "society" : "hostel";
       const success = await login(email, selectedRole as any, portal);
       if (success) {
-        router.push(selectedEcosystem === "society" ? "/society/dashboard" : "/hostel/dashboard");
+        router.replace(selectedEcosystem === "society" ? "/society/dashboard" : "/hostel/dashboard");
       } else {
         setError("Invalid credentials");
       }
@@ -74,9 +84,9 @@ export default function LoginPage() {
     }
   };
 
-  const handleInstantLogin = (role: "resident" | "worker" | "student" | "warden") => {
+  const handleInstantLogin = (role: "resident" | "worker" | "student" | "warden" | "security") => {
     loginAsMock(role);
-    router.push(role === "resident" || role === "worker" ? "/society/dashboard" : "/hostel/dashboard");
+    router.replace(role === "resident" || role === "worker" || role === "security" ? "/society/dashboard" : "/hostel/dashboard");
   };
 
   const getEcosystemRoles = () => {
@@ -84,6 +94,7 @@ export default function LoginPage() {
       return [
         { id: "resident", label: "Resident", icon: Users, description: "Flat Owner or Tenant" },
         { id: "worker", label: "Worker / Staff", icon: Briefcase, description: "Society Service Providers" },
+        { id: "security", label: "Security", icon: Shield, description: "Society Guard & Gate Control" },
       ];
     } else {
       return [
@@ -292,7 +303,7 @@ export default function LoginPage() {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     type="email"
-                    placeholder="Email address"
+                    placeholder="Organization Username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10 h-12 rounded-xl"
@@ -349,14 +360,21 @@ export default function LoginPage() {
                         className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
                       >
                         <span className="font-semibold text-foreground">Nidhi (Resident)</span>
-                        <span className="text-[10px] text-muted-foreground">nidhi@society.com</span>
+                        <span className="text-[10px] text-muted-foreground">nidhi@sunshinecomplex.com</span>
                       </button>
                       <button
                         onClick={() => handleInstantLogin("worker")}
                         className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
                       >
                         <span className="font-semibold text-foreground">Ramesh (Worker)</span>
-                        <span className="text-[10px] text-muted-foreground">ramesh@society.com</span>
+                        <span className="text-[10px] text-muted-foreground">ramesh@sunshinecomplex.com</span>
+                      </button>
+                      <button
+                        onClick={() => handleInstantLogin("security")}
+                        className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5 col-span-2 text-center"
+                      >
+                        <span className="font-semibold text-foreground">Rahul (Security)</span>
+                        <span className="text-[10px] text-muted-foreground">rahul@sunshinecomplex.com</span>
                       </button>
                     </>
                   ) : (
@@ -366,14 +384,14 @@ export default function LoginPage() {
                         className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
                       >
                         <span className="font-semibold text-foreground">Aarav (Student)</span>
-                        <span className="text-[10px] text-muted-foreground">aarav@hostel.com</span>
+                        <span className="text-[10px] text-muted-foreground">aarav@vesit.edu</span>
                       </button>
                       <button
                         onClick={() => handleInstantLogin("warden")}
                         className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
                       >
                         <span className="font-semibold text-foreground">Dr. Pillai (Warden)</span>
-                        <span className="text-[10px] text-muted-foreground">pillai@hostel.com</span>
+                        <span className="text-[10px] text-muted-foreground">pillai@vesit.edu</span>
                       </button>
                     </>
                   )}

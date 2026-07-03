@@ -60,6 +60,18 @@ export const SOCIETY_SIDEBAR_ITEMS = [
   { label: 'Settings', href: '/society/settings', icon: 'Settings' },
 ];
 
+export const SECURITY_SIDEBAR_ITEMS = [
+  { label: 'Visitor Desk', href: '/society/dashboard?tab=visitors', icon: 'Users' },
+  { label: 'Parcel & Couriers', href: '/society/dashboard?tab=parcels', icon: 'Package' },
+  { label: 'Helpers & Trades', href: '/society/dashboard?tab=workers', icon: 'Wrench' },
+  { label: 'Lost & Found', href: '/society/dashboard?tab=lostfound', icon: 'Search' },
+  { label: 'Gate Logs & Vehicles', href: '/society/dashboard?tab=vehicles', icon: 'Car' },
+  { label: 'Shift & Incident Logs', href: '/society/dashboard?tab=shift', icon: 'FileText' },
+  { label: 'CCTV Feeds', href: '/society/dashboard?tab=cctv', icon: 'Camera' },
+  { label: 'Security Notices', href: '/society/announcements', icon: 'Megaphone' },
+  { label: 'Settings', href: '/society/settings', icon: 'Settings' },
+];
+
 export const WORKER_SIDEBAR_ITEMS = [
   { label: 'Dashboard', href: '/society/dashboard', icon: 'LayoutDashboard' },
   { label: 'Assigned Tasks', href: '/society/complaints', icon: 'MessageSquareWarning' },

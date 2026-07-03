@@ -276,3 +276,58 @@ export interface FAQItem {
   answer: string;
   category: 'general' | 'society' | 'hostel' | 'pricing' | 'security';
 }
+
+// --- Security & Emergency ---
+export interface EmergencyAlert {
+  id: string;
+  residentId: string;
+  residentName: string;
+  unit: string;
+  building: string;
+  phone: string;
+  emergencyType: 'Medical' | 'Fire' | 'Lift Stuck' | 'Suspicious Activity' | 'Theft' | 'Gas Leakage';
+  status: 'pending' | 'accepted' | 'dispatched' | 'resolved';
+  priority: 'critical' | 'high';
+  createdAt: string;
+  resolvedAt?: string;
+  notes?: string;
+}
+
+export interface GatePass {
+  id: string;
+  name: string;
+  company?: string;
+  purpose: string;
+  validFrom: string;
+  validTo: string;
+  assignedResident: string;
+  unit: string;
+  building: string;
+  status: 'active' | 'expired' | 'used';
+  createdAt: string;
+}
+
+export interface VehicleLog {
+  id: string;
+  vehicleNumber: string;
+  ownerName: string;
+  ownerType: 'resident' | 'visitor' | 'delivery' | 'worker';
+  unit: string;
+  building: string;
+  entryTime: string;
+  exitTime?: string;
+  status: 'inside' | 'exited';
+}
+
+export interface IncidentReport {
+  id: string;
+  date: string;
+  time: string;
+  location: string;
+  description: string;
+  type: 'Visitor Dispute' | 'Lost Child' | 'Vehicle Damage' | 'Parking Violation' | 'Noise Complaint' | 'Theft Attempt' | 'Others';
+  status: 'logged' | 'under-review' | 'resolved';
+  reporter: string;
+  images?: string[];
+  createdAt: string;
+}

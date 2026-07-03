@@ -6,13 +6,20 @@ import { IndianRupee, CreditCard, Clock, CheckCircle2, AlertTriangle, Download, 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
 
 export default function MaintenancePage() {
   const { user, initialize } = useAuth();
-  const { maintenanceBills, payMaintenanceBill, initializeDb } = useCommunityStore();
+  const { maintenanceBills, payMaintenanceBill, initializeDb } = useCommunityStore(
+    useShallow((state) => ({
+      maintenanceBills: state.maintenanceBills,
+      payMaintenanceBill: state.payMaintenanceBill,
+      initializeDb: state.initializeDb,
+    }))
+  );
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
