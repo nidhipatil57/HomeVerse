@@ -3,7 +3,7 @@
 // ==========================================
 
 // --- Auth & Users ---
-export type UserRole = 'resident' | 'worker' | 'student' | 'warden' | 'admin' | 'security' | 'committee';
+export type UserRole = 'resident' | 'worker' | 'student' | 'warden' | 'admin' | 'security' | 'committee' | 'secretary';
 export type PortalType = 'society' | 'hostel';
 
 export interface User {
@@ -17,6 +17,9 @@ export interface User {
   unit?: string; // Flat/Room number
   building?: string;
   joinedAt: string;
+  status?: 'pending' | 'approved' | 'rejected' | 'deactivated';
+  designation?: string;
+  committeeId?: string;
 }
 
 // --- Complaints ---
@@ -330,4 +333,38 @@ export interface IncidentReport {
   reporter: string;
   images?: string[];
   createdAt: string;
+}
+
+// --- Secretary Specific Data Models ---
+export interface SocietyExpense {
+  id: string;
+  category: string;
+  vendor: string;
+  amount: number;
+  date: string;
+  invoiceUrl?: string;
+  notes?: string;
+}
+
+export interface FlatInfo {
+  id: string;
+  building: string;
+  wing: string;
+  floor: number;
+  flatNumber: string;
+  status: 'occupied' | 'vacant';
+  residentId?: string;
+  residentName?: string;
+}
+
+export interface RentRecord {
+  id: string;
+  unit: string;
+  building: string;
+  tenantName: string;
+  tenantId?: string;
+  amount: number;
+  dueDate: string;
+  status: 'paid' | 'pending';
+  paidOn?: string;
 }

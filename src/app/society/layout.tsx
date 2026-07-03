@@ -73,8 +73,8 @@ export default function SocietyLayout({
         logout();
         router.replace("/login?portal=society");
       }
-    } else if (user.role === "resident") {
-      // Resident attempting worker-only routes
+    } else if (user.role === "resident" || user.role === "secretary") {
+      // Resident or Secretary attempting worker-only routes
       const isWorkerRoute = WORKER_ONLY_PATHS.some(path => pathname.startsWith(path));
       if (isWorkerRoute) {
         logout();
@@ -107,7 +107,7 @@ export default function SocietyLayout({
   if (user.role === "worker" && RESIDENT_ONLY_PATHS.some(path => pathname.startsWith(path))) {
     return null;
   }
-  if (user.role === "resident" && WORKER_ONLY_PATHS.some(path => pathname.startsWith(path))) {
+  if ((user.role === "resident" || user.role === "secretary") && WORKER_ONLY_PATHS.some(path => pathname.startsWith(path))) {
     return null;
   }
   if (user.role === "security" && !SECURITY_ALLOWED_PATHS.some(path => pathname.startsWith(path))) {
@@ -124,7 +124,9 @@ export default function SocietyLayout({
     ? "Worker Portal" 
     : user.role === "security" 
       ? "Security Portal" 
-      : "Society Portal";
+      : user.role === "secretary"
+        ? "Secretary Portal"
+        : "Society Portal";
 
   return (
     <div className="min-h-screen bg-background">

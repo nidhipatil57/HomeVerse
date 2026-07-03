@@ -43,6 +43,18 @@ const SocietySecurityDashboard = dynamic(
   }
 );
 
+const SocietySecretaryDashboard = dynamic(
+  () => import("@/components/dashboard/SocietySecretaryDashboard").then((m) => m.SocietySecretaryDashboard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-primary" />
+      </div>
+    )
+  }
+);
+
 export default function SocietyDashboardPage() {
   const { user, initialize, logout } = useAuth();
   const initializeDb = useCommunityStore(state => state.initializeDb);
@@ -95,6 +107,10 @@ export default function SocietyDashboardPage() {
         <SocietySecurityDashboard security={user} />
       </Suspense>
     );
+  }
+
+  if (user?.role === "secretary") {
+    return <SocietySecretaryDashboard secretary={user} />;
   }
 
   return <SocietyResidentDashboard resident={user} />;

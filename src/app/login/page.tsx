@@ -55,7 +55,8 @@ export default function LoginPage() {
     setSelectedRole(role);
     if (role === "resident") setEmail("nidhi@sunshinecomplex.com");
     else if (role === "worker") setEmail("ramesh@sunshinecomplex.com");
-    else if (role === "security") setEmail("rahul@sunshinecomplex.com");
+    else if (role === "security") setEmail("security@sunshinecomplex.com");
+    else if (role === "secretary") setEmail("rahul@sunshinecomplex.com");
     else if (role === "student") setEmail("aarav@vesit.edu");
     else if (role === "warden") setEmail("pillai@vesit.edu");
     setPassword("password");
@@ -84,9 +85,9 @@ export default function LoginPage() {
     }
   };
 
-  const handleInstantLogin = (role: "resident" | "worker" | "student" | "warden" | "security") => {
+  const handleInstantLogin = (role: "resident" | "worker" | "student" | "warden" | "security" | "secretary") => {
     loginAsMock(role);
-    router.replace(role === "resident" || role === "worker" || role === "security" ? "/society/dashboard" : "/hostel/dashboard");
+    router.replace(role === "resident" || role === "worker" || role === "security" || role === "secretary" ? "/society/dashboard" : "/hostel/dashboard");
   };
 
   const getEcosystemRoles = () => {
@@ -95,6 +96,7 @@ export default function LoginPage() {
         { id: "resident", label: "Resident", icon: Users, description: "Flat Owner or Tenant" },
         { id: "worker", label: "Worker / Staff", icon: Briefcase, description: "Society Service Providers" },
         { id: "security", label: "Security", icon: Shield, description: "Society Guard & Gate Control" },
+        { id: "secretary", label: "Secretary", icon: UserCheck, description: "Society Administrator" },
       ];
     } else {
       return [
@@ -371,9 +373,16 @@ export default function LoginPage() {
                       </button>
                       <button
                         onClick={() => handleInstantLogin("security")}
-                        className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5 col-span-2 text-center"
+                        className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
                       >
                         <span className="font-semibold text-foreground">Rahul (Security)</span>
+                        <span className="text-[10px] text-muted-foreground">security@sunshinecomplex.com</span>
+                      </button>
+                      <button
+                        onClick={() => handleInstantLogin("secretary")}
+                        className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
+                      >
+                        <span className="font-semibold text-foreground">Rahul V. (Secretary)</span>
                         <span className="text-[10px] text-muted-foreground">rahul@sunshinecomplex.com</span>
                       </button>
                     </>

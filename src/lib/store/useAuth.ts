@@ -16,6 +16,7 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
     communityCode: "SUN123",
     ownerOrTenant: "Owner",
     joinedAt: "2026-01-10",
+    status: "approved",
   },
   worker: {
     id: "user-worker-1",
@@ -31,6 +32,7 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
     employeeId: "EMP-2940",
     workingShift: "Morning (9 AM - 5 PM)",
     joinedAt: "2026-02-15",
+    status: "approved",
   },
   student: {
     id: "user-student-1",
@@ -48,6 +50,7 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
     course: "Computer Science",
     year: "3rd Year",
     joinedAt: "2026-07-01",
+    status: "approved",
   },
   warden: {
     id: "user-warden-1",
@@ -62,11 +65,12 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
     communityCode: "VESIT26",
     employeeId: "WDN-1082",
     joinedAt: "2026-05-20",
+    status: "approved",
   },
   security: {
     id: "user-security-1",
     name: "Rahul Sharma",
-    email: "rahul@sunshinecomplex.com",
+    email: "security@sunshinecomplex.com",
     phone: "+91 99887 76655",
     role: "security",
     portal: "society",
@@ -76,6 +80,24 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
     workingShift: "Morning",
     gate: "Gate 1",
     joinedAt: "2026-03-01",
+    status: "approved",
+  },
+  secretary: {
+    id: "user-secretary-1",
+    name: "Rahul Verma",
+    email: "rahul@sunshinecomplex.com",
+    phone: "+91 98765 11111",
+    role: "secretary",
+    portal: "society",
+    unit: "302",
+    building: "A Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Owner",
+    designation: "Secretary",
+    committeeId: "SEC-COM-1",
+    status: "approved",
+    joinedAt: "2026-03-15",
   },
 };
 
@@ -140,6 +162,16 @@ export const useAuth = create<AuthState>((set, get) => ({
       return false;
     }
 
+    if (loggedInUser.status === "pending") {
+      set({ isLoading: false });
+      throw new Error("Your account is pending Secretary approval.");
+    }
+
+    if (loggedInUser.status === "rejected") {
+      set({ isLoading: false });
+      throw new Error("Your registration request was rejected.");
+    }
+
     if (typeof window !== "undefined") {
       localStorage.setItem("homeverse_auth", JSON.stringify(loggedInUser));
     }
@@ -163,27 +195,35 @@ export const useAuth = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     await new Promise((resolve) => setTimeout(resolve, 800));
 
+    const role = userData.role || "resident";
+    const status = (role === "resident" || role === "worker") ? "pending" : "approved";
+
     const newUser: User & Record<string, any> = {
       id: `user-${Date.now()}`,
       name: userData.name || "New User",
       email: userData.email || "new@example.com",
       phone: userData.phone || "+91 00000 00000",
-      role: userData.role || "resident",
+      role: role,
       portal: userData.portal || "society",
       avatar: userData.avatar,
       unit: userData.unit,
       building: userData.building,
       joinedAt: new Date().toISOString().split("T")[0],
+      status: status,
       ...userData,
     };
 
     const { useCommunityStore } = require("./useCommunityStore");
     useCommunityStore.getState().addRegisteredUser(newUser);
 
-    if (typeof window !== "undefined") {
-      localStorage.setItem("homeverse_auth", JSON.stringify(newUser));
+    if (status === "approved") {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("homeverse_auth", JSON.stringify(newUser));
+      }
+      set({ user: newUser, isAuthenticated: true, isLoading: false });
+    } else {
+      set({ user: null, isAuthenticated: false, isLoading: false });
     }
-    set({ user: newUser, isAuthenticated: true, isLoading: false });
     return true;
   },
 
