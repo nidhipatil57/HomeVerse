@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
@@ -25,7 +26,15 @@ const statusConfig: Record<VisitorStatus, { label: string; color: string; icon: 
 
 export default function VisitorsPage() {
   const { user, initialize } = useAuth();
-  const { visitors, submitVisitorRequest, checkInVisitor, checkOutVisitor, initializeDb } = useCommunityStore();
+  const { visitors, submitVisitorRequest, checkInVisitor, checkOutVisitor, initializeDb } = useCommunityStore(
+    useShallow((state) => ({
+      visitors: state.visitors,
+      submitVisitorRequest: state.submitVisitorRequest,
+      checkInVisitor: state.checkInVisitor,
+      checkOutVisitor: state.checkOutVisitor,
+      initializeDb: state.initializeDb,
+    }))
+  );
   const [mounted, setMounted] = useState(false);
 
   // Form State

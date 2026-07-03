@@ -6,25 +6,27 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
   resident: {
     id: "user-resident-1",
     name: "Nidhi Kumar",
-    email: "nidhi@society.com",
+    email: "nidhi@sunshinecomplex.com",
     phone: "+91 98765 43210",
     role: "resident",
     portal: "society",
-    unit: "A-301",
-    building: "Tower A",
-    societyName: "Harmony Heights",
+    unit: "301",
+    building: "A Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
     ownerOrTenant: "Owner",
     joinedAt: "2026-01-10",
   },
   worker: {
     id: "user-worker-1",
     name: "Ramesh Kumar",
-    email: "ramesh@society.com",
+    email: "ramesh@sunshinecomplex.com",
     phone: "+91 87654 32109",
     role: "worker",
     portal: "society",
-    building: "Tower A & B",
-    societyName: "Harmony Heights",
+    building: "A Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
     workerCategory: "Electrician",
     employeeId: "EMP-2940",
     workingShift: "Morning (9 AM - 5 PM)",
@@ -33,14 +35,15 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
   student: {
     id: "user-student-1",
     name: "Aarav Mehta",
-    email: "aarav@hostel.com",
+    email: "aarav@vesit.edu",
     phone: "+91 76543 21098",
     role: "student",
     portal: "hostel",
     unit: "204",
-    building: "Block B",
-    hostelName: "Vidya Bhawan Hostel",
-    collegeName: "National Institute of Technology",
+    building: "Wing A",
+    hostelName: "Boys Hostel",
+    collegeName: "Vivekanand Education Society Institute of Technology",
+    communityCode: "VESIT26",
     rollNumber: "NIT-2024-089",
     course: "Computer Science",
     year: "3rd Year",
@@ -49,14 +52,30 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
   warden: {
     id: "user-warden-1",
     name: "Dr. K. S. Pillai",
-    email: "pillai@hostel.com",
+    email: "pillai@vesit.edu",
     phone: "+91 65432 10987",
     role: "warden",
     portal: "hostel",
-    building: "Block A & B",
-    hostelName: "Vidya Bhawan Hostel",
+    assignedWing: "Wing A",
+    hostelName: "Boys Hostel",
+    collegeName: "Vivekanand Education Society Institute of Technology",
+    communityCode: "VESIT26",
     employeeId: "WDN-1082",
     joinedAt: "2026-05-20",
+  },
+  security: {
+    id: "user-security-1",
+    name: "Rahul Sharma",
+    email: "rahul@sunshinecomplex.com",
+    phone: "+91 99887 76655",
+    role: "security",
+    portal: "society",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    employeeId: "SEC-9040",
+    workingShift: "Morning",
+    gate: "Gate 1",
+    joinedAt: "2026-03-01",
   },
 };
 
@@ -84,10 +103,7 @@ export const useAuth = create<AuthState>((set, get) => ({
         const parsed = JSON.parse(stored);
         set({ user: parsed, isAuthenticated: true, isLoading: false });
       } else {
-        // Default: Log in as resident (Nidhi Kumar) to maintain existing flow
-        const defaultUser = MOCK_USERS.resident;
-        localStorage.setItem("homeverse_auth", JSON.stringify(defaultUser));
-        set({ user: defaultUser, isAuthenticated: true, isLoading: false });
+        set({ user: null, isAuthenticated: false, isLoading: false });
       }
     } catch (e) {
       set({ user: null, isAuthenticated: false, isLoading: false });
@@ -99,41 +115,29 @@ export const useAuth = create<AuthState>((set, get) => ({
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Try to match email with mock user, or create one
-    const matchingMock = Object.values(MOCK_USERS).find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
+    // Try to match email with registered users in useCommunityStore
+    const { useCommunityStore } = require("./useCommunityStore");
+    const existingUsers = useCommunityStore.getState().users || [];
+
+    let loggedInUser = existingUsers.find(
+      (u: any) => u.email.toLowerCase() === email.toLowerCase() && u.role === role && u.portal === portal
     );
 
-    let loggedInUser: User & Record<string, any>;
+    if (!loggedInUser) {
+      // Fallback: check static mock users list
+      const matchingMock = Object.values(MOCK_USERS).find(
+        (u) => u.email.toLowerCase() === email.toLowerCase() && u.role === role && u.portal === portal
+      );
+      if (matchingMock) {
+        loggedInUser = matchingMock;
+        // Seed into community store database so they are linked
+        useCommunityStore.getState().addRegisteredUser(matchingMock);
+      }
+    }
 
-    if (matchingMock && matchingMock.role === role) {
-      loggedInUser = matchingMock;
-    } else {
-      // Create a fallback mock user with this email
-      const name = email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-      loggedInUser = {
-        id: `user-gen-${Date.now()}`,
-        name: name,
-        email: email,
-        phone: "+91 99999 99999",
-        role: role,
-        portal: portal,
-        joinedAt: new Date().toISOString().split("T")[0],
-        ...(portal === "society"
-          ? {
-              societyName: "Harmony Heights",
-              building: "Tower A",
-              unit: role === "resident" ? "A-301" : undefined,
-              workerCategory: role === "worker" ? "Electrician" : undefined,
-              employeeId: role === "worker" ? `EMP-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
-            }
-          : {
-              hostelName: "Vidya Bhawan Hostel",
-              building: "Block A",
-              unit: role === "student" ? "101" : undefined,
-              employeeId: role === "warden" ? `WDN-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
-            }),
-      };
+    if (!loggedInUser) {
+      set({ isLoading: false });
+      return false;
     }
 
     if (typeof window !== "undefined") {
@@ -146,6 +150,8 @@ export const useAuth = create<AuthState>((set, get) => ({
   loginAsMock: (role: UserRole) => {
     const mockUser = MOCK_USERS[role];
     if (mockUser) {
+      const { useCommunityStore } = require("./useCommunityStore");
+      useCommunityStore.getState().addRegisteredUser(mockUser);
       if (typeof window !== "undefined") {
         localStorage.setItem("homeverse_auth", JSON.stringify(mockUser));
       }
@@ -170,6 +176,9 @@ export const useAuth = create<AuthState>((set, get) => ({
       joinedAt: new Date().toISOString().split("T")[0],
       ...userData,
     };
+
+    const { useCommunityStore } = require("./useCommunityStore");
+    useCommunityStore.getState().addRegisteredUser(newUser);
 
     if (typeof window !== "undefined") {
       localStorage.setItem("homeverse_auth", JSON.stringify(newUser));

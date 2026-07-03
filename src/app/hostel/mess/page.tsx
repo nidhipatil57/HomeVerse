@@ -11,10 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
 import { weeklyMenu, crowdPredictions } from "@/data/mock-mess-menu";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-} from "recharts";
+import dynamic from "next/dynamic";
+
+const HostelMessCrowdPredictionChart = dynamic(() => import("@/components/charts/HostelMessCrowdPredictionChart"), {
+  ssr: false,
+  loading: () => <div className="h-[250px] flex items-center justify-center bg-secondary/10 animate-pulse rounded-xl" />
+});
 
 export default function MessMenuPage() {
   const [selectedDay, setSelectedDay] = useState(2); // Wednesday
@@ -184,31 +186,7 @@ export default function MessMenuPage() {
             </p>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={crowdPredictions}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" label={{ value: "Crowd %", angle: -90, position: "insideLeft", style: { fontSize: 11 } }} />
-                <RechartsTooltip
-                  contentStyle={{
-                    backgroundColor: "var(--card)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "12px",
-                    fontSize: "12px",
-                  }}
-                />
-                <Bar
-                  dataKey="crowd"
-                  radius={[6, 6, 0, 0]}
-                  fill="var(--primary)"
-                >
-                  {crowdPredictions.map((entry, index) => {
-                    const color = entry.crowd <= 30 ? "#22c55e" : entry.crowd <= 50 ? "#eab308" : entry.crowd <= 75 ? "#f97316" : "#ef4444";
-                    return <rect key={index} fill={color} />;
-                  })}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <HostelMessCrowdPredictionChart />
           </CardContent>
         </Card>
       </motion.div>

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useShallow } from "zustand/react/shallow";
 import { COMPLAINT_CATEGORIES, PRIORITY_CONFIG } from "@/lib/constants";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { useAuth } from "@/lib/store/useAuth";
@@ -34,7 +35,14 @@ const statusColors: Record<ComplaintStatus, string> = {
 
 export default function ComplaintsPage() {
   const { user, initialize } = useAuth();
-  const { complaints, addComplaint, rateComplaint, initializeDb } = useCommunityStore();
+  const { complaints, addComplaint, rateComplaint, initializeDb } = useCommunityStore(
+    useShallow((state) => ({
+      complaints: state.complaints,
+      addComplaint: state.addComplaint,
+      rateComplaint: state.rateComplaint,
+      initializeDb: state.initializeDb,
+    }))
+  );
   const [mounted, setMounted] = useState(false);
 
   // Form State

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
@@ -37,6 +37,9 @@ import {
   Bed,
   FileText,
   UserCheck,
+  Search,
+  Car,
+  Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -51,6 +54,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Heart, BarChart3, Store, Megaphone, Settings,
   UtensilsCrossed, WashingMachine, ClipboardCheck, Package, GraduationCap,
   Briefcase, MapPin, Wrench, Star, AlertTriangle, Shield, FileCheck, Bed, FileText, UserCheck,
+  Search, Car, Camera,
 };
 
 interface SidebarProps {
@@ -59,7 +63,7 @@ interface SidebarProps {
   portalType: "society" | "hostel";
 }
 
-export function Sidebar({ items, portalName: initialPortalName, portalType: initialPortalType }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalName, portalType: initialPortalType }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -79,6 +83,8 @@ export function Sidebar({ items, portalName: initialPortalName, portalType: init
   if (mounted && user) {
     if (user.role === "worker") {
       portalName = "Worker Portal";
+    } else if (user.role === "security") {
+      portalName = "Security Portal";
     } else if (user.role === "warden") {
       portalName = "Warden Portal";
     } else if (user.role === "student") {
@@ -99,6 +105,8 @@ export function Sidebar({ items, portalName: initialPortalName, portalType: init
   } else if (activePortalType === "society") {
     if (activeUserRole === "worker") {
       gradientClass = "from-blue-600 to-indigo-600 bg-gradient-to-br";
+    } else if (activeUserRole === "security") {
+      gradientClass = "from-red-600 to-amber-600 bg-gradient-to-br";
     }
   }
 
@@ -123,8 +131,9 @@ export function Sidebar({ items, portalName: initialPortalName, portalType: init
   }
 
   const handleLogout = () => {
+    const portal = user?.portal || activePortalType;
     logout();
-    router.push("/login");
+    router.replace(`/login?portal=${portal}`);
   };
 
   return (
@@ -283,4 +292,4 @@ export function Sidebar({ items, portalName: initialPortalName, portalType: init
       </div>
     </motion.aside>
   );
-}
+});

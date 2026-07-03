@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import type { ComplaintStatus, ComplaintPriority } from "@/types";
@@ -25,7 +26,16 @@ const statusColors: Record<string, string> = {
 
 export default function HostelComplaintsPage() {
   const { user, initialize } = useAuth();
-  const { complaints, addComplaint, updateComplaintStatus, assignComplaintWorker, rateComplaint, initializeDb } = useCommunityStore();
+  const { complaints, addComplaint, updateComplaintStatus, assignComplaintWorker, rateComplaint, initializeDb } = useCommunityStore(
+    useShallow((state) => ({
+      complaints: state.complaints,
+      addComplaint: state.addComplaint,
+      updateComplaintStatus: state.updateComplaintStatus,
+      assignComplaintWorker: state.assignComplaintWorker,
+      rateComplaint: state.rateComplaint,
+      initializeDb: state.initializeDb,
+    }))
+  );
   const [mounted, setMounted] = useState(false);
 
   // Form State

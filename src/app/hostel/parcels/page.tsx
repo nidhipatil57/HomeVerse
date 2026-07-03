@@ -7,13 +7,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
 
 export default function ParcelsPage() {
   const { user, initialize } = useAuth();
-  const { parcels, addParcel, pickupParcelWithOTP, initializeDb } = useCommunityStore();
+  const { parcels, addParcel, pickupParcelWithOTP, initializeDb } = useCommunityStore(
+    useShallow((state) => ({
+      parcels: state.parcels,
+      addParcel: state.addParcel,
+      pickupParcelWithOTP: state.pickupParcelWithOTP,
+      initializeDb: state.initializeDb,
+    }))
+  );
   const [mounted, setMounted] = useState(false);
 
   // Warden Form State

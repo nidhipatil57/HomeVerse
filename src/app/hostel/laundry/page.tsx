@@ -7,13 +7,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
 
 export default function LaundryPage() {
   const { user, initialize } = useAuth();
-  const { laundrySlots, bookLaundrySlot, cancelLaundrySlot, initializeDb } = useCommunityStore();
+  const { laundrySlots, bookLaundrySlot, cancelLaundrySlot, initializeDb } = useCommunityStore(
+    useShallow((state) => ({
+      laundrySlots: state.laundrySlots,
+      bookLaundrySlot: state.bookLaundrySlot,
+      cancelLaundrySlot: state.cancelLaundrySlot,
+      initializeDb: state.initializeDb,
+    }))
+  );
   const [mounted, setMounted] = useState(false);
 
   // Booking dialog state

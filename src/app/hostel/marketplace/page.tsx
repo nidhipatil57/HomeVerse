@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
@@ -23,7 +24,14 @@ const campusVendors = [
 
 export default function HostelMarketplacePage() {
   const { user, initialize } = useAuth();
-  const { marketplaceItems, listMarketplaceItem, sellMarketplaceItem, initializeDb } = useCommunityStore();
+  const { marketplaceItems, listMarketplaceItem, sellMarketplaceItem, initializeDb } = useCommunityStore(
+    useShallow((state) => ({
+      marketplaceItems: state.marketplaceItems,
+      listMarketplaceItem: state.listMarketplaceItem,
+      sellMarketplaceItem: state.sellMarketplaceItem,
+      initializeDb: state.initializeDb,
+    }))
+  );
   const [mounted, setMounted] = useState(false);
 
   // Tab State

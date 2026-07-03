@@ -9,12 +9,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 
 export default function WardenLeavesPage() {
   const { user, initialize } = useAuth();
-  const { leaveRequests, submitLeaveRequest, approveRejectLeave, initializeDb } = useCommunityStore();
+  const { leaveRequests, submitLeaveRequest, approveRejectLeave, initializeDb } = useCommunityStore(
+    useShallow((state) => ({
+      leaveRequests: state.leaveRequests,
+      submitLeaveRequest: state.submitLeaveRequest,
+      approveRejectLeave: state.approveRejectLeave,
+      initializeDb: state.initializeDb,
+    }))
+  );
   const [mounted, setMounted] = useState(false);
 
   // Form State for Student

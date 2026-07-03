@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
@@ -24,7 +25,15 @@ const localVendors = [
 
 export default function SocietyMarketplacePage() {
   const { user, initialize } = useAuth();
-  const { marketplaceItems, listMarketplaceItem, sellMarketplaceItem, initializeDb } = useCommunityStore();
+  const { users, marketplaceItems, listMarketplaceItem, sellMarketplaceItem, initializeDb } = useCommunityStore(
+    useShallow((state) => ({
+      users: state.users,
+      marketplaceItems: state.marketplaceItems,
+      listMarketplaceItem: state.listMarketplaceItem,
+      sellMarketplaceItem: state.sellMarketplaceItem,
+      initializeDb: state.initializeDb,
+    }))
+  );
   const [mounted, setMounted] = useState(false);
 
   // Tab State
@@ -49,6 +58,47 @@ export default function SocietyMarketplacePage() {
   if (!mounted) return null;
 
   const isWorker = user?.role === "worker";
+
+  // Load registered workers for this resident's society
+  const registeredWorkers = users.filter(
+    (u) => u.role === "worker" && u.communityCode === user?.communityCode
+  );
+
+  const dbWorkers = registeredWorkers.map(w => ({
+    name: w.name,
+    category: w.workerCategory || "Staff",
+    specializations: w.specializations || [],
+    rating: 4.8,
+    reviews: 14,
+    verified: true,
+    initials: w.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2),
+    color: "from-blue-600 to-indigo-600",
+    phone: w.phone
+  }));
+
+  const allVendors = [
+    ...localVendors.map(v => ({ ...v, specializations: [] as string[], phone: "+91 99999 99999" })),
+    ...dbWorkers
+  ];
+
+  const filteredVendors = allVendors.filter((v) => {
+    const query = search.toLowerCase();
+    
+    // Check if name or category matches
+    const nameMatch = v.name.toLowerCase().includes(query);
+    const categoryMatch = v.category.toLowerCase().includes(query);
+    
+    // Special check for Maid specializations (e.g. Cooking Maid, Laundry Maid)
+    let specMatch = false;
+    if (v.specializations && v.specializations.length > 0) {
+      specMatch = v.specializations.some((spec: string) => {
+        const specLower = spec.toLowerCase();
+        return query.includes(specLower) || specLower.includes(query);
+      });
+    }
+
+    return nameMatch || categoryMatch || specMatch;
+  });
 
   // Filter listings
   const societyItems = marketplaceItems.filter(item => {
@@ -167,33 +217,57 @@ export default function SocietyMarketplacePage() {
       {/* Content Panels */}
       {activeTab === "services" ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {localVendors.filter(v => v.name.toLowerCase().includes(search.toLowerCase())).map((s) => (
+          {filteredVendors.map((s) => (
             <Card key={s.name} className="border-border/50 hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <Avatar className="w-12 h-12">
-                    <AvatarFallback className={`text-sm font-bold text-white bg-gradient-to-br ${s.color}`}>{s.initials}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="flex items-center gap-1">
-                      <h3 className="font-semibold">{s.name}</h3>
-                      {s.verified && <Badge className="text-[9px] bg-green-500/10 text-green-600 border-green-500/20">Verified</Badge>}
+              <CardContent className="p-5 flex flex-col justify-between h-full">
+                <div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <Avatar className="w-12 h-12">
+                      <AvatarFallback className={`text-sm font-bold text-white bg-gradient-to-br ${s.color}`}>{s.initials}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <h3 className="font-semibold">{s.name}</h3>
+                        {s.verified && <Badge className="text-[9px] bg-green-500/10 text-green-600 border-green-500/20">Verified</Badge>}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{s.category}</p>
+                      {s.specializations && s.specializations.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {s.specializations.map((spec: string) => (
+                            <Badge key={spec} variant="outline" className="text-[9px] px-1 bg-primary/5 text-primary">
+                              {spec}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{s.category}</p>
+                  </div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex gap-0.5">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star key={i} className={`w-3.5 h-3.5 ${i < Math.floor(s.rating) ? "text-yellow-500 fill-yellow-500" : "text-muted"}`} />
+                      ))}
+                    </div>
+                    <span className="text-sm font-medium">{s.rating}</span>
+                    <span className="text-xs text-muted-foreground">({s.reviews} reviews)</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="flex gap-0.5">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} className={`w-3.5 h-3.5 ${i < Math.floor(s.rating) ? "text-yellow-500 fill-yellow-500" : "text-muted"}`} />
-                    ))}
-                  </div>
-                  <span className="text-sm font-medium">{s.rating}</span>
-                  <span className="text-xs text-muted-foreground">({s.reviews} reviews)</span>
+                
+                <div className="flex gap-2 mt-2 w-full">
+                  <Link href="/society/complaints" className="flex-1">
+                    <Button className="w-full rounded-xl" variant="outline" size="sm">Book Service</Button>
+                  </Link>
+                  {s.phone && (
+                    <Button
+                      onClick={() => alert(`Dialing ${s.name} at: ${s.phone}`)}
+                      className="rounded-xl shrink-0"
+                      variant="secondary"
+                      size="sm"
+                    >
+                      Call
+                    </Button>
+                  )}
                 </div>
-                <Link href="/society/complaints">
-                  <Button className="w-full rounded-xl" variant="outline" size="sm">Book Service Request</Button>
-                </Link>
               </CardContent>
             </Card>
           ))}

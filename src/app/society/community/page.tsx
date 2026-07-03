@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
@@ -18,7 +19,19 @@ export default function CommunityPage() {
     communityEvents, rsvpEvent,
     lostFoundItems, reportLostFoundItem, claimLostFoundItem,
     initializeDb
-  } = useCommunityStore();
+  } = useCommunityStore(
+    useShallow((state) => ({
+      facilityBookings: state.facilityBookings,
+      bookFacility: state.bookFacility,
+      cancelFacilityBooking: state.cancelFacilityBooking,
+      communityEvents: state.communityEvents,
+      rsvpEvent: state.rsvpEvent,
+      lostFoundItems: state.lostFoundItems,
+      reportLostFoundItem: state.reportLostFoundItem,
+      claimLostFoundItem: state.claimLostFoundItem,
+      initializeDb: state.initializeDb,
+    }))
+  );
 
   const [mounted, setMounted] = useState(false);
 
