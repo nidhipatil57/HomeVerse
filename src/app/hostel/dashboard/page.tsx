@@ -15,29 +15,33 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AnimatedCounter } from "@/components/shared/AnimatedCounter";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
 import { useAuth } from "@/lib/store/useAuth";
-import { hostelDashboardStats } from "@/data/mock-dashboard";
+import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { weeklyMenu } from "@/data/mock-mess-menu";
 import Link from "next/link";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
-  Tooltip as RechartsTooltip, LineChart, Line, Cell, PieChart, Pie
+  Tooltip as RechartsTooltip, LineChart, Line, Legend
 } from "recharts";
-
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  UtensilsCrossed, ClipboardCheck, WashingMachine, MessageSquareWarning,
-  Package, Calendar, Users, IndianRupee,
-};
 
 const todayMenu = weeklyMenu[2]; // Wednesday
 
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  UtensilsCrossed,
+  WashingMachine,
+  MessageSquareWarning,
+  Package,
+};
+
 export default function HostelDashboardPage() {
   const { user, initialize } = useAuth();
+  const initializeDb = useCommunityStore(state => state.initializeDb);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     initialize();
+    initializeDb();
     setMounted(true);
-  }, [initialize]);
+  }, [initialize, initializeDb]);
 
   if (!mounted) {
     return (
@@ -59,6 +63,27 @@ export default function HostelDashboardPage() {
 // 1. HOSTEL STUDENT DASHBOARD
 // ==========================================
 function HostelStudentDashboard({ student }: { student: any }) {
+  const { complaints, laundrySlots, parcels, leaveRequests } = useCommunityStore();
+
+  // Dynamic calculations
+  const myComplaints = complaints.filter(c => c.raisedBy === student?.id || (c.portal === "hostel" && c.unit === student?.unit));
+  const openComplaintsCount = myComplaints.filter(c => c.status !== "resolved" && c.status !== "closed").length;
+
+  const bookedLaundryCount = laundrySlots.filter(s => s.bookedBy === student?.id && s.status === "booked").length;
+
+  const myParcels = parcels.filter(p => p.recipientId === student?.id && p.status === "received");
+  const pendingParcelsCount = myParcels.length;
+
+  const myLeaves = leaveRequests.filter(l => l.studentId === student?.id);
+  const pendingLeavesCount = myLeaves.filter(l => l.status === "pending").length;
+
+  const studentStats = [
+    { label: "Today's Menu", value: "4 Meals", change: 0, trend: "stable" as const, icon: "UtensilsCrossed", color: "#f59e0b" },
+    { label: "Laundry Bookings", value: bookedLaundryCount, change: 0, trend: "stable" as const, icon: "WashingMachine", color: "#3b82f6" },
+    { label: "Open Complaints", value: openComplaintsCount, change: -5, trend: "down" as const, icon: "MessageSquareWarning", color: "#ef4444" },
+    { label: "Parcels to Collect", value: pendingParcelsCount, change: 3, trend: "up" as const, icon: "Package", color: "#f97316" },
+  ];
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -90,7 +115,7 @@ function HostelStudentDashboard({ student }: { student: any }) {
         animate="visible"
         className="grid grid-cols-2 lg:grid-cols-4 gap-4"
       >
-        {hostelDashboardStats.map((stat) => {
+        {studentStats.map((stat) => {
           const Icon = iconMap[stat.icon] || Users;
           return (
             <motion.div key={stat.label} variants={fadeInUp}>
@@ -105,14 +130,6 @@ function HostelStudentDashboard({ student }: { student: any }) {
                         <Icon className="w-5 h-5" />
                       </span>
                     </div>
-                    {stat.change !== 0 && (
-                      <div className={`flex items-center gap-0.5 text-xs font-medium px-2 py-0.5 rounded-full ${
-                        stat.trend === "up" ? "text-green-600 bg-green-500/10" : stat.trend === "down" ? "text-red-600 bg-red-500/10" : "text-gray-500 bg-gray-500/10"
-                      }`}>
-                        {stat.trend === "up" ? <TrendingUp className="w-3 h-3" /> : stat.trend === "down" ? <TrendingDown className="w-3 h-3" /> : null}
-                        {stat.change !== 0 && `${Math.abs(stat.change ?? 0)}%`}
-                      </div>
-                    )}
                   </div>
                   <div className="text-2xl font-bold font-[family-name:var(--font-heading)]">
                     {typeof stat.value === "number" ? (
@@ -248,25 +265,18 @@ function HostelStudentDashboard({ student }: { student: any }) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {[
-                { name: "Machine 1 (F2)", status: "available", color: "green" },
-                { name: "Machine 2 (F2)", status: "in-use", color: "red", time: "25 min left" },
-                { name: "Machine 3 (F4)", status: "available", color: "green" },
-                { name: "Dryer 1 (F2)", status: "finishing", color: "yellow", time: "10 min" },
-              ].map((machine) => (
-                <div key={machine.name} className="flex items-center justify-between text-sm">
+              {laundrySlots.slice(0, 4).map((slotItem) => (
+                <div key={slotItem.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${
-                      machine.color === "green" ? "bg-green-500" :
-                      machine.color === "red" ? "bg-red-500" : "bg-yellow-500"
+                      slotItem.status === "available" ? "bg-green-500" : "bg-red-500"
                     }`} />
-                    <span className="text-muted-foreground">{machine.name}</span>
+                    <span className="text-muted-foreground truncate max-w-[150px]">{slotItem.machineName}</span>
                   </div>
                   <span className={`text-xs font-medium ${
-                    machine.color === "green" ? "text-green-500" :
-                    machine.color === "red" ? "text-red-500" : "text-yellow-500"
+                    slotItem.status === "available" ? "text-green-500" : "text-red-500"
                   }`}>
-                    {machine.status === "available" ? "Available" : machine.time}
+                    {slotItem.status === "available" ? "Available" : "Booked"}
                   </span>
                 </div>
               ))}
@@ -298,32 +308,6 @@ function HostelStudentDashboard({ student }: { student: any }) {
               </div>
             </CardContent>
           </Card>
-
-          {/* Upcoming */}
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-purple-500" />
-                Upcoming
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {[
-                { title: "Room Inspection", date: "July 8", type: "inspection" },
-                { title: "Cultural Night", date: "July 12", type: "event" },
-              ].map((event) => (
-                <div key={event.title} className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/50 transition-colors">
-                  <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                    <Calendar className="w-4 h-4 text-purple-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{event.title}</p>
-                    <p className="text-xs text-muted-foreground">{event.date}</p>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>
@@ -333,32 +317,48 @@ function HostelStudentDashboard({ student }: { student: any }) {
 // ==========================================
 // 2. HOSTEL WARDEN DASHBOARD (COMMAND CENTER)
 // ==========================================
-interface LeaveRequest {
-  id: string;
-  studentName: string;
-  room: string;
-  dates: string;
-  reason: string;
-  status: "pending" | "approved" | "rejected";
-}
-
 function HostelWardenDashboard({ warden }: { warden: any }) {
-  // Local state for Leave Approvals
-  const [leaves, setLeaves] = useState<LeaveRequest[]>([
-    { id: "L-1", studentName: "Rohan Das", room: "201-A", dates: "July 5 - July 8 (3 Days)", reason: "Going home for sister's wedding ceremony.", status: "pending" },
-    { id: "L-2", studentName: "Aditya Roy", room: "105-B", dates: "July 6 - July 7 (1 Day)", reason: "Medical appointment in native town.", status: "pending" },
-    { id: "L-3", studentName: "Sumit Mishra", room: "302-C", dates: "July 10 - July 15 (5 Days)", reason: "Family trip and festival leave.", status: "pending" }
-  ]);
+  const { leaveRequests, approveRejectLeave, complaints, laundrySlots, visitors, parcels } = useCommunityStore();
 
   const handleApproveLeave = (id: string) => {
-    setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: "approved" } : l));
+    approveRejectLeave(id, "approved");
   };
 
   const handleRejectLeave = (id: string) => {
-    setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: "rejected" } : l));
+    approveRejectLeave(id, "rejected");
   };
 
-  const pendingLeavesCount = leaves.filter(l => l.status === "pending").length;
+  const activeLeaves = leaveRequests.filter(l => l.status === "pending");
+  const pendingLeavesCount = activeLeaves.length;
+
+  const totalStudents = 340; // Hardcoded total size
+  const occupiedRooms = 165;
+  const vacantRooms = 15;
+
+  const pendingComplaintsCount = complaints.filter(
+    (c) => c.portal === "hostel" && c.status !== "resolved" && c.status !== "closed"
+  ).length;
+
+  const bookedLaundrySlotsCount = laundrySlots.filter(s => s.status === "booked").length;
+  const totalLaundryCapacity = laundrySlots.length || 1;
+  const laundryLoadPercentage = Math.round((bookedLaundrySlotsCount / totalLaundryCapacity) * 100);
+
+  const visitorsTodayCount = visitors.filter(
+    (v) => v.portal === "hostel" && (v.status === "checked-in" || v.status === "expected")
+  ).length;
+
+  const pendingParcelsCount = parcels.filter(p => p.portal === "hostel" && p.status === "received").length;
+
+  const wardenStats = [
+    { label: "Total Students Registered", value: totalStudents, icon: Users, color: "text-emerald-500 bg-emerald-500/10" },
+    { label: "Rooms Occupancy Rate", value: `${occupiedRooms} / ${occupiedRooms + vacantRooms}`, icon: Bed, color: "text-blue-500 bg-blue-500/10" },
+    { label: "Hostel Open Complaints", value: pendingComplaintsCount, icon: MessageSquareWarning, color: "text-red-500 bg-red-500/10" },
+    { label: "Mess Attendance (Breakfast)", value: "290 Checked In", icon: UtensilsCrossed, color: "text-amber-500 bg-amber-500/10" },
+    { label: "Active Laundry Load", value: `${laundryLoadPercentage}% Capacity`, icon: WashingMachine, color: "text-purple-500 bg-purple-500/10" },
+    { label: "Expected Visitors Logs", value: visitorsTodayCount, icon: Shield, color: "text-cyan-500 bg-cyan-500/10" },
+    { label: "Parcels in Locker Room", value: `${pendingParcelsCount} Awaiting`, icon: Package, color: "text-orange-500 bg-orange-500/10" },
+    { label: "Leave Requests Pending", value: pendingLeavesCount, icon: FileCheck, color: "text-pink-500 bg-pink-500/10" },
+  ];
 
   return (
     <div className="space-y-8 pb-12">
@@ -396,16 +396,7 @@ function HostelWardenDashboard({ warden }: { warden: any }) {
 
       {/* Grid of Command Center Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total Students Registered", value: 340, icon: Users, color: "text-emerald-500 bg-emerald-500/10" },
-          { label: "Rooms Occupancy Rate", value: "165 / 180 (91%)", icon: Bed, color: "text-blue-500 bg-blue-500/10" },
-          { label: "Pending Room Complaints", value: 8, icon: MessageSquareWarning, color: "text-red-500 bg-red-500/10" },
-          { label: "Mess Attendance (Breakfast)", value: "290 Checked In", icon: UtensilsCrossed, color: "text-amber-500 bg-amber-500/10" },
-          { label: "Active Laundry Load", value: "42% Capacity", icon: WashingMachine, color: "text-purple-500 bg-purple-500/10" },
-          { label: "Visitors Approved Today", value: 9, icon: Shield, color: "text-cyan-500 bg-cyan-500/10" },
-          { label: "Parcels In Locker", value: "12 Awaiting Pickup", icon: Package, color: "text-orange-500 bg-orange-500/10" },
-          { label: "Leave Requests Pending", value: pendingLeavesCount, icon: FileCheck, color: "text-pink-500 bg-pink-500/10" },
-        ].map((stat, i) => (
+        {wardenStats.map((stat, i) => (
           <Card key={i} className="border-border/50 hover:shadow-md transition-shadow">
             <CardContent className="p-4 flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${stat.color}`}>
@@ -433,13 +424,13 @@ function HostelWardenDashboard({ warden }: { warden: any }) {
           </CardHeader>
           <CardContent className="p-6 space-y-4">
             <AnimatePresence mode="popLayout">
-              {leaves.filter(l => l.status === "pending").length === 0 ? (
+              {activeLeaves.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground text-sm flex flex-col items-center justify-center gap-2">
                   <Check className="w-8 h-8 text-green-500 bg-green-500/10 rounded-full p-1.5" />
                   No pending leave requests in queue.
                 </div>
               ) : (
-                leaves.filter(l => l.status === "pending").map((req) => (
+                activeLeaves.map((req) => (
                   <motion.div
                     key={req.id}
                     layout
@@ -452,7 +443,7 @@ function HostelWardenDashboard({ warden }: { warden: any }) {
                         <Badge variant="outline" className="text-[9px]">Room: {req.room}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground font-semibold flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" /> Dates: {req.dates}
+                        <Clock className="w-3.5 h-3.5" /> Outing Period: {req.fromDate} to {req.toDate}
                       </p>
                       <p className="text-xs text-muted-foreground italic leading-normal mt-1 bg-card p-2 rounded-lg border border-border/40">
                         &quot;{req.reason}&quot;
@@ -509,7 +500,7 @@ function HostelWardenDashboard({ warden }: { warden: any }) {
               </div>
             ))}
 
-            <div className="p-3.5 rounded-2xl bg-secondary/30 text-xs border border-border/30 space-y-1">
+            <div className="p-3.5 rounded-2xl bg-secondary/30 text-xs border border-border/30 mt-4">
               <span className="font-semibold text-foreground">Vacancy Status:</span>
               <p className="text-muted-foreground">Block C PG Wing has 9 empty beds available for room transfer requests.</p>
             </div>
@@ -583,6 +574,7 @@ function HostelWardenDashboard({ warden }: { warden: any }) {
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <RechartsTooltip contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "11px" }} />
+                <Legend />
                 <Bar dataKey="Breakfast" fill="#10b981" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Lunch" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Dinner" fill="#eab308" radius={[4, 4, 0, 0]} />

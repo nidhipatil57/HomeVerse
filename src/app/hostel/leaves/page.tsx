@@ -1,23 +1,69 @@
 "use client";
 
-import { useState } from "react";
-import { FileCheck, Clock, Check, X, Search, ShieldCheck } from "lucide-react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { FileCheck, Clock, Check, X, Search, ShieldCheck, Plus, Calendar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useAuth } from "@/lib/store/useAuth";
+import { useCommunityStore } from "@/lib/store/useCommunityStore";
 
 export default function WardenLeavesPage() {
-  const [leaves, setLeaves] = useState([
-    { id: "L-1", studentName: "Rohan Das", room: "201-A", dates: "July 05 - July 08", duration: "3 Days", reason: "Sister's wedding ceremony in home town.", status: "pending" },
-    { id: "L-2", studentName: "Aditya Roy", room: "105-B", dates: "July 06 - July 07", duration: "1 Day", reason: "Medical appointment in city center.", status: "pending" },
-    { id: "L-3", studentName: "Sumit Mishra", room: "302-C", dates: "July 10 - July 15", duration: "5 Days", reason: "Going home for family festival.", status: "pending" },
-    { id: "L-4", studentName: "Abhinav Singh", room: "204-B", dates: "June 25 - June 28", duration: "3 Days", reason: "Academic project conference travel.", status: "approved" },
-    { id: "L-5", studentName: "Varun Sharma", room: "102-A", dates: "June 24 - June 25", duration: "1 Day", reason: "Personal work outstation.", status: "rejected" }
-  ]);
+  const { user, initialize } = useAuth();
+  const { leaveRequests, submitLeaveRequest, approveRejectLeave, initializeDb } = useCommunityStore();
+  const [mounted, setMounted] = useState(false);
 
-  const handleStatusChange = (id: string, status: "approved" | "rejected") => {
-    setLeaves(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+  // Form State for Student
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [parentContact, setParentContact] = useState("");
+
+  useEffect(() => {
+    initialize();
+    initializeDb();
+    setMounted(true);
+  }, [initialize, initializeDb]);
+
+  if (!mounted) return null;
+
+  const isWarden = user?.role === "warden";
+
+  // Filter leaves
+  const filteredLeaves = leaveRequests.filter((l) => {
+    if (!isWarden) {
+      return l.studentId === user?.id;
+    }
+    return true;
+  });
+
+  const pendingLeaves = filteredLeaves.filter((l) => l.status === "pending");
+  const historyLeaves = filteredLeaves.filter((l) => l.status !== "pending");
+
+  const handleCreateLeave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reason.trim() || !fromDate || !toDate || !parentContact) return;
+
+    submitLeaveRequest({
+      studentId: user?.id || "user-student-1",
+      studentName: user?.name || "Aarav Mehta",
+      room: `${user?.unit || "204"} (${user?.building || "Block B"})`,
+      parentContact,
+      reason,
+      fromDate,
+      toDate
+    });
+
+    setReason("");
+    setFromDate("");
+    setToDate("");
+    setParentContact("");
+    setDialogOpen(false);
   };
 
   return (
@@ -25,72 +71,131 @@ export default function WardenLeavesPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-extrabold font-[family-name:var(--font-heading)]">Leave & Outing Approvals</h1>
-          <p className="text-muted-foreground mt-1">Review student outstation notifications and grant gate permissions.</p>
+          <p className="text-muted-foreground mt-1">
+            {isWarden ? "Audit student gate pass permissions and outstation notifications" : "Submit outstation leaves and curfew checks bypass requests"}
+          </p>
         </div>
+
+        {!isWarden && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger
+              render={
+                <Button className="rounded-xl gradient-primary text-white border-0 shadow-lg shadow-primary/25">
+                  <Plus className="w-4 h-4 mr-2" /> Request Outstation Leave
+                </Button>
+              }
+            />
+            <DialogContent className="sm:max-w-md rounded-2xl">
+              <DialogHeader>
+                <DialogTitle className="font-[family-name:var(--font-heading)]">Submit Outing Pass</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreateLeave} className="space-y-4 mt-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground block mb-1">Departure Date</label>
+                    <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-10 text-xs rounded-lg animate-none" required />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground block mb-1">Return Date</label>
+                    <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-10 text-xs rounded-lg animate-none" required />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Parent Emergency Mobile</label>
+                  <Input placeholder="+91 99999 XXXXX" value={parentContact} onChange={(e) => setParentContact(e.target.value)} className="h-10 text-xs rounded-lg animate-none" required />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Reason for Leave</label>
+                  <Textarea placeholder="Describe the purpose of your trip..." value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-xl min-h-[80px]" required />
+                </div>
+                <Button type="submit" className="w-full rounded-xl gradient-primary text-white border-0 h-11">
+                  Submit Gate Pass Request
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="grid md:grid-cols-12 gap-6">
         <div className="md:col-span-8 space-y-4">
-          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Active Leave Queue</h3>
-          {leaves.filter(l => l.status === "pending").map((req) => (
-            <Card key={req.id} className="border-border/50 bg-secondary/10">
-              <CardContent className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-foreground">{req.studentName}</span>
-                    <Badge variant="outline" className="text-[10px]">Room: {req.room}</Badge>
-                    <Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] uppercase">{req.duration}</Badge>
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Active Outing Queue</h3>
+          
+          <AnimatePresence mode="popLayout">
+            {pendingLeaves.length === 0 ? (
+              <div className="p-10 rounded-3xl border border-dashed border-border/60 text-center text-muted-foreground text-sm flex flex-col items-center justify-center gap-2">
+                <ShieldCheck className="w-8 h-8 text-green-500 bg-green-500/10 rounded-full p-1.5" />
+                No pending requests. All outings accounted for.
+              </div>
+            ) : (
+              pendingLeaves.map((req) => (
+                <motion.div
+                  key={req.id}
+                  layout
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -15 }}
+                  className="p-4 rounded-2xl border border-border/50 bg-secondary/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+                >
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-foreground">{req.studentName}</span>
+                      <Badge variant="outline" className="text-[10px]">{req.room}</Badge>
+                      <Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] uppercase">
+                        Emergency Contact: {req.parentContact}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground font-semibold flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-blue-500" /> Outing: {req.fromDate} to {req.toDate}
+                    </p>
+                    <p className="text-xs text-muted-foreground italic leading-normal mt-1 bg-card p-3 rounded-xl border border-border/50">
+                      &quot;{req.reason}&quot;
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground font-semibold flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> Dates: {req.dates}
-                  </p>
-                  <p className="text-xs text-muted-foreground italic leading-normal mt-1 bg-card p-3 rounded-xl border border-border/50">
-                    &quot;{req.reason}&quot;
-                  </p>
-                </div>
 
-                <div className="flex gap-2 w-full md:w-auto shrink-0 self-end md:self-center">
-                  <Button
-                    size="sm"
-                    onClick={() => handleStatusChange(req.id, "approved")}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg h-9 border-0"
-                  >
-                    <Check className="w-4 h-4 mr-1" /> Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => handleStatusChange(req.id, "rejected")}
-                    variant="outline"
-                    className="flex-1 border-red-500/20 text-red-500 hover:bg-red-500/10 rounded-lg h-9"
-                  >
-                    <X className="w-4 h-4 mr-1" /> Reject
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          {leaves.filter(l => l.status === "pending").length === 0 && (
-            <div className="p-10 rounded-3xl border border-dashed border-border/60 text-center text-muted-foreground text-sm flex flex-col items-center justify-center gap-2">
-              <ShieldCheck className="w-8 h-8 text-green-500" />
-              No pending leave requests in queue. All caught up!
-            </div>
-          )}
+                  {isWarden && (
+                    <div className="flex gap-2 w-full md:w-auto shrink-0 self-end md:self-center">
+                      <Button
+                        size="sm"
+                        onClick={() => approveRejectLeave(req.id, "approved")}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg h-9 border-0"
+                      >
+                        <Check className="w-4 h-4 mr-1" /> Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => approveRejectLeave(req.id, "rejected")}
+                        variant="outline"
+                        className="flex-1 border-red-500/20 text-red-500 hover:bg-red-500/10 rounded-lg h-9"
+                      >
+                        <X className="w-4 h-4 mr-1" /> Reject
+                      </Button>
+                    </div>
+                  )}
+                </motion.div>
+              ))
+            )}
+          </AnimatePresence>
 
           <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider pt-4">History Log</h3>
-          {leaves.filter(l => l.status !== "pending").map((req) => (
-            <Card key={req.id} className="border-border/50 opacity-70">
-              <CardContent className="p-4 flex justify-between items-center text-sm">
-                <div>
-                  <span className="font-bold">{req.studentName}</span>
-                  <p className="text-xs text-muted-foreground">Dates: {req.dates} ({req.duration})</p>
-                </div>
-                <Badge className={req.status === "approved" ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-red-500/10 text-red-500 border border-red-500/20"}>
-                  {req.status}
-                </Badge>
-              </CardContent>
-            </Card>
-          ))}
+          <div className="space-y-2">
+            {historyLeaves.map((req) => (
+              <Card key={req.id} className="border-border/50 opacity-70">
+                <CardContent className="p-4 flex justify-between items-center text-xs">
+                  <div>
+                    <span className="font-bold text-foreground">{req.studentName}</span>
+                    <p className="text-muted-foreground mt-0.5">Room: {req.room} • Period: {req.fromDate} to {req.toDate}</p>
+                  </div>
+                  <Badge className={req.status === "approved" ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-red-500/10 text-red-500 border border-red-500/20"}>
+                    {req.status.toUpperCase()}
+                  </Badge>
+                </CardContent>
+              </Card>
+            ))}
+            {historyLeaves.length === 0 && (
+              <div className="text-center py-4 text-xs text-muted-foreground">No historical records available.</div>
+            )}
+          </div>
         </div>
 
         <Card className="md:col-span-4 border-border/50 p-6 space-y-4 h-fit">

@@ -52,6 +52,7 @@ export interface Complaint {
   building: string;
   images?: string[];
   assignedTo?: string;
+  assignedToId?: string;
   priorityScore?: number;
   estimatedResolution?: string;
   createdAt: string;
@@ -59,6 +60,10 @@ export interface Complaint {
   resolvedAt?: string;
   rating?: number;
   timeline: ComplaintTimelineEntry[];
+  portal?: PortalType;
+  beforePhoto?: string;
+  afterPhoto?: string;
+  comments?: string;
 }
 
 export interface ComplaintTimelineEntry {
@@ -87,6 +92,7 @@ export interface Visitor {
   approvedBy?: string;
   vehicleNumber?: string;
   date: string;
+  portal?: PortalType;
 }
 
 // --- Maintenance ---
