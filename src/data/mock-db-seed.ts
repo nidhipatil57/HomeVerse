@@ -1,4 +1,4 @@
-import { Complaint, Visitor, User, Announcement, EmergencyAlert, GatePass, VehicleLog, IncidentReport } from "@/types";
+import { Complaint, Visitor, User, Announcement, EmergencyAlert, GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord } from "@/types";
 import {
   LeaveRequest,
   LaundrySlot,
@@ -277,7 +277,8 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
     ownerOrTenant: "Owner",
-    joinedAt: "2026-01-10"
+    joinedAt: "2026-01-10",
+    status: "approved"
   },
   {
     id: "user-worker-1",
@@ -292,7 +293,8 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     workerCategory: "Electrician",
     employeeId: "EMP-2940",
     workingShift: "Morning (9 AM - 5 PM)",
-    joinedAt: "2026-02-15"
+    joinedAt: "2026-02-15",
+    status: "approved"
   },
   {
     id: "user-student-1",
@@ -308,7 +310,8 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     communityCode: "VESIT26",
     course: "Computer Science",
     year: "3rd Year",
-    joinedAt: "2026-07-01"
+    joinedAt: "2026-07-01",
+    status: "approved"
   },
   {
     id: "user-warden-1",
@@ -322,12 +325,13 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     collegeName: "Vivekanand Education Society Institute of Technology",
     communityCode: "VESIT26",
     employeeId: "WDN-1082",
-    joinedAt: "2026-05-20"
+    joinedAt: "2026-05-20",
+    status: "approved"
   },
   {
     id: "user-security-1",
     name: "Rahul Sharma",
-    email: "rahul@sunshinecomplex.com",
+    email: "security@sunshinecomplex.com",
     phone: "+91 99887 76655",
     role: "security",
     portal: "society",
@@ -336,7 +340,54 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     employeeId: "SEC-9040",
     workingShift: "Morning",
     gate: "Gate 1",
-    joinedAt: "2026-03-01"
+    joinedAt: "2026-03-01",
+    status: "approved"
+  },
+  {
+    id: "user-secretary-1",
+    name: "Rahul Verma",
+    email: "rahul@sunshinecomplex.com",
+    phone: "+91 98765 11111",
+    role: "secretary",
+    portal: "society",
+    unit: "302",
+    building: "A Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Owner",
+    joinedAt: "2026-03-15",
+    designation: "Secretary",
+    committeeId: "SEC-COM-1",
+    status: "approved"
+  },
+  {
+    id: "user-resident-pending-1",
+    name: "Gaurav Sen",
+    email: "gaurav@sunshinecomplex.com",
+    phone: "+91 91234 56789",
+    role: "resident",
+    portal: "society",
+    unit: "102",
+    building: "A Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Tenant",
+    status: "pending",
+    joinedAt: "2026-07-02"
+  },
+  {
+    id: "user-worker-pending-1",
+    name: "Mohan Lal",
+    email: "mohan@sunshinecomplex.com",
+    phone: "+91 98989 89898",
+    role: "worker",
+    portal: "society",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    workerCategory: "Plumber",
+    employeeId: "EMP-9002",
+    status: "pending",
+    joinedAt: "2026-07-03"
   }
 ];
 
@@ -431,6 +482,66 @@ export const getPrepopulatedAnnouncements = (): Announcement[] => [
   }
 ];
 
+export const getPrepopulatedExpenses = (): SocietyExpense[] => [
+  {
+    id: "EXP-001",
+    category: "Security Salaries",
+    vendor: "Tiger Security Agency",
+    amount: 45000,
+    date: "2026-07-01",
+    notes: "Monthly salary payment for 3 gate guards."
+  },
+  {
+    id: "EXP-002",
+    category: "Lift Servicing",
+    vendor: "Otis Elevators India",
+    amount: 12500,
+    date: "2026-06-28",
+    notes: "Quarterly maintenance and safety checks for Wing A lift."
+  },
+  {
+    id: "EXP-003",
+    category: "Gardening",
+    vendor: "Green Thumb Nursery",
+    amount: 4000,
+    date: "2026-07-02",
+    notes: "Purchase of new lawn plants and fertilizer."
+  }
+];
+
+export const getPrepopulatedFlats = (): FlatInfo[] => [
+  { id: "FL-101", building: "A Wing", wing: "A", floor: 1, flatNumber: "101", status: "occupied", residentId: "user-resident-other", residentName: "Amit Shah" },
+  { id: "FL-102", building: "A Wing", wing: "A", floor: 1, flatNumber: "102", status: "vacant" },
+  { id: "FL-201", building: "A Wing", wing: "A", floor: 2, flatNumber: "201", status: "occupied", residentId: "user-resident-other2", residentName: "Sunita Rao" },
+  { id: "FL-202", building: "A Wing", wing: "A", floor: 2, flatNumber: "202", status: "vacant" },
+  { id: "FL-301", building: "A Wing", wing: "A", floor: 3, flatNumber: "301", status: "occupied", residentId: "user-resident-1", residentName: "Nidhi Kumar" },
+  { id: "FL-302", building: "A Wing", wing: "A", floor: 3, flatNumber: "302", status: "occupied", residentId: "user-secretary-1", residentName: "Rahul Verma" },
+  { id: "FL-B101", building: "B Wing", wing: "B", floor: 1, flatNumber: "101", status: "vacant" },
+  { id: "FL-B102", building: "B Wing", wing: "B", floor: 1, flatNumber: "102", status: "occupied", residentId: "user-resident-other3", residentName: "Kishore Kumar" }
+];
+
+export const getPrepopulatedRentRecords = (): RentRecord[] => [
+  {
+    id: "RNT-001",
+    unit: "101",
+    building: "A Wing",
+    tenantName: "Amit Shah",
+    amount: 15000,
+    dueDate: "2026-07-05",
+    status: "pending"
+  },
+  {
+    id: "RNT-002",
+    unit: "102",
+    building: "B Wing",
+    tenantName: "Kishore Kumar",
+    amount: 18000,
+    dueDate: "2026-07-01",
+    status: "paid",
+    paidOn: "2026-06-30"
+  }
+];
+
 export const getInitialDb = () => ({
   users: getPrepopulatedUsers(),
   complaints: getPrepopulatedComplaints(),
@@ -450,5 +561,8 @@ export const getInitialDb = () => ({
   gatePasses: getPrepopulatedGatePasses(),
   vehicleLogs: getPrepopulatedVehicleLogs(),
   incidents: getPrepopulatedIncidents(),
-  announcements: getPrepopulatedAnnouncements()
+  announcements: getPrepopulatedAnnouncements(),
+  expenses: getPrepopulatedExpenses(),
+  flats: getPrepopulatedFlats(),
+  rentRecords: getPrepopulatedRentRecords()
 });

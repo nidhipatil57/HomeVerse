@@ -65,6 +65,10 @@ export default function RegisterPage() {
     familyMembers: "",
     vehicleDetails: "",
 
+    // Secretary specific
+    designation: "Secretary",
+    committeeId: "",
+
     // Worker specific
     workerCategory: "Maid",
     selectedSpecializations: [] as string[],
@@ -179,7 +183,7 @@ export default function RegisterPage() {
 
   const validateDetails = () => {
     if (ecosystem === "society") {
-      if (role === "resident") {
+      if (role === "resident" || role === "secretary") {
         if (!formData.building) return "Please select a building / wing";
         if (!formData.flatNumber.trim()) return "Flat number is mandatory";
 
@@ -235,7 +239,7 @@ export default function RegisterPage() {
       }
       
       try {
-        const generatedFloor = role === "resident" 
+        const generatedFloor = (role === "resident" || role === "secretary")
           ? Math.floor(parseInt(formData.flatNumber, 10) / 100) 
           : undefined;
 
@@ -257,8 +261,8 @@ export default function RegisterPage() {
           
           // Structural references
           communityCode: communityCode.toUpperCase(),
-          unit: role === "resident" ? formData.flatNumber : undefined, // Student unit is allocated by Warden
-          building: role === "resident" 
+          unit: (role === "resident" || role === "secretary") ? formData.flatNumber : undefined, // Student unit is allocated by Warden
+          building: (role === "resident" || role === "secretary")
             ? formData.building 
             : role === "student" 
               ? formData.hostelWing 
@@ -272,15 +276,19 @@ export default function RegisterPage() {
           societyName: ecosystem === "society" ? verifiedCommunity.name : undefined,
           collegeName: ecosystem === "hostel" ? verifiedCommunity.name : undefined,
           hostelName: calculatedHostel,
-          ownerOrTenant: role === "resident" ? formData.ownerOrTenant : undefined,
+          ownerOrTenant: (role === "resident" || role === "secretary") ? formData.ownerOrTenant : undefined,
           floorNumber: generatedFloor,
-          familyMembers: (role === "resident" && formData.familyMembers) ? parseInt(formData.familyMembers) : undefined,
-          vehicleDetails: role === "resident" ? formData.vehicleDetails : undefined,
+          familyMembers: ((role === "resident" || role === "secretary") && formData.familyMembers) ? parseInt(formData.familyMembers) : undefined,
+          vehicleDetails: (role === "resident" || role === "secretary") ? formData.vehicleDetails : undefined,
+
+          // Secretary details
+          designation: role === "secretary" ? formData.designation : undefined,
+          committeeId: role === "secretary" ? formData.committeeId : undefined,
 
           // Worker / Security specializations
           workerCategory: role === "worker" ? formData.workerCategory : undefined,
           specializations: (role === "worker" && formData.workerCategory === "Maid") ? formData.selectedSpecializations : undefined,
-          employeeId: (role === "worker" || role === "warden" || role === "security") ? formData.employeeId : undefined,
+          employeeId: (role === "worker" || role === "warden" || role === "security" || role === "secretary") ? formData.employeeId || formData.committeeId : undefined,
           workingShift: role === "security" ? formData.workingShift : undefined,
           
           // Student details
@@ -462,6 +470,17 @@ export default function RegisterPage() {
                           </div>
                           <p className="font-bold text-foreground">Security</p>
                           <p className="text-xs text-muted-foreground mt-1">Guard & Gate Control</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRoleSelect("secretary")}
+                          className="p-5 rounded-2xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 group"
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center mb-4 shadow-md group-hover:scale-105 transition-transform">
+                            <UserCheck className="w-5 h-5 text-white" />
+                          </div>
+                          <p className="font-bold text-foreground">Secretary</p>
+                          <p className="text-xs text-muted-foreground mt-1">Society Administrator</p>
                         </button>
                       </>
                     ) : (
@@ -701,6 +720,60 @@ export default function RegisterPage() {
                       </>
                     )}
 
+                    {/* 1.5 SOCIETY SECRETARY */}
+                    {role === "secretary" && (
+                      <>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Building / Wing</label>
+                            <select
+                              value={formData.building}
+                              onChange={(e) => updateField("building", e.target.value)}
+                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
+                            >
+                              {verifiedCommunity.buildings.map((b: string) => (
+                                <option key={b} value={b}>{b}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Flat Number <span className="text-red-500">*</span></label>
+                            <Input
+                              placeholder="e.g. 302"
+                              value={formData.flatNumber}
+                              onChange={(e) => updateField("flatNumber", e.target.value)}
+                              className="rounded-xl h-11"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Designation</label>
+                            <select
+                              value={formData.designation}
+                              onChange={(e) => updateField("designation", e.target.value)}
+                              className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
+                            >
+                              <option value="Secretary">Secretary</option>
+                              <option value="Chairman">Chairman</option>
+                              <option value="Treasurer">Treasurer</option>
+                              <option value="Committee Member">Committee Member</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground block mb-1">Committee / Employee ID (Optional)</label>
+                            <Input
+                              placeholder="e.g. SEC-COM-1"
+                              value={formData.committeeId}
+                              onChange={(e) => updateField("committeeId", e.target.value)}
+                              className="rounded-xl h-11"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
                     {/* 2. SOCIETY WORKER */}
                     {role === "worker" && (
                       <>
@@ -929,9 +1002,13 @@ export default function RegisterPage() {
                     <Check className="w-8 h-8 text-white" />
                   </div>
                   <div className="space-y-1">
-                    <h2 className="text-2xl font-bold font-[family-name:var(--font-heading)]">You&apos;re all set!</h2>
+                    <h2 className="text-2xl font-bold font-[family-name:var(--font-heading)]">
+                      {role === "resident" || role === "worker" ? "Application Submitted! ⏳" : "You're all set!"}
+                    </h2>
                     <p className="text-sm text-muted-foreground">
-                      Welcome to the HomeVerse family. Your account is ready.
+                      {role === "resident" || role === "worker" 
+                        ? "Your account is pending Secretary approval. Once approved, you can log in." 
+                        : "Welcome to the HomeVerse family. Your account is ready."}
                     </p>
                   </div>
                   
@@ -940,15 +1017,21 @@ export default function RegisterPage() {
                     <div className="flex justify-between"><span className="text-muted-foreground">Community:</span><span className="font-semibold text-foreground">{verifiedCommunity?.name}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Your Username:</span><span className="font-bold text-primary">{generatedUsername}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Active Role:</span><span className="font-semibold text-foreground capitalize">{role}</span></div>
-                    {role === "resident" && <div className="flex justify-between"><span className="text-muted-foreground">Flat Unit:</span><span className="font-semibold text-foreground">{formData.building} · {formData.flatNumber}</span></div>}
+                    {(role === "resident" || role === "secretary") && <div className="flex justify-between"><span className="text-muted-foreground">Flat Unit:</span><span className="font-semibold text-foreground">{formData.building} · {formData.flatNumber}</span></div>}
                     {role === "student" && <div className="flex justify-between"><span className="text-muted-foreground">Hostel Wing:</span><span className="font-semibold text-foreground">{formData.hostelWing} (Unallocated)</span></div>}
                   </div>
 
                   <Button
-                    onClick={() => router.replace(ecosystem === "society" ? "/society/dashboard" : "/hostel/dashboard")}
+                    onClick={() => {
+                      if (role === "resident" || role === "worker") {
+                        router.replace("/login?portal=society");
+                      } else {
+                        router.replace(ecosystem === "society" ? "/society/dashboard" : "/hostel/dashboard");
+                      }
+                    }}
                     className="w-full h-12 rounded-xl gradient-primary text-white border-0 shadow-lg text-base font-semibold mt-4"
                   >
-                    Enter HomeVerse
+                    {role === "resident" || role === "worker" ? "Return to Login Portal" : "Enter HomeVerse"}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>

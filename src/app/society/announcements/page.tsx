@@ -78,7 +78,7 @@ export default function AnnouncementsPage() {
           <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">Announcements 📢</h1>
           <p className="text-muted-foreground mt-1">Stay updated with community news and gate notices</p>
         </div>
-        {(user.role === "security" || user.role === "worker") && (
+        {(user.role === "security" || user.role === "worker" || user.role === "secretary") && (
           <Button
             onClick={() => setShowAddModal(true)}
             className="rounded-xl bg-red-600 hover:bg-red-700 text-white border-0 shadow-lg shadow-red-500/25 h-10 px-4 text-xs font-semibold"

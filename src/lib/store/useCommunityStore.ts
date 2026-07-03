@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { Complaint, Visitor, UserRole, PortalType, User, Announcement, EmergencyAlert, GatePass, VehicleLog, IncidentReport } from "@/types";
+import { Complaint, Visitor, UserRole, PortalType, User, Announcement, EmergencyAlert, GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord } from "@/types";
 
 // ==========================================
 // Centralized Database Interfaces
@@ -162,6 +162,9 @@ interface CommunityState {
   vehicleLogs: VehicleLog[];
   incidents: IncidentReport[];
   announcements: Announcement[];
+  expenses: SocietyExpense[];
+  flats: FlatInfo[];
+  rentRecords: RentRecord[];
 
   initializeDb: () => void;
   saveDb: () => void;
@@ -232,6 +235,15 @@ interface CommunityState {
   logVehicleExit: (id: string) => void;
   addAnnouncement: (ann: Omit<Announcement, "id" | "createdAt">) => void;
   addIncidentReport: (incident: Omit<IncidentReport, "id" | "createdAt">) => void;
+  approveUser: (userId: string) => void;
+  rejectUser: (userId: string) => void;
+  activateDeactivateUser: (userId: string, status: 'approved' | 'deactivated') => void;
+  addFlat: (flat: Omit<FlatInfo, 'id'>) => void;
+  addExpense: (expense: Omit<SocietyExpense, 'id'>) => void;
+  addRentRecord: (rent: Omit<RentRecord, 'id'>) => void;
+  payRentRecord: (id: string) => void;
+  generateBulkMaintenanceBills: (billDetails: { month: string; amount: number; breakdown: { label: string; amount: number }[] }) => void;
+  deleteMarketplaceItem: (itemId: string) => void;
 }
 
 export const useCommunityStore = create<CommunityState>((set, get) => ({
@@ -254,6 +266,9 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   vehicleLogs: [],
   incidents: [],
   announcements: [],
+  expenses: [],
+  flats: [],
+  rentRecords: [],
 
   initializeDb: () => {
     if (typeof window === "undefined") return;
@@ -282,13 +297,17 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     const {
       users, complaints, leaveRequests, visitors, laundrySlots, parcels,
       facilityBookings, marketplaceItems, lostFoundItems, roomChangeRequests,
-      maintenanceBills, communityEvents, notifications, roommatePreferences
+      maintenanceBills, communityEvents, notifications, roommatePreferences,
+      emergencies, gatePasses, vehicleLogs, incidents, announcements,
+      expenses, flats, rentRecords
     } = get();
     try {
       localStorage.setItem("homeverse_db", JSON.stringify({
         users, complaints, leaveRequests, visitors, laundrySlots, parcels,
         facilityBookings, marketplaceItems, lostFoundItems, roomChangeRequests,
-        maintenanceBills, communityEvents, notifications, roommatePreferences
+        maintenanceBills, communityEvents, notifications, roommatePreferences,
+        emergencies, gatePasses, vehicleLogs, incidents, announcements,
+        expenses, flats, rentRecords
       }));
     } catch (e) {}
   },
@@ -1104,6 +1123,102 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       createdAt: new Date().toISOString()
     };
     set(state => ({ incidents: [newReport, ...state.incidents] }));
+    get().saveDb();
+  },
+
+  approveUser: (userId) => {
+    set(state => ({
+      users: state.users.map(u => u.id === userId ? { ...u, status: "approved" as const } : u)
+    }));
+    get().saveDb();
+
+    const user = get().users.find(u => u.id === userId);
+    if (user) {
+      get().sendNotification(
+        userId,
+        "Account Approved! 🎉",
+        "Your HomeVerse account has been approved by the Society Secretary. You now have full access.",
+        "success"
+      );
+    }
+  },
+
+  rejectUser: (userId) => {
+    set(state => ({
+      users: state.users.map(u => u.id === userId ? { ...u, status: "rejected" as const } : u)
+    }));
+    get().saveDb();
+  },
+
+  activateDeactivateUser: (userId, status) => {
+    set(state => ({
+      users: state.users.map(u => u.id === userId ? { ...u, status } : u)
+    }));
+    get().saveDb();
+  },
+
+  addFlat: (flat) => {
+    const id = `FL-${Math.floor(100 + Math.random() * 900)}`;
+    const newFlat: FlatInfo = { ...flat, id };
+    set(state => ({ flats: [...state.flats, newFlat] }));
+    get().saveDb();
+  },
+
+  addExpense: (expense) => {
+    const id = `EXP-${Math.floor(100 + Math.random() * 900)}`;
+    const newExpense: SocietyExpense = { ...expense, id };
+    set(state => ({ expenses: [newExpense, ...state.expenses] }));
+    get().saveDb();
+  },
+
+  addRentRecord: (rent) => {
+    const id = `RNT-${Math.floor(100 + Math.random() * 900)}`;
+    const newRent: RentRecord = { ...rent, id };
+    set(state => ({ rentRecords: [newRent, ...state.rentRecords] }));
+    get().saveDb();
+  },
+
+  payRentRecord: (id) => {
+    set(state => ({
+      rentRecords: state.rentRecords.map(r => r.id === id ? { ...r, status: "paid" as const, paidOn: new Date().toISOString().split("T")[0] } : r)
+    }));
+    get().saveDb();
+  },
+
+  generateBulkMaintenanceBills: (billDetails) => {
+    const approvedResidents = get().users.filter(u => u.role === "resident" && u.status === "approved");
+    const newBills = approvedResidents.map(res => {
+      const id = `BILL-${Math.floor(1000 + Math.random() * 9000)}`;
+      return {
+        id,
+        residentId: res.id,
+        residentName: res.name,
+        unit: res.unit || "N/A",
+        month: billDetails.month,
+        amount: billDetails.amount,
+        dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 10).toISOString().split("T")[0],
+        status: "pending" as const,
+        breakdown: billDetails.breakdown
+      };
+    });
+
+    set(state => ({ maintenanceBills: [...newBills, ...state.maintenanceBills] }));
+    get().saveDb();
+
+    approvedResidents.forEach(res => {
+      get().sendNotification(
+        res.id,
+        "Maintenance Bill Generated 🧾",
+        `Maintenance bill of ₹${billDetails.amount} for ${billDetails.month} has been generated. Due date: ${new Date(Date.now() + 1000 * 60 * 60 * 24 * 10).toISOString().split("T")[0]}`,
+        "warning"
+      );
+    });
+  },
+
+  deleteMarketplaceItem: (itemId) => {
+    set(state => ({
+      marketplaceItems: state.marketplaceItems.filter(item => item.id !== itemId)
+    }));
     get().saveDb();
   }
 }));

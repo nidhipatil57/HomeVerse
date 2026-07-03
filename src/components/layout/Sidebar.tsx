@@ -89,6 +89,8 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
       portalName = "Warden Portal";
     } else if (user.role === "student") {
       portalName = "Student Portal";
+    } else if (user.role === "secretary") {
+      portalName = "Secretary Portal";
     } else {
       portalName = user.portal === "society" ? "Society Portal" : "Hostel Portal";
     }
@@ -107,6 +109,8 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
       gradientClass = "from-blue-600 to-indigo-600 bg-gradient-to-br";
     } else if (activeUserRole === "security") {
       gradientClass = "from-red-600 to-amber-600 bg-gradient-to-br";
+    } else if (activeUserRole === "secretary") {
+      gradientClass = "from-indigo-600 to-violet-600 bg-gradient-to-br";
     }
   }
 
