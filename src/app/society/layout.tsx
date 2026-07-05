@@ -18,7 +18,8 @@ const SECURITY_ALLOWED_PATHS = [
   "/society/dashboard",
   "/society/visitors",
   "/society/announcements",
-  "/society/settings"
+  "/society/settings",
+  "/society/complaints"
 ];
 
 const RESIDENT_ONLY_PATHS = [
