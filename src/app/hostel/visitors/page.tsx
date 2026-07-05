@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Shield, Clock, Check, X, Calendar, Search, LogIn, LogOut, Plus } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Shield, Clock, Check, X, Calendar, Search, LogIn, LogOut, Plus, Users, Ban } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,17 +12,33 @@ import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
 
+const statusColors: Record<string, string> = {
+  expected: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+  "checked-in": "bg-green-500/10 text-green-600 border-green-500/20",
+  "checked-out": "bg-gray-500/10 text-gray-500 border border-gray-500/20",
+  denied: "bg-red-500/10 text-red-600 border-red-500/20"
+};
+
 export default function HostelVisitorsPage() {
   const { user, initialize } = useAuth();
-  const { visitors, submitVisitorRequest, checkInVisitor, checkOutVisitor, initializeDb } = useCommunityStore(
+  const {
+    visitors,
+    submitVisitorRequest,
+    checkInVisitor,
+    checkOutVisitor,
+    denyVisitorEntry,
+    initializeDb
+  } = useCommunityStore(
     useShallow((state) => ({
-      visitors: state.visitors,
+      visitors: state.visitors || [],
       submitVisitorRequest: state.submitVisitorRequest,
       checkInVisitor: state.checkInVisitor,
       checkOutVisitor: state.checkOutVisitor,
+      denyVisitorEntry: state.denyVisitorEntry,
       initializeDb: state.initializeDb,
     }))
   );
+  
   const [mounted, setMounted] = useState(false);
 
   // Form State for Student
@@ -31,6 +47,9 @@ export default function HostelVisitorsPage() {
   const [purpose, setPurpose] = useState("Parent Dropoff");
   const [expectedAt, setExpectedAt] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Search filter
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     initialize();
@@ -45,11 +64,17 @@ export default function HostelVisitorsPage() {
   // Filter visitors
   const filteredVisitors = visitors.filter((v) => {
     if (v.portal !== "hostel") return false;
+
+    // Student only sees guests visiting them
     if (!isWarden) {
-      // Student: only see guests visiting them
       return v.visitingResident === user?.name || v.visitingUnit === user?.unit;
     }
-    return true;
+
+    // Warden sees all matching search query
+    const matchesSearch = v.name.toLowerCase().includes(search.toLowerCase()) ||
+      v.visitingResident.toLowerCase().includes(search.toLowerCase()) ||
+      v.visitingUnit.includes(search);
+    return matchesSearch;
   });
 
   const handleRequestVisitor = (e: React.FormEvent) => {
@@ -71,84 +96,85 @@ export default function HostelVisitorsPage() {
     setPhone("");
     setExpectedAt("");
     setDialogOpen(false);
+    alert("Visitor pre-approval registered! Pass code generated.");
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold font-[family-name:var(--font-heading)]">Visitor & Security Logs</h1>
-          <p className="text-muted-foreground mt-1 flex-wrap">
-            {isWarden ? "Oversight log: Monitor guest entries, parents drop-offs, and verification logs" : "Request security gate approval for parents or guest check-in"}
-          </p>
+  const stats = {
+    total: filteredVisitors.length,
+    checkedIn: filteredVisitors.filter(v => v.status === "checked-in").length,
+    expected: filteredVisitors.filter(v => v.status === "expected").length,
+    denied: filteredVisitors.filter(v => v.status === "denied").length,
+  };
+
+  // --- WARDEN VISITORS LEDGER VIEW ---
+  if (isWarden) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
+              <Shield className="w-8 h-8 text-primary" /> Warden Visitor Ledger
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Check in expected parents/guests, log departures, and audit gated security logs
+            </p>
+          </div>
         </div>
 
-        {!isWarden && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger
-              render={
-                <Button className="rounded-xl gradient-primary text-white border-0 shadow-lg shadow-primary/25">
-                  <Plus className="w-4 h-4 mr-2" /> Register Guest / Parent
-                </Button>
-              }
-            />
-            <DialogContent className="sm:max-w-md rounded-2xl">
-              <DialogHeader>
-                <DialogTitle className="font-[family-name:var(--font-heading)]">Pre-Register Guest</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleRequestVisitor} className="space-y-4 mt-2">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Guest Full Name</label>
-                  <Input placeholder="e.g. Sanjay Mehta" value={guestName} onChange={(e) => setGuestName(e.target.value)} className="rounded-xl h-11" required />
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: "Total Logs Today", value: stats.total, color: "#8b5cf6", icon: Users },
+            { label: "Active Inside Hostel", value: stats.checkedIn, color: "#22c55e", icon: LogIn },
+            { label: "Expected Arrivals", value: stats.expected, color: "#3b82f6", icon: Clock },
+            { label: "Denials / Flags", value: stats.denied, color: "#ef4444", icon: Ban },
+          ].map((s) => (
+            <Card key={s.label} className="border-border/50">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${s.color}15` }}>
+                  <s.icon className="w-5 h-5" style={{ color: s.color }} />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Mobile Number</label>
-                  <Input placeholder="+91 XXXXX XXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl h-11" required />
+                  <p className="text-xl font-bold font-[family-name:var(--font-heading)]">{s.value}</p>
+                  <p className="text-[10px] text-muted-foreground">{s.label}</p>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Purpose / Relationship</label>
-                  <select
-                    value={purpose}
-                    onChange={(e) => setPurpose(e.target.value)}
-                    className="w-full h-11 px-3 rounded-xl border border-input bg-card text-sm"
-                  >
-                    <option value="Parent Dropoff">Parent Dropoff</option>
-                    <option value="Local Guardian">Local Guardian</option>
-                    <option value="Personal Guest">Personal Guest</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Arrival Date & Time</label>
-                  <Input type="datetime-local" value={expectedAt} onChange={(e) => setExpectedAt(e.target.value)} className="rounded-xl h-11" required />
-                </div>
-                <Button type="submit" className="w-full rounded-xl gradient-primary text-white border-0 h-11">
-                  Send Gate Access Request
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-      <div className="grid md:grid-cols-12 gap-6">
-        <div className="md:col-span-8 space-y-4">
-          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Today&apos;s Visitor Roster</h3>
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by student name, guest name, room number..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 rounded-xl h-11 text-xs"
+          />
+        </div>
+
+        {/* Visitor Cards */}
+        <div className="grid gap-3">
           {filteredVisitors.map((v) => (
-            <Card key={v.id} className="border-border/50">
-              <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-sm">
+            <Card key={v.id} className="border-border/50 bg-card hover:shadow-sm">
+              <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                     <Shield className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-foreground">{v.name}</span>
-                      <Badge variant="outline" className="text-[9px]">{v.purpose}</Badge>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-foreground text-sm">{v.name}</span>
+                      <span className="text-[10px] text-muted-foreground">({v.phone})</span>
+                      <Badge className={statusColors[v.status] || "bg-secondary text-foreground"} variant="outline">
+                        {v.status}
+                      </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Visiting: {v.visitingResident} (Room {v.visitingUnit}) • Phone: {v.phone}
+                    <p className="text-muted-foreground mt-0.5">
+                      Visiting: <span className="font-semibold text-foreground">{v.visitingResident} (Room {v.visitingUnit})</span> • Purpose: {v.purpose}
                     </p>
-                    <p className="text-[10px] text-muted-foreground font-semibold mt-1">
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
                       Expected: {new Date(v.expectedAt || "").toLocaleString()}
                     </p>
                   </div>
@@ -156,50 +182,143 @@ export default function HostelVisitorsPage() {
 
                 <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                   {v.status === "expected" && (
-                    <Button
-                      size="sm"
-                      onClick={() => checkInVisitor(v.id)}
-                      className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8 px-2 border-0 text-xs flex items-center gap-0.5"
-                    >
-                      <LogIn className="w-3 h-3" /> Check In
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          checkInVisitor(v.id);
+                          alert(`Checked-in guest ${v.name}`);
+                        }}
+                        className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-9 border-0 px-3"
+                      >
+                        <LogIn className="w-3.5 h-3.5 mr-1" /> Check In
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          denyVisitorEntry(v.id, "Warden restriction");
+                          alert(`Denied entry for guest ${v.name}`);
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white rounded-lg h-9 border-0 px-3"
+                      >
+                        <Ban className="w-3.5 h-3.5 mr-1" /> Deny
+                      </Button>
+                    </>
                   )}
                   {v.status === "checked-in" && (
                     <Button
                       size="sm"
-                      onClick={() => checkOutVisitor(v.id)}
-                      className="bg-gray-600 hover:bg-gray-700 text-white rounded-lg h-8 px-2 border-0 text-xs flex items-center gap-0.5"
+                      onClick={() => {
+                        checkOutVisitor(v.id);
+                        alert(`Checked-out guest ${v.name}`);
+                      }}
+                      className="bg-gray-600 hover:bg-gray-700 text-white rounded-lg h-9 border-0 px-3"
                     >
-                      <LogOut className="w-3 h-3" /> Check Out
+                      <LogOut className="w-3.5 h-3.5 mr-1" /> Log Checkout
                     </Button>
                   )}
-
-                  <Badge className={
-                    v.status === "checked-in" ? "bg-green-500/10 text-green-500 border border-green-500/20" :
-                    v.status === "checked-out" ? "bg-gray-500/10 text-gray-500 border border-gray-500/20" :
-                    "bg-blue-500/10 text-blue-500 border border-blue-500/20"
-                  }>
-                    {v.status}
-                  </Badge>
                 </div>
               </CardContent>
             </Card>
           ))}
           {filteredVisitors.length === 0 && (
-            <div className="p-8 text-center text-muted-foreground text-sm border rounded-2xl">No visitor logs found.</div>
+            <div className="text-center py-10 border border-dashed rounded-2xl text-muted-foreground">
+              No visitor records logged today.
+            </div>
           )}
         </div>
+      </div>
+    );
+  }
 
-        <Card className="md:col-span-4 border-border/50 p-6 space-y-4 h-fit">
-          <h3 className="text-lg font-bold font-[family-name:var(--font-heading)]">Gate Regulations</h3>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            All guests must produce an OTP generated by the student or obtain direct phone approval from the warden before entering the hostel blocks.
-          </p>
-          <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-xs">
-            <span className="font-bold text-emerald-500 block mb-0.5">Visitor Hours:</span>
-            Daily 09:00 AM to 06:30 PM. No overnight guest stays permitted without committee waiver.
-          </div>
-        </Card>
+  // --- STUDENT VIEW (Pre-approve visitors and own logs) ---
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">My Visitors & Guest Passes 👥</h1>
+          <p className="text-muted-foreground mt-1">Pre-approve parents or study friends for hostel entry gate check-in</p>
+        </div>
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger
+            render={
+              <Button className="rounded-xl gradient-primary text-white border-0 shadow-lg shadow-primary/25">
+                <Plus className="w-4 h-4 mr-2" /> Pre-Register Guest
+              </Button>
+            }
+          />
+          <DialogContent className="sm:max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-[family-name:var(--font-heading)]">Pre-Register Guest</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleRequestVisitor} className="space-y-4 mt-2">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Guest Full Name</label>
+                <Input placeholder="Guest name" value={guestName} onChange={(e) => setGuestName(e.target.value)} className="h-10 text-xs rounded-xl" required />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Guest Mobile Number</label>
+                <Input placeholder="+91 99999 00000" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-10 text-xs rounded-xl" required />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Expected Arrival Date & Time</label>
+                <Input type="datetime-local" value={expectedAt} onChange={(e) => setExpectedAt(e.target.value)} className="h-10 text-xs rounded-xl" required />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Purpose of Visit</label>
+                <select value={purpose} onChange={(e) => setPurpose(e.target.value)} className="w-full h-10 px-3 border rounded-xl text-xs bg-card">
+                  <option>Parent Visit / Drop-off</option>
+                  <option>Local Guardian drop</option>
+                  <option>Friend / Group Study</option>
+                </select>
+              </div>
+              <Button type="submit" className="w-full h-10 gradient-primary text-white border-0 rounded-xl font-semibold text-xs mt-2">
+                Generate Guest Pass OTP
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Roster list */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold font-[family-name:var(--font-heading)]">My Visitors Log (Room {user?.unit})</h2>
+        <div className="grid gap-3">
+          {filteredVisitors.map((v) => (
+            <Card key={v.id} className="border-border/50 hover:shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between gap-4 text-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground shrink-0 font-bold">
+                    {v.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-foreground text-sm">{v.name}</span>
+                      <Badge className={statusColors[v.status] || "bg-secondary text-foreground"} variant="outline">
+                        {v.status}
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground mt-0.5">Purpose: {v.purpose} • Mobile: {v.phone}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Expected: {new Date(v.expectedAt || "").toLocaleString()}</p>
+                  </div>
+                </div>
+
+                {v.status === "expected" && (
+                  <div className="p-2 border border-dashed rounded-lg text-center shrink-0">
+                    <p className="text-[8px] text-muted-foreground leading-none">Retrieval OTP</p>
+                    <span className="font-mono text-sm font-bold text-primary block mt-1">{v.qrCode || "4820"}</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+          {filteredVisitors.length === 0 && (
+            <div className="p-8 text-center text-muted-foreground text-xs border rounded-xl">
+              No guest passes requested yet for Room {user?.unit}.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

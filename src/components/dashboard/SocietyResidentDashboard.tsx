@@ -23,10 +23,7 @@ const SocietyUtilityChart = dynamic(() => import("@/components/charts/SocietyUti
   loading: () => <div className="h-[260px] flex items-center justify-center bg-secondary/10 animate-pulse rounded-xl" />
 });
 
-const SocietyExpenseChart = dynamic(() => import("@/components/charts/SocietyExpenseChart"), {
-  ssr: false,
-  loading: () => <div className="h-[220px] flex items-center justify-center bg-secondary/10 animate-pulse rounded-xl" />
-});
+
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   MessageSquareWarning, IndianRupee, Calendar, Users, Package,
@@ -279,30 +276,20 @@ export function SocietyResidentDashboard({ resident }: { resident: any }) {
       </motion.div>
 
       {/* Charts Row */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Utility Consumption Chart */}
         <Card className="border-border/50">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">Utility Consumption</CardTitle>
+              <div>
+                <CardTitle className="text-base font-semibold">My Flat Utility Consumption</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Electricity and water usage for Flat {resident?.unit || "A-301"}</p>
+              </div>
               <Badge variant="outline" className="text-xs">Last 7 months</Badge>
             </div>
           </CardHeader>
           <CardContent>
             <SocietyUtilityChart />
-          </CardContent>
-        </Card>
-
-        {/* Expense Breakdown */}
-        <Card className="border-border/50">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">Expense Breakdown</CardTitle>
-              <Badge variant="outline" className="text-xs">This Month</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <SocietyExpenseChart />
           </CardContent>
         </Card>
       </div>

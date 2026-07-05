@@ -1,86 +1,198 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Send, Bot, User, Sparkles, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { ChatMessage } from "@/types";
+import { useAuth } from "@/lib/store/useAuth";
 
 interface AIChatProps {
   portalType: "society" | "hostel";
 }
 
-const societySuggestions = [
-  "What is my maintenance bill?",
-  "When is the next society meeting?",
-  "How many visitors entered today?",
-  "Show water consumption this month",
-  "Has my complaint been resolved?",
-  "When is garbage collection?",
-];
+const suggestionsByRole: Record<string, string[]> = {
+  // Society Portal
+  "society-resident": [
+    "What is my maintenance bill?",
+    "When is the next society meeting?",
+    "Where is my parcel?",
+    "Has my complaint been resolved?",
+    "When is garbage collection?",
+  ],
+  "society-secretary": [
+    "Generate billing report",
+    "Summarize pending complaints",
+    "Review today's budget",
+    "Who is the plumber on shift today?",
+  ],
+  "society-security": [
+    "Verify guest OTP code",
+    "Look up incident log",
+    "Show active visitors",
+    "Emergency gate procedure",
+  ],
+  "society-worker": [
+    "Show today's tasks",
+    "Get route instructions",
+    "What tools do I need?",
+    "Safety protocols",
+  ],
+  // Hostel Portal
+  "hostel-student": [
+    "What's today's dinner?",
+    "When is laundry available?",
+    "Where is my parcel?",
+    "What are my hostel dues?",
+  ],
+  "hostel-warden": [
+    "Review pending leaves",
+    "Check laundry machine status",
+    "Show student check-in list",
+    "Mess demand analytics",
+  ]
+};
 
-const hostelSuggestions = [
-  "What's today's dinner?",
-  "When is laundry available?",
-  "Where is my parcel?",
-  "What are my hostel dues?",
-  "Find available study room",
-  "When is hostel inspection?",
-];
-
-function getAIResponse(message: string, portalType: "society" | "hostel"): string {
+function getAIResponseByRole(message: string, portalType: "society" | "hostel", role: string): string {
   const lower = message.toLowerCase();
 
   if (portalType === "society") {
+    // --- SECRETARY REPLIES ---
+    if (role === "secretary") {
+      if (lower.includes("report") || lower.includes("billing"))
+        return "💰 **July 2026 Invoicing & Collections Audit**:\n\n• **Total Invoiced**: ₹5,40,000\n• **Collected**: ₹4,12,000 (76%)\n• **Outstanding**: ₹1,28,000 (12 households)\n• **Expenses logged**: ₹84,500\n• **Net reserves balance**: ₹3,27,500\n\nWould you like to send automated push reminders to outstanding flats?";
+      if (lower.includes("complaint") || lower.includes("summar"))
+        return "📋 **Active Tickets Summary**:\n\n• **Plumbing**: 2 pending (A-301 tap, Tower B corridor leak)\n• **Electrical**: 1 pending (B-402 regulator sparking)\n• **Lift Elevator**: 0 pending (resolved)\n\n💡 **AI Priority Recommendation**: Assign the Tower B leak to Ramesh (Plumber) immediately as it is worsening.";
+      if (lower.includes("budget"))
+        return "📊 **Monthly Budget Allocation**:\n\n• Security Salaries: ₹90,000\n• Utility Bills (Power/Water): ₹45,000\n• Emergency Reserve: ₹50,000\n• Repairs Contract: ₹35,000\n\nAll logs match bank statements. No anomalies flagged.";
+      if (lower.includes("plumber") || lower.includes("worker") || lower.includes("electrician"))
+        return "🛠️ **On-Duty Contractors Today**:\n\n• Ramesh (Plumbing) - Shift: 9 AM - 6 PM\n• Shankar (Electrical) - Shift: 10 AM - 7 PM\n• Mahesh (Gardening) - Shift: 8 AM - 12 PM\n\nAll verified. Tap on 'Helpers & Trades' in your dashboard to modify details.";
+    }
+
+    // --- SECURITY REPLIES ---
+    if (role === "security") {
+      if (lower.includes("otp") || lower.includes("verify"))
+        return "🔑 **Verification Desk**:\n\nTo verify, enter the 4-digit code presented by the guest. Pre-approved entries will be matched automatically. For walk-ins, tap 'Log Walk-In Visitor' to register name and flat details.";
+      if (lower.includes("incident") || lower.includes("log"))
+        return "🚨 **Security Incident Log - Today**:\n\n1. **Parking Blockage (Tower C)**: Resolved by issuing fine.\n2. **Basement leakage**: Notified maintenance supervisor.\n3. **Lost Keys found**: Returned to Flat B-102.\n\nDo you want to file a new incident log?";
+      if (lower.includes("visitor") || lower.includes("active"))
+        return "👥 **Gated Entry Traffic**:\n\n• **Checked-In (Inside)**: 8 guests\n• **Pre-Approved Expected**: 4 guests\n• **Checked-Out**: 12 guests\n• **Denied Access**: 1 guest\n\nAll registers synchronized with the Central database.";
+      if (lower.includes("emergency") || lower.includes("procedure"))
+        return "🆘 **Emergency Gated Response Protocol**:\n\n• **Medical SOS**: Direct warden/guards to Flat location immediately. Intercom hotline: **#009**.\n• **Fire Hazard**: Sound master siren, isolate gas valves, call **+91-100-2940**.";
+    }
+
+    // --- WORKER REPLIES ---
+    if (role === "worker") {
+      if (lower.includes("task") || lower.includes("job"))
+        return "🛠️ **Today's Assigned Jobs**:\n\n1. **AC Regulator Sparking (Flat B-402)** - Category: Electrical\n2. **Kitchen Tap Leak (Flat A-301)** - Category: Plumbing\n\n💡 **AI Route Recommendation**: Start at A-301 first, then move to B-402 to minimize climbing elevations.";
+      if (lower.includes("route"))
+        return "📍 **Walking Route Guidance**:\n\nYour optimal walking path: **Workshop → Tower A (Flat 301) → Tower B (Flat 402)**. Estimated walking time: 6 mins. You save 12 floors of elevator transfers today!";
+      if (lower.includes("tool") || lower.includes("inventory"))
+        return "🔧 **Required Tool Slip Suggestions**:\n\n• **Plumbing Job (A-301)**: Teflon tape, Adjustable spanner, 1/2\" pipe.\n• **Electrical Job (B-402)**: Insulated tester screwdriver, PVC black tape.\n\nAll marked as 'Acquired' or 'Ready' in your inventory panel.";
+      if (lower.includes("safety"))
+        return "⚠️ **Workplace Safety Guidelines**:\n\n1. Isolate main electricity breaker before checking sockets/wires.\n2. Wear rubber-grip safety gloves and safety harness if working on elevators/heights.";
+    }
+
+    // --- RESIDENT REPLIES (DEFAULT SOCIETY) ---
     if (lower.includes("maintenance") || lower.includes("bill"))
-      return "Your maintenance bill for July 2026 is **₹4,500**. Here's the breakdown:\n\n• Society Maintenance: ₹2,500\n• Sinking Fund: ₹500\n• Parking: ₹800\n• Water Charges: ₹400\n• Common Electricity: ₹300\n\n📅 Due Date: July 10, 2026\n\nYou can pay via UPI, net banking, or card from the Maintenance section.";
+      return "Your maintenance bill for July 2026 is **₹4,500**. Breakdown:\n\n• Base Charges: ₹2,500\n• Sinking Fund: ₹500\n• Parking space: ₹800\n• Water Tariff: ₹400\n• Common Electricity: ₹300\n\n📅 **Due Date**: July 10, 2026. Settle online from the Maintenance page.";
     if (lower.includes("meeting"))
-      return "The next **Annual General Meeting (AGM)** is scheduled for:\n\n📅 **July 15, 2026** at **6:00 PM**\n📍 **Clubhouse, Ground Floor**\n\nAgenda items include:\n1. Financial report 2025-26\n2. New gym equipment proposal\n3. Security upgrade discussion\n4. Garden renovation\n\nWould you like to RSVP?";
-    if (lower.includes("visitor"))
-      return "Today's visitor summary for **Harmony Heights**:\n\n👥 **Total Visitors: 24**\n• ✅ Checked In: 8\n• ✅ Checked Out: 12\n• ⏳ Expected: 4\n\nRecent visitors:\n• Rahul Verma → A-301 (Personal)\n• Manoj Electrician → C-401 (AC Service)\n• Dr. Suresh → A-101 (Medical Visit)\n\nWant me to pre-approve a visitor for you?";
-    if (lower.includes("water"))
-      return "Your water consumption for **July 2026** so far:\n\n💧 **12.4 KL** (kiloliters)\n\nCompared to last month: **📉 Down 5%** — Great job!\n\n🏢 Building Average: 14.2 KL\n🏘️ Society Average: 13.8 KL\n\n💡 **AI Tip:** Your consumption is below average. You saved approximately ₹180 this month!";
-    if (lower.includes("complaint") && lower.includes("resolv"))
-      return "Here's the status of your complaints:\n\n1. **WiFi issue in lobby** — ✅ Resolved (July 1)\n   Rating: ⭐⭐⭐⭐ (4/5)\n\n2. **Parking dispute** — 🟡 Submitted (July 2)\n   Awaiting assignment\n\nWould you like to raise a new complaint or view details?";
+      return "The next **Annual General Meeting (AGM)** is scheduled for:\n\n📅 **July 15, 2026** at **6:00 PM**\n📍 **Clubhouse Lounge, Ground Floor**\n\nAgenda items: Financial Audit, Garden renovation, and Gym upgrades.";
+    if (lower.includes("parcel") || lower.includes("package"))
+      return "📦 **Parcel Delivery Alert**:\n\n1 parcel from **Amazon** is awaiting gate pickup at Gate 1 Locker.\nOTP for release: **4821**.";
+    if (lower.includes("water") || lower.includes("consumption"))
+      return "💧 **Water Consumption log for July 2026**:\n\n• **Total**: 12.4 KL (kiloliters)\n• **Trend**: **Down 5%** compared to last month average.\n• You saved approximately ₹180 this month!";
+    if (lower.includes("complaint"))
+      return "📋 **My Complaint Status**:\n\n• **Kitchen Tap Leaking (A-301)**: 🟡 Submitted (July 2). Assigned to Plumber Ramesh. Estimated arrival: 3:00 PM.\n• Tap 'Complaints' to view timeline.";
     if (lower.includes("garbage"))
-      return "Garbage collection schedule for **Tower A**:\n\n🗑️ **Dry Waste:** Monday, Wednesday, Friday\n♻️ **Wet Waste:** Daily (7:00 AM - 8:00 AM)\n📦 **E-Waste:** First Saturday of every month\n\n⏰ Next collection: Tomorrow, 7:00 AM (Wet Waste)\n\nPlease keep segregated bins ready by 6:45 AM.";
+      return "🗑️ **Garbage Disposal Schedule (Tower A)**:\n\n• **Wet Waste**: Daily (7:00 AM - 8:00 AM)\n• **Dry Waste**: Monday, Wednesday, Friday\n• Please keep segregated bins ready by 6:45 AM.";
+
   } else {
+    // --- HOSTEL WARDEN REPLIES ---
+    if (role === "warden") {
+      if (lower.includes("leave") || lower.includes("pending"))
+        return "📝 **Curfew Leaves - Pending warden review**:\n\n• **Aarav Mehta** (Room 204) - Outstation weekend visit (Reason: Parent drop-off)\n• **Rohan Das** (Room 201) - Medical curfew extension\n\nTap 'Leave Requests' in sidebar to approve/reject.";
+      if (lower.includes("laundry") || lower.includes("machine"))
+        return "👕 **Laundry Machinery Logs**:\n\n• Washing Machine #1: Active\n• Washing Machine #2: Active\n• Dryer #1: Active\n• Dryer #2: **Under maintenance** (Health: 45%). Technician dispatched.";
+      if (lower.includes("check-in") || lower.includes("attendance"))
+        return "📋 **Hostel Attendance Roll-Call**:\n\n• Present: 322/340 students\n• Approved Outings: 12\n• Missing Check-ins: 6 students (Tower B Block)\n\n curate SMS reminders?";
+      if (lower.includes("demand") || lower.includes("mess"))
+        return "🍽️ **Mess Demand Analytics**:\n\nEstimated lunch volume: **285 students**.\nFood wastage rating is 3.8 ★ (Dinner has highest engagement). Kitchen stock warning: Milk reserves low.";
+    }
+
+    // --- STUDENT REPLIES (DEFAULT HOSTEL) ---
     if (lower.includes("dinner") || lower.includes("menu") || lower.includes("today"))
-      return "Today's dinner menu (**Wednesday**):\n\n🍽️ **Time:** 7:30 PM - 9:30 PM\n\n• Palak Paneer 🟢\n• Egg Curry 🔴\n• Roti\n• Rice\n• Kheer (Dessert) 🍮\n\n⭐ Rating: 4.3/5\n👥 **Crowd Prediction: High** (Peak at 8:00 PM)\n\n💡 **Best time to eat:** 7:30 PM or after 9:00 PM to avoid crowds!";
+      return "🍽️ **Today's Dinner Menu (Wednesday)**:\n\n• Palak Paneer 🟢\n• Egg Curry 🔴\n• Roti & Rice\n• Kheer (Dessert) 🍮\n\n⏰ Time: 7:30 PM - 9:30 PM\n👥 **Crowd Prediction**: High peak at 8:00 PM. Best to eat at 7:40 PM or 9:00 PM.";
     if (lower.includes("laundry"))
-      return "Laundry availability right now:\n\n🟢 **Machine 1 (Floor 2):** Available\n🔴 **Machine 2 (Floor 2):** In use (free in 25 min)\n🟢 **Machine 3 (Floor 4):** Available\n🟡 **Dryer 1 (Floor 2):** Available in 10 min\n\nWould you like to book a slot?";
+      return "👕 **Laundry Booking slots**:\n\n• Washer Machine #1: Available\n• Washer Machine #2: In use (free in 25 mins)\n\nReserve a slot from the Laundry page before curfew.";
     if (lower.includes("parcel"))
-      return "You have **1 parcel** waiting for pickup:\n\n📦 **Flipkart Package**\nReceived: Today, 2:30 PM\nLocation: Hostel Reception\nPickup OTP: **4821**\n\n⏰ Please collect before 9:00 PM today.";
-    if (lower.includes("due"))
-      return "Your hostel fee status:\n\n💰 **Total Due: ₹4,500**\n\n• Hostel Rent (July): ₹3,000\n• Mess Charges: ₹1,200\n• Laundry: ₹300\n\n📅 Due Date: July 5, 2026\n\nPay online to avoid late fees!";
-    if (lower.includes("study"))
-      return "Available study rooms right now:\n\n🟢 **Reading Room A** (Floor 1) — 12 seats available\n🔴 **Reading Room B** (Floor 3) — Full\n🟢 **Meeting Room** (Floor 2) — Available\n🟢 **Gaming Room** — Available\n\nWould you like to reserve a spot?";
+      return "📦 **Parcel Locker**:\n\n1 Flipkart Package has arrived at Warden Locker Room.\nOTP for retrieval: **4821**.";
+    if (lower.includes("due") || lower.includes("fee"))
+      return "💰 **Hostel Dues Status**:\n\n• Monthly rent (July): ₹3,000\n• Mess bill: ₹1,200\n• Laundry bill: ₹300\n\n**Total Dues: ₹4,500**. Due date: July 10, 2026.";
+    if (lower.includes("study") || lower.includes("room"))
+      return "📖 **Study Room occupancy**:\n\n• Reading Room A (Floor 1): 12 seats free.\n• Reading Room B (Floor 3): Full.\n• Tap booking from settings to reserve study spaces.";
     if (lower.includes("inspection"))
-      return "Next hostel inspection:\n\n📅 **July 8, 2026** (Monday)\n⏰ **10:00 AM - 1:00 PM**\n\nChecklist:\n• Room cleanliness\n• Electrical items check\n• Furniture condition\n• Bathroom hygiene\n\n💡 Make sure to keep your room clean and organized!";
+      return "📅 **Next Hostel Room Inspection**:\n\n• Monday, July 8 at 10:00 AM.\n• Checklist: Cleanliness, electrical appliances check, furniture hygiene.";
   }
 
-  return "I'd be happy to help! I can assist you with:\n\n• 📊 Bills & payments\n• 📝 Complaints & status\n• 👥 Visitor information\n• 💧 Utility consumption\n• 📅 Events & schedules\n• 📦 Parcel tracking\n\nTry asking me something specific!";
+  return "I am your role-specific AI assistant! I can help you with:\n\n• 📊 Status lookups\n• 📝 Complaint timeline trackers\n• 👥 Visitor verification logs\n• 💵 Outstanding dues audits\n\nAsk me a specific question!";
 }
 
 export function AIChat({ portalType }: AIChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: portalType === "society"
-        ? "Hi! 👋 I'm your **AI Community Assistant**. I can help you with maintenance bills, complaints, visitor info, utility consumption, and more. Just ask me anything!"
-        : "Hey there! 👋 I'm your **AI Hostel Assistant**. Ask me about today's menu, laundry availability, parcels, study rooms, or anything else about hostel life!",
-      timestamp: new Date().toISOString(),
-    },
-  ]);
+  const { user, initialize } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    initialize();
+    setMounted(true);
+  }, [initialize]);
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const suggestions = portalType === "society" ? societySuggestions : hostelSuggestions;
+  const userRole = mounted && user ? user.role : "resident";
+
+  // Derive suggestion key
+  const suggestionKey = `${portalType}-${userRole}`;
+  const suggestions = suggestionsByRole[suggestionKey] || suggestionsByRole[`${portalType}-resident`] || [];
+
+  // Initialize welcome message once mounted
+  useEffect(() => {
+    if (!mounted) return;
+    
+    let welcomeText = "";
+    if (portalType === "society") {
+      if (userRole === "secretary") {
+        welcomeText = "Greetings, Secretary. 💼 I am your **AI Administrative Assistant**. Ask me to generate billing reports, summarize pending complaints, or audit budget lists.";
+      } else if (userRole === "security") {
+        welcomeText = "Gated Entry Assistant Online. 🚨 I can verify visitor OTPs, retrieve incident registries, or outline emergency procedures.";
+      } else if (userRole === "worker") {
+        welcomeText = "Service Assistant Online. 🛠️ Let me fetch your walking routes, tool slips, or workplace safety instructions.";
+      } else {
+        welcomeText = "Hi! 👋 I'm your **AI Resident Assistant**. Ask me about your bills, parcels, expected guests, or utility logs.";
+      }
+    } else {
+      if (userRole === "warden") {
+        welcomeText = "Warden Console Assistant Online. 🎓 Ask me about curfew logs, leave requests, mess demand forecasting, or laundry machine status.";
+      } else {
+        welcomeText = "Hey! 👋 I'm your **AI Student Assistant**. Ask me about today's mess menu, laundry availability, or packages.";
+      }
+    }
+
+    setMessages([
+      {
+        id: "welcome",
+        role: "assistant",
+        content: welcomeText,
+        timestamp: new Date().toISOString(),
+      }
+    ]);
+  }, [mounted, portalType, userRole]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -106,13 +218,15 @@ export function AIChat({ portalType }: AIChatProps) {
       const response: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: getAIResponse(messageText, portalType),
+        content: getAIResponseByRole(messageText, portalType, userRole),
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, response]);
       setIsTyping(false);
-    }, 1000 + Math.random() * 1000);
+    }, 800 + Math.random() * 800);
   };
+
+  if (!mounted) return null;
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
@@ -127,7 +241,7 @@ export function AIChat({ portalType }: AIChatProps) {
           </h1>
           <p className="text-sm text-muted-foreground flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            Always online · Powered by AI
+            Active · Adapting to {userRole.charAt(0).toUpperCase() + userRole.slice(1)} role
           </p>
         </div>
       </div>
@@ -187,14 +301,14 @@ export function AIChat({ portalType }: AIChatProps) {
           </div>
 
           {/* Suggestions */}
-          {messages.length <= 1 && (
+          {messages.length <= 1 && suggestions.length > 0 && (
             <div className="px-4 pb-3">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
                 <Lightbulb className="w-3 h-3" />
                 Try asking:
               </div>
               <div className="flex flex-wrap gap-2">
-                {suggestions.slice(0, 4).map((s) => (
+                {suggestions.map((s) => (
                   <button
                     key={s}
                     onClick={() => handleSend(s)}
