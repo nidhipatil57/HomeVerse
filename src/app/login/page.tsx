@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Building2, GraduationCap, Shield, Users, Eye, EyeOff,
-  Sparkles, ArrowRight, Mail, Lock, ArrowLeft, Briefcase, UserCheck
+  Sparkles, ArrowRight, Mail, Lock, ArrowLeft, Briefcase, UserCheck, CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,13 +16,14 @@ import { useAuth, MOCK_USERS } from "@/lib/store/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, logout, user, initialize } = useAuth();
+  const { login, loginWithGoogle, logout, user, initialize } = useAuth();
   const [selectedEcosystem, setSelectedEcosystem] = useState<"society" | "hostel" | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -50,10 +51,12 @@ export default function LoginPage() {
       setPassword("Aarav@123");
     }
     setError("");
+    setSuccessMessage("");
   }, [selectedEcosystem]);
 
   const handleRoleChange = (role: string) => {
     setSelectedRole(role);
+    setSuccessMessage("");
     if (role === "resident") {
       setEmail("sara@sunshinecomplex.com");
       setPassword("Sara@123");
@@ -82,10 +85,11 @@ export default function LoginPage() {
       return;
     }
     setError("");
+    setSuccessMessage("");
     setLoading(true);
     try {
       const portal = selectedEcosystem === "society" ? "society" : "hostel";
-      const success = await login(email, selectedRole as any, portal);
+      const success = await login(email, password, selectedRole as any, portal);
       if (success) {
         router.replace(selectedEcosystem === "society" ? "/society/dashboard" : "/hostel/dashboard");
       } else {
@@ -98,6 +102,26 @@ export default function LoginPage() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setError("");
+    setSuccessMessage("");
+    setLoading(true);
+    try {
+      const portal = selectedEcosystem === "society" ? "society" : "hostel";
+      const result = await loginWithGoogle(selectedRole as any, portal);
+      if (result === "success") {
+        router.replace(selectedEcosystem === "society" ? "/society/dashboard" : "/hostel/dashboard");
+      } else if (result === "pending") {
+        setSuccessMessage("Registered successfully! Waiting for secretary approval.");
+        setError("");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to sign in with Google.");
+      setSuccessMessage("");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getEcosystemRoles = () => {
     if (selectedEcosystem === "society") {
@@ -316,6 +340,13 @@ export default function LoginPage() {
                 </div>
               )}
 
+              {successMessage && (
+                <div className="p-3 mb-4 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 text-xs font-medium flex items-center gap-2">
+                  <CheckCircle2 className="w-4.5 h-4.5 shrink-0" />
+                  {successMessage}
+                </div>
+              )}
+
               {/* Form */}
               <form className="space-y-4" onSubmit={handleManualLogin}>
                 <div className="relative">
@@ -375,7 +406,7 @@ export default function LoginPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <Button type="button" variant="outline" className="h-11 rounded-xl">
+                <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={handleGoogleLogin} disabled={loading}>
                   <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
