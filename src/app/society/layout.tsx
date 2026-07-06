@@ -3,33 +3,87 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { SOCIETY_SIDEBAR_ITEMS, WORKER_SIDEBAR_ITEMS, SECURITY_SIDEBAR_ITEMS } from "@/lib/constants";
+import { SOCIETY_SIDEBAR_ITEMS, WORKER_SIDEBAR_ITEMS, SECURITY_SIDEBAR_ITEMS, SECRETARY_SIDEBAR_ITEMS } from "@/lib/constants";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 
-const WORKER_ONLY_PATHS = [
-  "/society/route",
-  "/society/inventory",
-  "/society/performance",
-  "/society/emergency"
-];
-
-const SECURITY_ALLOWED_PATHS = [
-  "/society/dashboard",
-  "/society/visitors",
-  "/society/announcements",
-  "/society/settings",
-  "/society/complaints"
-];
-
-const RESIDENT_ONLY_PATHS = [
-  "/society/maintenance",
-  "/society/community",
-  "/society/visitors",
-  "/society/marketplace",
-  "/society/analytics",
-  "/society/announcements"
-];
+const getAllowedPaths = (role: string): string[] => {
+  switch (role) {
+    case "resident":
+      return [
+        "/society/dashboard",
+        "/society/ai-assistant",
+        "/society/complaints",
+        "/society/visitors",
+        "/society/maintenance-bills",
+        "/society/payment-history",
+        "/society/utility-usage",
+        "/society/events",
+        "/society/lost-found",
+        "/society/find-local-help",
+        "/society/buy-sell",
+        "/society/local-businesses",
+        "/society/resident-directory",
+        "/society/book-borrowing",
+        "/society/facility-booking",
+        "/society/my-parcels",
+        "/society/notifications",
+        "/society/settings"
+      ];
+    case "worker":
+      return [
+        "/society/dashboard",
+        "/society/complaints",
+        "/society/route",
+        "/society/emergency",
+        "/society/inventory",
+        "/society/performance",
+        "/society/services",
+        "/society/availability",
+        "/society/notifications",
+        "/society/settings"
+      ];
+    case "security":
+      return [
+        "/society/dashboard",
+        "/society/visitor-desk",
+        "/society/parcel-management",
+        "/society/helpers-entry",
+        "/society/vehicle-logs",
+        "/society/gate-logs",
+        "/society/security-lost-found",
+        "/society/incident-reports",
+        "/society/cctv",
+        "/society/announcements",
+        "/society/notifications",
+        "/society/settings"
+      ];
+    case "secretary":
+      return [
+        "/society/dashboard",
+        "/society/ai-assistant",
+        "/society/residents",
+        "/society/buildings",
+        "/society/flats",
+        "/society/workers",
+        "/society/security-staff",
+        "/society/complaints",
+        "/society/maintenance-bills-mgmt",
+        "/society/payments",
+        "/society/expenses",
+        "/society/financial-reports",
+        "/society/analytics",
+        "/society/announcements",
+        "/society/events-mgmt",
+        "/society/facility-management",
+        "/society/approvals",
+        "/society/notifications",
+        "/society/settings"
+      ];
+    default:
+      return [];
+  }
+};
 
 export default function SocietyLayout({
   children,
@@ -67,29 +121,9 @@ export default function SocietyLayout({
     }
 
     // 3. Role Authorization check
-    if (user.role === "worker") {
-      // Worker attempting resident-only routes
-      const isResidentRoute = RESIDENT_ONLY_PATHS.some(path => pathname.startsWith(path));
-      if (isResidentRoute) {
-        logout();
-        router.replace("/login?portal=society");
-      }
-    } else if (user.role === "resident" || user.role === "secretary") {
-      // Resident or Secretary attempting worker-only routes
-      const isWorkerRoute = WORKER_ONLY_PATHS.some(path => pathname.startsWith(path));
-      if (isWorkerRoute) {
-        logout();
-        router.replace("/login?portal=society");
-      }
-    } else if (user.role === "security") {
-      // Security attempting unauthorized routes
-      const isAllowed = SECURITY_ALLOWED_PATHS.some(path => pathname.startsWith(path));
-      if (!isAllowed) {
-        logout();
-        router.replace("/login?portal=society");
-      }
-    } else {
-      // Unrecognized role for society
+    const allowedPaths = getAllowedPaths(user.role);
+    const isAllowed = allowedPaths.some(path => pathname.startsWith(path));
+    if (!isAllowed) {
       logout();
       router.replace("/login?portal=society");
     }
@@ -105,13 +139,8 @@ export default function SocietyLayout({
   }
 
   // Prevent rendering if role and path mismatch
-  if (user.role === "worker" && RESIDENT_ONLY_PATHS.some(path => pathname.startsWith(path))) {
-    return null;
-  }
-  if ((user.role === "resident" || user.role === "secretary") && WORKER_ONLY_PATHS.some(path => pathname.startsWith(path))) {
-    return null;
-  }
-  if (user.role === "security" && !SECURITY_ALLOWED_PATHS.some(path => pathname.startsWith(path))) {
+  const allowedPaths = getAllowedPaths(user.role);
+  if (!allowedPaths.some(path => pathname.startsWith(path))) {
     return null;
   }
 
@@ -119,7 +148,9 @@ export default function SocietyLayout({
     ? WORKER_SIDEBAR_ITEMS 
     : user.role === "security" 
       ? SECURITY_SIDEBAR_ITEMS 
-      : SOCIETY_SIDEBAR_ITEMS;
+      : user.role === "secretary"
+        ? SECRETARY_SIDEBAR_ITEMS
+        : SOCIETY_SIDEBAR_ITEMS;
 
   const portalName = user.role === "worker" 
     ? "Worker Portal" 
