@@ -72,7 +72,7 @@ export default function LaundryPage() {
 
   const todayStr = new Date().toISOString().split("T")[0];
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBookingError("");
     setBookingSuccess(false);
@@ -83,7 +83,7 @@ export default function LaundryPage() {
       return;
     }
 
-    const success = bookLaundrySlot(
+    const success = await bookLaundrySlot(
       selectedMachineId,
       selectedSlot,
       todayStr,

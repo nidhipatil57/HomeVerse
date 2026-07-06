@@ -70,7 +70,7 @@ export default function CommunityPage() {
     "06:00 PM - 07:00 PM"
   ];
 
-  const handleBookFacility = (e: React.FormEvent) => {
+  const handleBookFacility = async (e: React.FormEvent) => {
     e.preventDefault();
     setFacilityError("");
     setFacilitySuccess(false);
@@ -80,7 +80,7 @@ export default function CommunityPage() {
       return;
     }
 
-    const success = bookFacility({
+    const success = await bookFacility({
       facility: selectedFacility,
       userId: user?.id || "user-resident-1",
       userName: user?.name || "Nidhi Kumar",

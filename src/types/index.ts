@@ -91,6 +91,7 @@ export interface ComplaintTimelineEntry {
   timestamp: string;
   note?: string;
   by?: string;
+  afterPhoto?: string;
 }
 
 // --- Visitors ---

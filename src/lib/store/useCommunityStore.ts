@@ -1,7 +1,15 @@
 "use client";
 
 import { create } from "zustand";
-import { Complaint, Visitor, UserRole, PortalType, User, Announcement, EmergencyAlert, GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord } from "@/types";
+import {
+  Complaint, Visitor, UserRole, PortalType, User, Announcement, EmergencyAlert,
+  GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord
+} from "@/types";
+import { db, auth } from "@/lib/firebase/config";
+import {
+  collection, doc, setDoc, updateDoc, deleteDoc, getDoc, onSnapshot
+} from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 // ==========================================
 // Centralized Database Interfaces
@@ -108,6 +116,7 @@ export interface MaintenanceBill {
   dueDate: string;
   status: "paid" | "pending" | "overdue";
   paidOn?: string;
+  breakdown?: { label: string; amount: number }[];
 }
 
 export interface CommunityEvent {
@@ -168,89 +177,89 @@ interface CommunityState {
 
   initializeDb: () => void;
   saveDb: () => void;
-  addRegisteredUser: (u: User & Record<string, any>) => void;
+  addRegisteredUser: (u: User & Record<string, any>) => Promise<void>;
   
   // Complaint Transactions
-  addComplaint: (c: Omit<Complaint, "id" | "createdAt" | "updatedAt" | "timeline">) => void;
-  updateComplaintStatus: (id: string, status: Complaint["status"], details?: { by?: string; note?: string; afterPhoto?: string }) => void;
-  assignComplaintWorker: (id: string, workerName: string, workerId: string, eta: string) => void;
-  rateComplaint: (id: string, rating: number) => void;
+  addComplaint: (c: Omit<Complaint, "id" | "createdAt" | "updatedAt" | "timeline">) => Promise<void>;
+  updateComplaintStatus: (id: string, status: Complaint["status"], details?: { by?: string; note?: string; afterPhoto?: string }) => Promise<void>;
+  assignComplaintWorker: (id: string, workerName: string, workerId: string, eta: string) => Promise<void>;
+  rateComplaint: (id: string, rating: number) => Promise<void>;
 
   // Leaves Transactions
-  submitLeaveRequest: (req: Omit<LeaveRequest, "id" | "status" | "createdAt">) => void;
-  approveRejectLeave: (id: string, status: "approved" | "rejected") => void;
+  submitLeaveRequest: (req: Omit<LeaveRequest, "id" | "status" | "createdAt">) => Promise<void>;
+  approveRejectLeave: (id: string, status: "approved" | "rejected") => Promise<void>;
 
   // Visitors Transactions
-  submitVisitorRequest: (v: Omit<Visitor, "id" | "status" | "qrCode">) => void;
-  checkInVisitor: (id: string) => void;
-  checkOutVisitor: (id: string) => void;
-  denyVisitorEntry: (id: string, reason: string) => void;
+  submitVisitorRequest: (v: Omit<Visitor, "id" | "status" | "qrCode">) => Promise<void>;
+  checkInVisitor: (id: string) => Promise<void>;
+  checkOutVisitor: (id: string) => Promise<void>;
+  denyVisitorEntry: (id: string, reason: string) => Promise<void>;
 
   // Laundry Transactions
-  bookLaundrySlot: (machineId: string, slot: string, date: string, studentId: string, studentName: string) => boolean;
-  cancelLaundrySlot: (machineId: string, slot: string, date: string) => void;
+  bookLaundrySlot: (machineId: string, slot: string, date: string, studentId: string, studentName: string) => Promise<boolean>;
+  cancelLaundrySlot: (machineId: string, slot: string, date: string) => Promise<void>;
 
   // Parcels Transactions
-  addParcel: (p: Omit<Parcel, "id" | "status" | "receivedAt">) => void;
-  pickupParcelWithOTP: (id: string, otp: string) => boolean;
+  addParcel: (p: Omit<Parcel, "id" | "status" | "receivedAt">) => Promise<void>;
+  pickupParcelWithOTP: (id: string, otp: string) => Promise<boolean>;
 
   // Room Allocation Transactions
-  reallocateRoom: (studentId: string, newRoom: string, newBlock: string, newFloor: string) => void;
-  vacateRoom: (studentId: string) => void;
-  requestRoomChange: (req: Omit<RoomChangeRequest, "id" | "status" | "createdAt">) => void;
-  approveRoomChange: (id: string) => void;
+  reallocateRoom: (studentId: string, newRoom: string, newBlock: string, newFloor: string) => Promise<void>;
+  vacateRoom: (studentId: string) => Promise<void>;
+  requestRoomChange: (req: Omit<RoomChangeRequest, "id" | "status" | "createdAt">) => Promise<void>;
+  approveRoomChange: (id: string) => Promise<void>;
 
   // Roommate Matching Transactions
-  submitRoommatePreference: (pref: RoommatePreference) => void;
+  submitRoommatePreference: (pref: RoommatePreference) => Promise<void>;
 
   // Facility Bookings
-  bookFacility: (booking: Omit<FacilityBooking, "id" | "status">) => boolean;
-  cancelFacilityBooking: (id: string) => void;
+  bookFacility: (booking: Omit<FacilityBooking, "id" | "status">) => Promise<boolean>;
+  cancelFacilityBooking: (id: string) => Promise<void>;
 
   // Marketplace Transactions
-  listMarketplaceItem: (item: Omit<MarketplaceItem, "id" | "status" | "createdAt">) => void;
-  sellMarketplaceItem: (id: string) => void;
+  listMarketplaceItem: (item: Omit<MarketplaceItem, "id" | "status" | "createdAt">) => Promise<void>;
+  sellMarketplaceItem: (id: string) => Promise<void>;
 
   // Lost & Found Transactions
-  reportLostFoundItem: (item: Omit<LostFoundItem, "id" | "status" | "createdAt">) => void;
-  claimLostFoundItem: (id: string, claimantId: string, claimantName: string) => void;
-  resolveLostFoundItem: (id: string) => void;
+  reportLostFoundItem: (item: Omit<LostFoundItem, "id" | "status" | "createdAt">) => Promise<void>;
+  claimLostFoundItem: (id: string, claimantId: string, claimantName: string) => Promise<void>;
+  resolveLostFoundItem: (id: string) => Promise<void>;
 
-  // Maintenance Bills Payments
-  payMaintenanceBill: (id: string) => void;
+  // Society Finance & Billing Transactions
+  payMaintenanceBill: (id: string) => Promise<void>;
 
   // Community Events
-  createEvent: (ev: Omit<CommunityEvent, "id" | "rsvps">) => void;
-  rsvpEvent: (id: string, userId: string) => void;
+  createEvent: (ev: Omit<CommunityEvent, "id" | "rsvps">) => Promise<void>;
+  rsvpEvent: (id: string, userId: string) => Promise<void>;
 
   // Notifications
-  sendNotification: (userId: string, title: string, message: string, type: Notification["type"]) => void;
-  markNotificationsRead: (userId: string) => void;
+  sendNotification: (userId: string, title: string, message: string, type: Notification["type"]) => Promise<void>;
+  markNotificationsRead: (userId: string) => Promise<void>;
 
   // Security Operations
-  raiseEmergencyAlert: (alert: Omit<EmergencyAlert, "id" | "status" | "createdAt">) => void;
-  updateEmergencyStatus: (id: string, status: EmergencyAlert["status"], notes?: string) => void;
-  issueGatePass: (pass: Omit<GatePass, "id" | "status" | "createdAt">) => void;
-  logVehicleEntry: (vehicle: Omit<VehicleLog, "id" | "entryTime" | "status">) => void;
-  logVehicleExit: (id: string) => void;
-  addAnnouncement: (ann: Omit<Announcement, "id" | "createdAt">) => void;
-  addIncidentReport: (incident: Omit<IncidentReport, "id" | "createdAt">) => void;
-  approveUser: (userId: string) => void;
-  rejectUser: (userId: string) => void;
-  activateDeactivateUser: (userId: string, status: 'approved' | 'deactivated') => void;
-  addFlat: (flat: Omit<FlatInfo, 'id'>) => void;
-  addExpense: (expense: Omit<SocietyExpense, 'id'>) => void;
-  addRentRecord: (rent: Omit<RentRecord, 'id'>) => void;
-  payRentRecord: (id: string) => void;
-  generateBulkMaintenanceBills: (billDetails: { month: string; amount: number; breakdown: { label: string; amount: number }[] }) => void;
-  deleteMarketplaceItem: (itemId: string) => void;
+  raiseEmergencyAlert: (alert: Omit<EmergencyAlert, "id" | "status" | "createdAt">) => Promise<void>;
+  updateEmergencyStatus: (id: string, status: EmergencyAlert["status"], notes?: string) => Promise<void>;
+  issueGatePass: (pass: Omit<GatePass, "id" | "status" | "createdAt">) => Promise<void>;
+  logVehicleEntry: (vehicle: Omit<VehicleLog, "id" | "entryTime" | "status">) => Promise<void>;
+  logVehicleExit: (id: string) => Promise<void>;
+  addAnnouncement: (ann: Omit<Announcement, "id" | "createdAt">) => Promise<void>;
+  addIncidentReport: (incident: Omit<IncidentReport, "id" | "createdAt">) => Promise<void>;
+  approveUser: (userId: string) => Promise<void>;
+  rejectUser: (userId: string) => Promise<void>;
+  activateDeactivateUser: (userId: string, status: 'approved' | 'deactivated') => Promise<void>;
+  addFlat: (flat: Omit<FlatInfo, 'id'>) => Promise<void>;
+  addExpense: (expense: Omit<SocietyExpense, 'id'>) => Promise<void>;
+  addRentRecord: (rent: Omit<RentRecord, 'id'>) => Promise<void>;
+  payRentRecord: (id: string) => Promise<void>;
+  generateBulkMaintenanceBills: (billDetails: { month: string; amount: number; breakdown: { label: string; amount: number }[] }) => Promise<void>;
+  deleteMarketplaceItem: (itemId: string) => Promise<void>;
   updateWorkerServices: (workerId: string, details: {
     specializations: string[];
     experience: string;
     workingShift: string;
     phone: string;
     availability: string;
-  }) => void;
+  }) => Promise<void>;
 }
 
 export const useCommunityStore = create<CommunityState>((set, get) => ({
@@ -279,61 +288,66 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
   initializeDb: () => {
     if (typeof window === "undefined") return;
-    try {
-      const stored = localStorage.getItem("homeverse_db");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const { getPrepopulatedUsers } = require("@/data/mock-db-seed");
-        const seedUsers = getPrepopulatedUsers();
-        // If users list is missing or size is different, force re-seed to include new mock users
-        if (!parsed.users || parsed.users.length !== seedUsers.length) {
-          const { getInitialDb } = require("@/data/mock-db-seed");
-          const initialDb = getInitialDb();
-          set(initialDb);
-          localStorage.setItem("homeverse_db", JSON.stringify(initialDb));
-          return;
+    if ((globalThis as any).__homeverse_auth_listener_active) return;
+    (globalThis as any).__homeverse_auth_listener_active = true;
+
+    onAuthStateChanged(auth, (firebaseUser: any) => {
+      if (firebaseUser) {
+        if ((globalThis as any).__homeverse_listeners_active) return;
+        (globalThis as any).__homeverse_listeners_active = true;
+
+        const collectionsToListen = [
+          { key: "complaints", coll: "complaints" },
+          { key: "leaveRequests", coll: "leaveRequests" },
+          { key: "visitors", coll: "visitors" },
+          { key: "laundrySlots", coll: "laundrySlots" },
+          { key: "parcels", coll: "parcels" },
+          { key: "facilityBookings", coll: "facilityBookings" },
+          { key: "marketplaceItems", coll: "marketplaceItems" },
+          { key: "lostFoundItems", coll: "lostFoundItems" },
+          { key: "roomChangeRequests", coll: "roomChangeRequests" },
+          { key: "maintenanceBills", coll: "maintenanceBills" },
+          { key: "communityEvents", coll: "communityEvents" },
+          { key: "notifications", coll: "notifications" },
+          { key: "roommatePreferences", coll: "roommatePreferences" },
+          { key: "users", coll: "users" },
+          { key: "emergencies", coll: "emergencies" },
+          { key: "gatePasses", coll: "gatePasses" },
+          { key: "vehicleLogs", coll: "vehicleLogs" },
+          { key: "incidents", coll: "incidents" },
+          { key: "announcements", coll: "announcements" },
+          { key: "expenses", coll: "expenses" },
+          { key: "flats", coll: "flats" },
+          { key: "rentRecords", coll: "rentRecords" }
+        ];
+
+        (globalThis as any).__homeverse_unsubscribers = collectionsToListen.map(({ key, coll }) => {
+          return onSnapshot(collection(db, coll), (snapshot) => {
+            const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+            set({ [key]: list } as any);
+          });
+        });
+      } else {
+        if ((globalThis as any).__homeverse_unsubscribers) {
+          (globalThis as any).__homeverse_unsubscribers.forEach((unsub: any) => unsub());
+          delete (globalThis as any).__homeverse_unsubscribers;
         }
-        set(parsed);
-        return;
+        (globalThis as any).__homeverse_listeners_active = false;
       }
-    } catch (e) {
-      console.error("Failed to load local DB", e);
-    }
-
-    const { getInitialDb } = require("@/data/mock-db-seed");
-    const initialDb = getInitialDb();
-
-    set(initialDb);
-    try {
-      localStorage.setItem("homeverse_db", JSON.stringify(initialDb));
-    } catch (e) {}
+    });
   },
 
-  // Helper transaction to save database
-  saveDb: () => {
-    if (typeof window === "undefined") return;
-    const {
-      users, complaints, leaveRequests, visitors, laundrySlots, parcels,
-      facilityBookings, marketplaceItems, lostFoundItems, roomChangeRequests,
-      maintenanceBills, communityEvents, notifications, roommatePreferences,
-      emergencies, gatePasses, vehicleLogs, incidents, announcements,
-      expenses, flats, rentRecords
-    } = get();
-    try {
-      localStorage.setItem("homeverse_db", JSON.stringify({
-        users, complaints, leaveRequests, visitors, laundrySlots, parcels,
-        facilityBookings, marketplaceItems, lostFoundItems, roomChangeRequests,
-        maintenanceBills, communityEvents, notifications, roommatePreferences,
-        emergencies, gatePasses, vehicleLogs, incidents, announcements,
-        expenses, flats, rentRecords
-      }));
-    } catch (e) {}
+  // No-op since we write straight to Firestore
+  saveDb: () => {},
+
+  addRegisteredUser: async (u) => {
+    await setDoc(doc(db, "users", u.id), u);
   },
 
   // ==========================================
   // COMPLAINT TRANSACTIONS
   // ==========================================
-  addComplaint: (c) => {
+  addComplaint: async (c) => {
     const id = `CMP-${Math.floor(100 + Math.random() * 900)}`;
     const newComplaint: Complaint = {
       ...c,
@@ -344,147 +358,95 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         { status: "submitted", timestamp: new Date().toISOString(), note: "Complaint registered successfully." }
       ]
     };
-    set(state => ({ complaints: [newComplaint, ...state.complaints] }));
-    get().saveDb();
+    await setDoc(doc(db, "complaints", id), newComplaint);
 
-    // Trigger Notification
-    const isHostel = c.portal === "hostel";
-    if (isHostel) {
-      // Notify Warden
-      get().sendNotification("user-warden-1", "New Complaint Raised", `Student ${c.raisedByName} raised a complaint: "${c.title}"`, "warning");
-    } else {
-      // Notify Committee/Admin
-      get().sendNotification("admin", "New Maintenance Job", `${c.raisedByName} (Flat ${c.unit}) reported: "${c.title}"`, "warning");
-    }
+    const title = `New Ticket Raised 📋`;
+    const message = `Unit ${c.unit} raised ticket: "${c.title}"`;
+    await get().sendNotification("all_residents", title, message, "info");
   },
 
-  updateComplaintStatus: (id, status, details = {}) => {
-    set(state => ({
-      complaints: state.complaints.map(c => {
-        if (c.id === id) {
-          const timestamp = new Date().toISOString();
-          const timelineEntry = {
-            status,
-            timestamp,
-            note: details.note || `Status updated to ${status}.`,
-            by: details.by || "System"
-          };
-          return {
-            ...c,
-            status,
-            updatedAt: timestamp,
-            beforePhoto: details.afterPhoto ? c.beforePhoto : (details.note?.includes("proof") ? details.afterPhoto : c.beforePhoto), // fallback
-            resolvedAt: status === "resolved" ? timestamp : c.resolvedAt,
-            timeline: [...c.timeline, timelineEntry],
-            // Append completion notes/images if applicable
-            ...(status === "resolved" || status === "closed" ? {
-              comments: details.note,
-              afterPhoto: details.afterPhoto
-            } : {})
-          };
-        }
-        return c;
-      })
-    }));
-    get().saveDb();
-
-    // Notify User
-    const updated = get().complaints.find(c => c.id === id);
-    if (updated) {
-      get().sendNotification(
-        updated.raisedBy,
-        `Complaint Update: ${updated.title.slice(0, 20)}...`,
-        `Complaint status has been updated to "${status}".`,
-        status === "resolved" ? "success" : "info"
-      );
+  updateComplaintStatus: async (id, status, details) => {
+    const compDoc = await getDoc(doc(db, "complaints", id));
+    if (!compDoc.exists()) return;
+    const comp = compDoc.data() as Complaint;
+    const newTimeline = [...(comp.timeline || [])];
+    if (details?.note) {
+      newTimeline.push({
+        status,
+        timestamp: new Date().toISOString(),
+        note: details.note,
+        by: details.by,
+        afterPhoto: details.afterPhoto
+      });
     }
+    const updates: Partial<Complaint> = {
+      status,
+      updatedAt: new Date().toISOString(),
+      timeline: newTimeline
+    };
+    await updateDoc(doc(db, "complaints", id), updates);
+
+    await get().sendNotification(
+      comp.raisedBy,
+      `Ticket Status Updated ⚙️`,
+      `Your ticket "${comp.title}" is now: ${status.toUpperCase()}`,
+      "success"
+    );
   },
 
-  assignComplaintWorker: (id, workerName, workerId, eta) => {
-    set(state => ({
-      complaints: state.complaints.map(c => {
-        if (c.id === id) {
-          const timestamp = new Date().toISOString();
-          const timelineEntry = {
-            status: "assigned" as const,
-            timestamp,
-            note: `Assigned to ${workerName}. Est. resolution: ${eta}`,
-            by: "Admin/Warden"
-          };
-          return {
-            ...c,
-            status: "assigned" as const,
-            assignedTo: workerName,
-            estimatedResolution: eta,
-            updatedAt: timestamp,
-            timeline: [...c.timeline, timelineEntry]
-          };
-        }
-        return c;
-      })
-    }));
-    get().saveDb();
-
-    const updated = get().complaints.find(c => c.id === id);
-    if (updated) {
-      // Notify Resident
-      get().sendNotification(
-        updated.raisedBy,
-        "Worker Assigned to Task",
-        `Worker ${workerName} has been assigned. Estimated time: ${eta}`,
-        "info"
-      );
-      // Notify Worker
-      get().sendNotification(
-        workerId,
-        "New Job Assigned",
-        `Job details: ${updated.title} at ${updated.building} Unit ${updated.unit}. Priority: ${updated.priority}`,
-        "alert"
-      );
-    }
+  assignComplaintWorker: async (id, workerName, workerId, eta) => {
+    const updates = {
+      assignedTo: `${workerName} (ETA: ${eta})`,
+      assignedToId: workerId,
+      updatedAt: new Date().toISOString()
+    };
+    await updateDoc(doc(db, "complaints", id), updates);
+    
+    await get().sendNotification(
+      workerId,
+      `New Job Assigned 🛠️`,
+      `You have been assigned: "${id}". Please review ETA.`,
+      "info"
+    );
   },
 
-  rateComplaint: (id, rating) => {
-    set(state => ({
-      complaints: state.complaints.map(c => {
-        if (c.id === id) {
-          return { ...c, rating, status: "closed" as const };
-        }
-        return c;
-      })
-    }));
-    get().saveDb();
+  rateComplaint: async (id, rating) => {
+    await updateDoc(doc(db, "complaints", id), {
+      rating,
+      updatedAt: new Date().toISOString()
+    });
   },
 
   // ==========================================
-  // LEAVE TRANSACTIONS
+  // LEAVES TRANSACTIONS
   // ==========================================
-  submitLeaveRequest: (req) => {
-    const newLeave: LeaveRequest = {
+  submitLeaveRequest: async (req) => {
+    const id = `LEV-${Math.floor(100 + Math.random() * 900)}`;
+    const newReq: LeaveRequest = {
       ...req,
-      id: `LEAVE-${Math.floor(100 + Math.random() * 900)}`,
+      id,
       status: "pending",
       createdAt: new Date().toISOString()
     };
-    set(state => ({ leaveRequests: [newLeave, ...state.leaveRequests] }));
-    get().saveDb();
+    await setDoc(doc(db, "leaveRequests", id), newReq);
 
-    // Notify Warden
-    get().sendNotification("user-warden-1", "Leave Approval Required", `${req.studentName} requested leave from ${req.fromDate}.`, "warning");
+    await get().sendNotification(
+      "user-warden-1",
+      "New Outstation Request ✈️",
+      `${req.studentName} has requested outstation leave.`,
+      "warning"
+    );
   },
 
-  approveRejectLeave: (id, status) => {
-    set(state => ({
-      leaveRequests: state.leaveRequests.map(l => l.id === id ? { ...l, status } : l)
-    }));
-    get().saveDb();
-
-    const request = get().leaveRequests.find(l => l.id === id);
-    if (request) {
-      get().sendNotification(
-        request.studentId,
-        `Leave Request ${status === "approved" ? "Approved ✔" : "Rejected ✘"}`,
-        `Your outing request for dates ${request.fromDate} to ${request.toDate} has been ${status}.`,
+  approveRejectLeave: async (id, status) => {
+    await updateDoc(doc(db, "leaveRequests", id), { status });
+    const leaveDoc = await getDoc(doc(db, "leaveRequests", id));
+    if (leaveDoc.exists()) {
+      const leaveData = leaveDoc.data() as LeaveRequest;
+      await get().sendNotification(
+        leaveData.studentId,
+        `Leave Request ${status.toUpperCase()} ✈️`,
+        `Your leave request from ${leaveData.fromDate} has been ${status}.`,
         status === "approved" ? "success" : "error"
       );
     }
@@ -493,115 +455,88 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   // ==========================================
   // VISITORS TRANSACTIONS
   // ==========================================
-  submitVisitorRequest: (v) => {
+  submitVisitorRequest: async (v) => {
     const id = `VIS-${Math.floor(100 + Math.random() * 900)}`;
+    const qrCode = `QR-HOMEVERSE-${id}`;
     const newVisitor: Visitor = {
       ...v,
       id,
-      status: v.portal === "hostel" ? "expected" : "expected", // needs warden approval if hostel
-      qrCode: `QR-CODE-${id}`,
-      approvedBy: v.approvedBy || v.visitingResident
+      status: "expected",
+      qrCode
     };
-    set(state => ({ visitors: [newVisitor, ...state.visitors] }));
-    get().saveDb();
+    await setDoc(doc(db, "visitors", id), newVisitor);
 
-    if (v.portal === "hostel") {
-      // Send approval to Warden
-      get().sendNotification("user-warden-1", "Hostel Visitor Requested", `${v.visitingResident} requested visitor access for ${v.name}.`, "info");
+    await get().sendNotification(
+      "user-security-1",
+      "Pre-approved Visitor Scheduled 🚪",
+      `Visitor ${v.name} scheduled for unit ${v.visitingUnit}.`,
+      "info"
+    );
+  },
+
+  checkInVisitor: async (id) => {
+    await updateDoc(doc(db, "visitors", id), {
+      status: "checked-in",
+      checkInTime: new Date().toISOString()
+    });
+    
+    const visDoc = await getDoc(doc(db, "visitors", id));
+    if (visDoc.exists()) {
+      const vis = visDoc.data() as Visitor;
+      const resident = get().users.find(u => u.role === "resident" && u.unit === vis.visitingUnit);
+      if (resident) {
+        await get().sendNotification(
+          resident.id,
+          "Visitor Checked In 🔔",
+          `Your visitor ${vis.name} has checked in at the gate.`,
+          "success"
+        );
+      }
     }
   },
 
-  checkInVisitor: (id) => {
-    set(state => ({
-      visitors: state.visitors.map(v => v.id === id ? { ...v, status: "checked-in", checkInTime: new Date().toISOString() } : v)
-    }));
-    get().saveDb();
-
-    const visitor = get().visitors.find(v => v.id === id);
-    if (visitor) {
-      // Notify resident/student
-      const matchingComplaints = get().complaints.filter(c => c.raisedByName === visitor.visitingResident);
-      const recipientId = matchingComplaints.length > 0 ? matchingComplaints[0].raisedBy : "user-resident-1";
-      get().sendNotification(
-        recipientId,
-        "Visitor Checked In 🏢",
-        `Your pre-approved guest ${visitor.name} has checked into the main gate.`,
-        "success"
-      );
-    }
+  checkOutVisitor: async (id) => {
+    await updateDoc(doc(db, "visitors", id), {
+      status: "checked-out",
+      checkOutTime: new Date().toISOString()
+    });
   },
 
-  checkOutVisitor: (id) => {
-    set(state => ({
-      visitors: state.visitors.map(v => v.id === id ? { ...v, status: "checked-out", checkOutTime: new Date().toISOString() } : v)
-    }));
-    get().saveDb();
+  denyVisitorEntry: async (id, reason) => {
+    await updateDoc(doc(db, "visitors", id), {
+      status: "denied",
+      denialReason: reason
+    });
   },
 
   // ==========================================
   // LAUNDRY TRANSACTIONS
   // ==========================================
-  bookLaundrySlot: (machineId, slot, date, studentId, studentName) => {
-    // Check if slot is already booked
-    const existing = get().laundrySlots.find(
-      (s) => s.machineId === machineId && s.slot === slot && s.date === date
-    );
-
-    if (existing && existing.status === "booked") {
-      return false; // already taken
-    }
-
-    set(state => ({
-      laundrySlots: state.laundrySlots.map(s => {
-        if (s.machineId === machineId && s.slot === slot && s.date === date) {
-          return { ...s, status: "booked", bookedBy: studentId, bookedByName: studentName };
-        }
-        return s;
-      })
-    }));
-    get().saveDb();
-
-    // Notify Student
-    get().sendNotification(
-      studentId,
-      "Laundry Slot Confirmed 🧺",
-      `Successfully reserved machine ${machineId} for slot ${slot}.`,
-      "success"
-    );
-
+  bookLaundrySlot: async (machineId, slot, date, studentId, studentName) => {
+    const slotId = `${machineId}-${date}-${slot.replace(/\s+/g, "")}`;
+    const newSlot: LaundrySlot = {
+      id: slotId,
+      machineId,
+      machineName: machineId === "M1" || machineId === "M3" ? "Front Load LG" : "Top Load Samsung",
+      slot,
+      date,
+      bookedBy: studentId,
+      bookedByName: studentName,
+      status: "booked"
+    };
+    await setDoc(doc(db, "laundrySlots", slotId), newSlot);
     return true;
   },
 
-  cancelLaundrySlot: (machineId, slot, date) => {
-    const existing = get().laundrySlots.find(
-      (s) => s.machineId === machineId && s.slot === slot && s.date === date
-    );
-    const prevBookedBy = existing?.bookedBy;
-
-    set(state => ({
-      laundrySlots: state.laundrySlots.map(s => {
-        if (s.machineId === machineId && s.slot === slot && s.date === date) {
-          return { ...s, status: "available", bookedBy: undefined, bookedByName: undefined };
-        }
-        return s;
-      })
-    }));
-    get().saveDb();
-
-    if (prevBookedBy) {
-      get().sendNotification(
-        prevBookedBy,
-        "Laundry Booking Cancelled",
-        `Your laundry reservation for machine ${machineId} has been cancelled.`,
-        "info"
-      );
-    }
+  cancelLaundrySlot: async (machineId, slot, date) => {
+    const slotId = `${machineId}-${date}-${slot.replace(/\s+/g, "")}`;
+    await deleteDoc(doc(db, "laundrySlots", slotId));
   },
 
   // ==========================================
   // PARCELS TRANSACTIONS
   // ==========================================
-  addParcel: (p) => {
+  addParcel: async (p) => {
     const id = `PRC-${Math.floor(100 + Math.random() * 900)}`;
     const newParcel: Parcel = {
       ...p,
@@ -609,266 +544,143 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       status: "received",
       receivedAt: new Date().toISOString()
     };
-    set(state => ({ parcels: [newParcel, ...state.parcels] }));
-    get().saveDb();
+    await setDoc(doc(db, "parcels", id), newParcel);
 
-    // Notify recipient
-    get().sendNotification(
+    await get().sendNotification(
       p.recipientId,
-      "New Package Received 📦",
-      `A parcel from ${p.courier} is registered at ${p.location}. Pickup OTP is: ${p.otp}`,
-      "success"
+      "New Parcel at Desk 📦",
+      `A parcel from ${p.courier} has been logged. OTP: ${p.otp}`,
+      "warning"
     );
   },
 
-  pickupParcelWithOTP: (id, otp) => {
-    const parcel = get().parcels.find(p => p.id === id);
-    if (parcel && parcel.otp === otp && parcel.status === "received") {
-      set(state => ({
-        parcels: state.parcels.map(p => p.id === id ? { ...p, status: "picked-up", pickedUpAt: new Date().toISOString() } : p)
-      }));
-      get().saveDb();
-
-      // Notify Student/Resident
-      get().sendNotification(
-        parcel.recipientId,
-        "Package Handed Over",
-        `You have successfully collected your courier from ${parcel.courier}.`,
-        "success"
-      );
-      return true;
+  pickupParcelWithOTP: async (id, otp) => {
+    const docRef = doc(db, "parcels", id);
+    const parcelDoc = await getDoc(docRef);
+    if (parcelDoc.exists()) {
+      const parcel = parcelDoc.data() as Parcel;
+      if (parcel.otp === otp) {
+        await updateDoc(docRef, {
+          status: "picked-up",
+          pickedUpAt: new Date().toISOString()
+        });
+        return true;
+      }
     }
     return false;
   },
 
   // ==========================================
-  // ROOM ALLOCATION & ROOMMATE PREFERENCES
+  // ROOM ALLOCATION TRANSACTIONS
   // ==========================================
-  reallocateRoom: (studentId, newRoom, newBlock, newFloor) => {
-    // 1. Update complaints raised by this student to match new room/block
-    set(state => ({
-      complaints: state.complaints.map(c => {
-        if (c.raisedBy === studentId) {
-          return { ...c, unit: newRoom, building: newBlock };
-        }
-        return c;
-      }),
-      // 2. Update leave requests
-      leaveRequests: state.leaveRequests.map(l => {
-        if (l.studentId === studentId) {
-          return { ...l, room: `${newRoom} (${newBlock})` };
-        }
-        return l;
-      }),
-      // 3. Update parcels
-      parcels: state.parcels.map(p => {
-        if (p.recipientId === studentId) {
-          return { ...p, unit: newRoom };
-        }
-        return p;
-      }),
-      // 4. Update visitors
-      visitors: state.visitors.map(v => {
-        if (v.visitingResident.includes(studentId) || v.visitingUnit === studentId) {
-          return { ...v, visitingUnit: newRoom };
-        }
-        return v;
-      }),
-      // 5. Update user list
-      users: state.users.map(u => {
-        if (u.id === studentId) {
-          return { ...u, unit: newRoom, building: newBlock };
-        }
-        return u;
-      })
-    }));
-
-    // Invalidate/Sync active session if matches
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("homeverse_auth");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.id === studentId) {
-          parsed.unit = newRoom;
-          parsed.building = newBlock;
-          localStorage.setItem("homeverse_auth", JSON.stringify(parsed));
-          try {
-            const { useAuth } = require("./useAuth");
-            useAuth.setState({ user: parsed });
-          } catch (e) {}
-        }
-      }
-    }
-
-    // Trigger Notification
-    get().sendNotification(
+  reallocateRoom: async (studentId, newRoom, newBlock, newFloor) => {
+    await updateDoc(doc(db, "users", studentId), {
+      unit: newRoom,
+      building: newBlock,
+      floor: newFloor
+    });
+    await get().sendNotification(
       studentId,
-      "Room Reallocated 🛌",
-      `Warden has updated your room assignment to Block ${newBlock}, Room ${newRoom}. All logs updated.`,
-      "warning"
-    );
-
-    get().saveDb();
-  },
-
-  vacateRoom: (studentId) => {
-    set(state => ({
-      users: state.users.map(u => {
-        if (u.id === studentId) {
-          const { unit, building, ...rest } = u;
-          return { ...rest } as any;
-        }
-        return u;
-      })
-    }));
-
-    // Invalidate/Sync active session if matches
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("homeverse_auth");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.id === studentId) {
-          delete parsed.unit;
-          delete parsed.building;
-          localStorage.setItem("homeverse_auth", JSON.stringify(parsed));
-          try {
-            const { useAuth } = require("./useAuth");
-            useAuth.setState({ user: parsed });
-          } catch (e) {}
-        }
-      }
-    }
-
-    get().sendNotification(
-      studentId,
-      "Room Vacated 🚪",
-      "Warden has processed your room exit. You are now unassigned.",
+      "Room Reallocation 🛌",
+      `Your room allocation has been updated: ${newBlock} - Room ${newRoom}`,
       "info"
     );
-
-    get().saveDb();
   },
 
-  requestRoomChange: (req) => {
-    const id = `RMCHG-${Math.floor(100 + Math.random() * 900)}`;
+  vacateRoom: async (studentId) => {
+    await updateDoc(doc(db, "users", studentId), {
+      unit: "",
+      building: ""
+    });
+  },
+
+  requestRoomChange: async (req) => {
+    const id = `RCH-${Math.floor(100 + Math.random() * 900)}`;
     const newReq: RoomChangeRequest = {
       ...req,
       id,
       status: "pending",
       createdAt: new Date().toISOString()
     };
-    set(state => ({ roomChangeRequests: [newReq, ...state.roomChangeRequests] }));
-    get().saveDb();
+    await setDoc(doc(db, "roomChangeRequests", id), newReq);
 
-    // Notify Warden
-    get().sendNotification(
+    await get().sendNotification(
       "user-warden-1",
-      "Room Transfer Request",
-      `Student ${req.studentName} requested room transfer to ${req.requestedBlock} Room ${req.requestedRoom}.`,
-      "info"
+      "Room Change Request 🔄",
+      `${req.studentName} requested room change to ${req.requestedRoom}`,
+      "warning"
     );
   },
 
-  approveRoomChange: (id) => {
-    const request = get().roomChangeRequests.find(r => r.id === id);
-    if (request && request.status === "pending") {
-      set(state => ({
-        roomChangeRequests: state.roomChangeRequests.map(r => r.id === id ? { ...r, status: "approved" as const } : r)
-      }));
-      
-      // Perform actual room re-allocation
-      get().reallocateRoom(request.studentId, request.requestedRoom, request.requestedBlock, "2");
-      get().saveDb();
+  approveRoomChange: async (id) => {
+    const reqDoc = await getDoc(doc(db, "roomChangeRequests", id));
+    if (reqDoc.exists()) {
+      const req = reqDoc.data() as RoomChangeRequest;
+      await updateDoc(doc(db, "roomChangeRequests", id), { status: "approved" });
+      await updateDoc(doc(db, "users", req.studentId), {
+        unit: req.requestedRoom,
+        building: req.requestedBlock
+      });
+      await get().sendNotification(
+        req.studentId,
+        "Room Change Approved 🔄",
+        `Your room change request to ${req.requestedRoom} has been approved.`,
+        "success"
+      );
     }
   },
 
-  submitRoommatePreference: (pref) => {
-    set(state => {
-      const idx = state.roommatePreferences.findIndex(p => p.userId === pref.userId);
-      if (idx !== -1) {
-        return {
-          roommatePreferences: state.roommatePreferences.map(p => p.userId === pref.userId ? pref : p)
-        };
-      }
-      return { roommatePreferences: [pref, ...state.roommatePreferences] };
-    });
-    get().saveDb();
+  // ==========================================
+  // ROOMMATE PREFERENCE TRANSACTIONS
+  // ==========================================
+  submitRoommatePreference: async (pref) => {
+    await setDoc(doc(db, "roommatePreferences", pref.userId), pref);
   },
 
   // ==========================================
-  // FACILITY BOOKINGS (SOCIETY)
+  // FACILITY BOOKINGS
   // ==========================================
-  bookFacility: (booking) => {
-    const existing = get().facilityBookings.find(
-      (b) => b.facility === booking.facility && b.date === booking.date && b.slot === booking.slot && b.status === "booked"
-    );
-
-    if (existing) {
-      return false; // double booking block
-    }
-
+  bookFacility: async (booking) => {
     const id = `FAC-${Math.floor(100 + Math.random() * 900)}`;
     const newBooking: FacilityBooking = {
       ...booking,
       id,
       status: "booked"
     };
-
-    set(state => ({ facilityBookings: [newBooking, ...state.facilityBookings] }));
-    get().saveDb();
-
-    get().sendNotification(
-      booking.userId,
-      "Facility Reservation Confirmed",
-      `Your booking for ${booking.facility} on ${booking.date} at ${booking.slot} is confirmed.`,
-      "success"
-    );
-
+    await setDoc(doc(db, "facilityBookings", id), newBooking);
     return true;
   },
 
-  cancelFacilityBooking: (id) => {
-    set(state => ({
-      facilityBookings: state.facilityBookings.map(b => b.id === id ? { ...b, status: "cancelled" as const } : b)
-    }));
-    get().saveDb();
+  cancelFacilityBooking: async (id) => {
+    await updateDoc(doc(db, "facilityBookings", id), { status: "cancelled" });
   },
 
   // ==========================================
   // MARKETPLACE TRANSACTIONS
   // ==========================================
-  listMarketplaceItem: (item) => {
-    const id = `MKT-${Math.floor(100 + Math.random() * 900)}`;
+  listMarketplaceItem: async (item) => {
+    const id = `ITEM-${Math.floor(100 + Math.random() * 900)}`;
     const newItem: MarketplaceItem = {
       ...item,
       id,
       status: "available",
       createdAt: new Date().toISOString()
     };
-    set(state => ({ marketplaceItems: [newItem, ...state.marketplaceItems] }));
-    get().saveDb();
-
-    // Broadcast notice to portal
-    const targetGroup = item.portal === "hostel" ? "all_students" : "all_residents";
-    get().sendNotification(
-      targetGroup,
-      "New Listing in Marketplace 🏷️",
-      `A new item "${item.title}" is listed for sale by ${item.sellerName}.`,
-      "info"
-    );
+    await setDoc(doc(db, "marketplaceItems", id), newItem);
   },
 
-  sellMarketplaceItem: (id) => {
-    set(state => ({
-      marketplaceItems: state.marketplaceItems.map(item => item.id === id ? { ...item, status: "sold" as const } : item)
-    }));
-    get().saveDb();
+  sellMarketplaceItem: async (id) => {
+    await updateDoc(doc(db, "marketplaceItems", id), { status: "sold" });
+  },
+
+  deleteMarketplaceItem: async (itemId) => {
+    await deleteDoc(doc(db, "marketplaceItems", itemId));
   },
 
   // ==========================================
   // LOST & FOUND TRANSACTIONS
   // ==========================================
-  reportLostFoundItem: (item) => {
+  reportLostFoundItem: async (item) => {
     const id = `LF-${Math.floor(100 + Math.random() * 900)}`;
     const newItem: LostFoundItem = {
       ...item,
@@ -876,104 +688,64 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       status: "reported",
       createdAt: new Date().toISOString()
     };
-    set(state => ({ lostFoundItems: [newItem, ...state.lostFoundItems] }));
-    get().saveDb();
-
-    // Broadcast notice
-    const targetGroup = item.portal === "hostel" ? "all_students" : "all_residents";
-    get().sendNotification(
-      targetGroup,
-      "Item Reported in Lost & Found 🔍",
-      `Found: "${item.title}" reported by ${item.reporterName}. Check board to claim.`,
-      "warning"
-    );
+    await setDoc(doc(db, "lostFoundItems", id), newItem);
   },
 
-  claimLostFoundItem: (id, claimantId, claimantName) => {
-    set(state => ({
-      lostFoundItems: state.lostFoundItems.map(item =>
-        item.id === id
-          ? { ...item, status: "claimed" as const, claimantId, claimantName }
-          : item
-      )
-    }));
-    get().saveDb();
+  claimLostFoundItem: async (id, claimantId, claimantName) => {
+    await updateDoc(doc(db, "lostFoundItems", id), {
+      status: "claimed",
+      claimantId,
+      claimantName
+    });
+  },
 
-    const claimed = get().lostFoundItems.find(item => item.id === id);
-    if (claimed) {
-      // Notify reporter
-      get().sendNotification(
-        claimed.reporterId,
-        "Lost & Found Claim Filed",
-        `${claimantName} claimed the reported item: "${claimed.title}".`,
-        "success"
-      );
+  resolveLostFoundItem: async (id) => {
+    await updateDoc(doc(db, "lostFoundItems", id), { status: "claimed" });
+  },
+
+  // ==========================================
+  // BILLING & FINANCE
+  // ==========================================
+  payMaintenanceBill: async (id) => {
+    await updateDoc(doc(db, "maintenanceBills", id), {
+      status: "paid",
+      paidOn: new Date().toISOString().split("T")[0]
+    });
+  },
+
+  // ==========================================
+  // EVENTS
+  // ==========================================
+  createEvent: async (ev) => {
+    const id = `EVT-${Math.floor(100 + Math.random() * 900)}`;
+    const newEvent: CommunityEvent = {
+      ...ev,
+      id,
+      rsvps: []
+    };
+    await setDoc(doc(db, "communityEvents", id), newEvent);
+  },
+
+  rsvpEvent: async (id, userId) => {
+    const docRef = doc(db, "communityEvents", id);
+    const evDoc = await getDoc(docRef);
+    if (evDoc.exists()) {
+      const ev = evDoc.data() as CommunityEvent;
+      const currentRsvps = ev.rsvps || [];
+      const newRsvps = currentRsvps.includes(userId)
+        ? currentRsvps.filter((u) => u !== userId)
+        : [...currentRsvps, userId];
+      await updateDoc(docRef, { rsvps: newRsvps });
     }
-  },
-
-  // ==========================================
-  // MAINTENANCE BILLS
-  // ==========================================
-  payMaintenanceBill: (id) => {
-    set(state => ({
-      maintenanceBills: state.maintenanceBills.map(b =>
-        b.id === id ? { ...b, status: "paid" as const, paidOn: new Date().toISOString().split("T")[0] } : b
-      )
-    }));
-    get().saveDb();
-
-    const bill = get().maintenanceBills.find(b => b.id === id);
-    if (bill) {
-      get().sendNotification(
-        bill.residentId,
-        "Maintenance Paid successfully 💳",
-        `Payment of ₹${bill.amount} for ${bill.month} has been processed successfully.`,
-        "success"
-      );
-      // Notify admin
-      get().sendNotification(
-        "admin",
-        "Maintenance Payment Received",
-        `Resident ${bill.residentName} (Flat ${bill.unit}) paid maintenance ₹${bill.amount} for ${bill.month}`,
-        "info"
-      );
-    }
-  },
-
-  // ==========================================
-  // COMMUNITY EVENTS
-  // ==========================================
-  createEvent: (ev) => {
-    const id = `EV-${Math.floor(100 + Math.random() * 900)}`;
-    const newEvent: CommunityEvent = { ...ev, id, rsvps: [] };
-    set(state => ({ communityEvents: [newEvent, ...state.communityEvents] }));
-    get().saveDb();
-
-    // Notify all residents
-    get().sendNotification("all_residents", "New Society Event Announced 🗓️", `Upcoming Event: "${ev.title}" organized at ${ev.location}. RSVP now!`, "info");
-  },
-
-  rsvpEvent: (id, userId) => {
-    set(state => ({
-      communityEvents: state.communityEvents.map(ev => {
-        if (ev.id === id) {
-          const rsvps = ev.rsvps.includes(userId)
-            ? ev.rsvps.filter(u => u !== userId) // toggle off RSVP
-            : [...ev.rsvps, userId];
-          return { ...ev, rsvps };
-        }
-        return ev;
-      })
-    }));
-    get().saveDb();
   },
 
   // ==========================================
   // NOTIFICATIONS
   // ==========================================
-  sendNotification: (userId, title, message, type) => {
+  sendNotification: async (userId, title, message, type) => {
+    const id = `NTF-${Math.floor(1000 + Math.random() * 9000)}`;
     const newNtf: Notification = {
-      id: `NTF-${Math.floor(100 + Math.random() * 900)}`,
+      id,
       userId,
       title,
       message,
@@ -981,60 +753,20 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       read: false,
       createdAt: new Date().toISOString()
     };
-    set(state => ({ notifications: [newNtf, ...state.notifications] }));
-    get().saveDb();
+    await setDoc(doc(db, "notifications", id), newNtf);
   },
 
-  markNotificationsRead: (userId) => {
-    set(state => ({
-      notifications: state.notifications.map(n =>
-        n.userId === userId || n.userId === "all_residents" || n.userId === "all_students"
-          ? { ...n, read: true }
-          : n
-      )
-    }));
-    get().saveDb();
-  },
-
-  addRegisteredUser: (u) => {
-    set(state => {
-      const filtered = state.users.filter(
-        user => user.id !== u.id && user.email.toLowerCase() !== u.email.toLowerCase()
-      );
-      return { users: [...filtered, u] };
-    });
-    get().saveDb();
-  },
-
-  denyVisitorEntry: (id, reason) => {
-    set(state => ({
-      visitors: state.visitors.map(v => v.id === id ? { ...v, status: "denied" as const } : v)
-    }));
-    get().saveDb();
-
-    const visitor = get().visitors.find(v => v.id === id);
-    if (visitor) {
-      const matchingUser = get().users.find(u => u.name === visitor.visitingResident || u.unit === visitor.visitingUnit);
-      const recipientId = matchingUser ? matchingUser.id : "user-resident-1";
-      get().sendNotification(
-        recipientId,
-        "Visitor Entry Denied 🚫",
-        `Entry for your guest ${visitor.name} was denied. Reason: ${reason}`,
-        "error"
-      );
+  markNotificationsRead: async (userId) => {
+    const userNtfs = get().notifications.filter((n) => n.userId === userId && !n.read);
+    for (const ntf of userNtfs) {
+      await updateDoc(doc(db, "notifications", ntf.id), { read: true });
     }
   },
 
-  resolveLostFoundItem: (id) => {
-    set(state => ({
-      lostFoundItems: state.lostFoundItems.map(item =>
-        item.id === id ? { ...item, status: "collected" as any } : item
-      )
-    }));
-    get().saveDb();
-  },
-
-  raiseEmergencyAlert: (alert) => {
+  // ==========================================
+  // SECURITY OPERATIONS
+  // ==========================================
+  raiseEmergencyAlert: async (alert) => {
     const id = `EMG-${Math.floor(100 + Math.random() * 900)}`;
     const newAlert: EmergencyAlert = {
       ...alert,
@@ -1042,47 +774,24 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       status: "pending",
       createdAt: new Date().toISOString()
     };
-    set(state => ({ emergencies: [newAlert, ...state.emergencies] }));
-    get().saveDb();
+    await setDoc(doc(db, "emergencies", id), newAlert);
 
-    get().sendNotification(
-      "all_residents",
-      `🚨 EMERGENCY ALERT: Flat ${alert.unit}`,
-      `${alert.emergencyType} reported by ${alert.residentName}. Help needed!`,
-      "error"
+    await get().sendNotification(
+      "user-security-1",
+      "🚨 EMERGENCY SIREN ALARM 🚨",
+      `Medical/Security panic button pressed at unit ${alert.unit}. Resident: ${alert.residentName}.`,
+      "alert"
     );
   },
 
-  updateEmergencyStatus: (id, status, notes) => {
-    set(state => ({
-      emergencies: state.emergencies.map(e => {
-        if (e.id === id) {
-          const update: Partial<EmergencyAlert> = { status };
-          if (status === "resolved") {
-            update.resolvedAt = new Date().toISOString();
-          }
-          if (notes) {
-            update.notes = notes;
-          }
-          return { ...e, ...update };
-        }
-        return e;
-      })
-    }));
-    get().saveDb();
-
-    const alert = get().emergencies.find(e => e.id === id);
-    if (alert) {
-      get().sendNotification(
-        alert.residentId,
-        `Emergency Alert ${status.toUpperCase()} 🚨`,
-        `Your safety alert status was updated to: ${status}. Notes: ${notes || "None"}`,
-        status === "resolved" ? "success" : "info"
-      );
-    }
+  updateEmergencyStatus: async (id, status, notes) => {
+    await updateDoc(doc(db, "emergencies", id), {
+      status,
+      notes: notes || ""
+    });
   },
 
-  issueGatePass: (pass) => {
+  issueGatePass: async (pass) => {
     const id = `PASS-${Math.floor(100 + Math.random() * 900)}`;
     const newPass: GatePass = {
       ...pass,
@@ -1090,124 +799,90 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       status: "active",
       createdAt: new Date().toISOString()
     };
-    set(state => ({ gatePasses: [newPass, ...state.gatePasses] }));
-    get().saveDb();
+    await setDoc(doc(db, "gatePasses", id), newPass);
   },
 
-  logVehicleEntry: (vehicle) => {
+  logVehicleEntry: async (vehicle) => {
     const id = `VEH-${Math.floor(100 + Math.random() * 900)}`;
-    const newLog: VehicleLog = {
+    const newVehicle: VehicleLog = {
       ...vehicle,
       id,
       entryTime: new Date().toISOString(),
       status: "inside"
     };
-    set(state => ({ vehicleLogs: [newLog, ...state.vehicleLogs] }));
-    get().saveDb();
+    await setDoc(doc(db, "vehicleLogs", id), newVehicle);
   },
 
-  logVehicleExit: (id) => {
-    set(state => ({
-      vehicleLogs: state.vehicleLogs.map(log =>
-        log.id === id ? { ...log, status: "exited" as const, exitTime: new Date().toISOString() } : log
-      )
-    }));
-    get().saveDb();
+  logVehicleExit: async (id) => {
+    await updateDoc(doc(db, "vehicleLogs", id), {
+      exitTime: new Date().toISOString(),
+      status: "exited"
+    });
   },
 
-  addAnnouncement: (ann) => {
+  addAnnouncement: async (ann) => {
     const id = `ANN-${Math.floor(100 + Math.random() * 900)}`;
     const newAnn: Announcement = {
       ...ann,
       id,
       createdAt: new Date().toISOString()
     };
-    set(state => ({ announcements: [newAnn, ...state.announcements] }));
-    get().saveDb();
-
-    get().sendNotification(
-      "all_residents",
-      `Notice: ${ann.title} 📢`,
-      ann.content,
-      ann.priority === "urgent" ? "error" : "info"
-    );
+    await setDoc(doc(db, "announcements", id), newAnn);
   },
 
-  addIncidentReport: (incident) => {
+  addIncidentReport: async (incident) => {
     const id = `INC-${Math.floor(100 + Math.random() * 900)}`;
-    const newReport: IncidentReport = {
+    const newIncident: IncidentReport = {
       ...incident,
       id,
       createdAt: new Date().toISOString()
     };
-    set(state => ({ incidents: [newReport, ...state.incidents] }));
-    get().saveDb();
+    await setDoc(doc(db, "incidents", id), newIncident);
   },
 
-  approveUser: (userId) => {
-    set(state => ({
-      users: state.users.map(u => u.id === userId ? { ...u, status: "approved" as const } : u)
-    }));
-    get().saveDb();
-
-    const user = get().users.find(u => u.id === userId);
-    if (user) {
-      get().sendNotification(
-        userId,
-        "Account Approved! 🎉",
-        "Your HomeVerse account has been approved by the Society Secretary. You now have full access.",
-        "success"
-      );
-    }
+  approveUser: async (userId) => {
+    await updateDoc(doc(db, "users", userId), { status: "approved" });
   },
 
-  rejectUser: (userId) => {
-    set(state => ({
-      users: state.users.map(u => u.id === userId ? { ...u, status: "rejected" as const } : u)
-    }));
-    get().saveDb();
+  rejectUser: async (userId) => {
+    await updateDoc(doc(db, "users", userId), { status: "rejected" });
   },
 
-  activateDeactivateUser: (userId, status) => {
-    set(state => ({
-      users: state.users.map(u => u.id === userId ? { ...u, status } : u)
-    }));
-    get().saveDb();
+  activateDeactivateUser: async (userId, status) => {
+    await updateDoc(doc(db, "users", userId), { status });
   },
 
-  addFlat: (flat) => {
-    const id = `FL-${Math.floor(100 + Math.random() * 900)}`;
-    const newFlat: FlatInfo = { ...flat, id };
-    set(state => ({ flats: [...state.flats, newFlat] }));
-    get().saveDb();
+  addFlat: async (flat) => {
+    const id = `FL-${flat.building.replace(/\s+/g, "")}-${flat.flatNumber}`;
+    await setDoc(doc(db, "flats", id), { id, ...flat });
   },
 
-  addExpense: (expense) => {
+  addExpense: async (expense) => {
     const id = `EXP-${Math.floor(100 + Math.random() * 900)}`;
-    const newExpense: SocietyExpense = { ...expense, id };
-    set(state => ({ expenses: [newExpense, ...state.expenses] }));
-    get().saveDb();
+    const newExpense: SocietyExpense = { id, ...expense };
+    await setDoc(doc(db, "expenses", id), newExpense);
   },
 
-  addRentRecord: (rent) => {
+  addRentRecord: async (rent) => {
     const id = `RNT-${Math.floor(100 + Math.random() * 900)}`;
-    const newRent: RentRecord = { ...rent, id };
-    set(state => ({ rentRecords: [newRent, ...state.rentRecords] }));
-    get().saveDb();
+    const newRent: RentRecord = { id, ...rent };
+    await setDoc(doc(db, "rentRecords", id), newRent);
   },
 
-  payRentRecord: (id) => {
-    set(state => ({
-      rentRecords: state.rentRecords.map(r => r.id === id ? { ...r, status: "paid" as const, paidOn: new Date().toISOString().split("T")[0] } : r)
-    }));
-    get().saveDb();
+  payRentRecord: async (id) => {
+    await updateDoc(doc(db, "rentRecords", id), {
+      status: "paid",
+      paidOn: new Date().toISOString().split("T")[0]
+    });
   },
 
-  generateBulkMaintenanceBills: (billDetails) => {
-    const approvedResidents = get().users.filter(u => u.role === "resident" && u.status === "approved");
-    const newBills = approvedResidents.map(res => {
+  generateBulkMaintenanceBills: async (billDetails) => {
+    const approvedResidents = get().users.filter(
+      (u) => u.role === "resident" && u.status === "approved"
+    );
+    for (const res of approvedResidents) {
       const id = `BILL-${Math.floor(1000 + Math.random() * 9000)}`;
-      return {
+      const bill = {
         id,
         residentId: res.id,
         residentName: res.name,
@@ -1215,35 +890,21 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         month: billDetails.month,
         amount: billDetails.amount,
         dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 10).toISOString().split("T")[0],
-        status: "pending" as const,
+        status: "pending",
         breakdown: billDetails.breakdown
       };
-    });
+      await setDoc(doc(db, "maintenanceBills", id), bill);
 
-    set(state => ({ maintenanceBills: [...newBills, ...state.maintenanceBills] }));
-    get().saveDb();
-
-    approvedResidents.forEach(res => {
-      get().sendNotification(
+      await get().sendNotification(
         res.id,
         "Maintenance Bill Generated 🧾",
         `Maintenance bill of ₹${billDetails.amount} for ${billDetails.month} has been generated. Due date: ${new Date(Date.now() + 1000 * 60 * 60 * 24 * 10).toISOString().split("T")[0]}`,
         "warning"
       );
-    });
+    }
   },
 
-  deleteMarketplaceItem: (itemId) => {
-    set(state => ({
-      marketplaceItems: state.marketplaceItems.filter(item => item.id !== itemId)
-    }));
-    get().saveDb();
-  },
-
-  updateWorkerServices: (workerId, details) => {
-    set(state => ({
-      users: state.users.map(u => u.id === workerId ? { ...u, ...details } : u)
-    }));
-    get().saveDb();
+  updateWorkerServices: async (workerId, details) => {
+    await updateDoc(doc(db, "users", workerId), details);
   }
 }));

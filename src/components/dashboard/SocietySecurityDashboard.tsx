@@ -193,12 +193,12 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
     });
   };
 
-  const handleReleaseParcel = (e: React.FormEvent) => {
+  const handleReleaseParcel = async (e: React.FormEvent) => {
     e.preventDefault();
     setParcelReleaseError("");
     if (!releaseParcelId || !parcelOtp) return;
 
-    const success = pickupParcelWithOTP(releaseParcelId, parcelOtp);
+    const success = await pickupParcelWithOTP(releaseParcelId, parcelOtp);
     if (success) {
       setReleaseParcelId("");
       setParcelOtp("");

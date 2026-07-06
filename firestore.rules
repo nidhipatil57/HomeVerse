@@ -1,0 +1,172 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Is the user logged in?
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: Verify if user has a specific role
+    function hasRole(role) {
+      return isLoggedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    // Helper: Is the user accessing their own document?
+    function isOwner(userId) {
+      return isLoggedIn() && request.auth.uid == userId;
+    }
+
+    // 👤 Users Profiles
+    match /users/{userId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && (isOwner(userId) || hasRole('secretary') || hasRole('warden'));
+    }
+
+    // 📋 Complaints
+    match /complaints/{complaintId} {
+      allow read: if isLoggedIn();
+      // Residents can raise/update their own complaints; workers can update completion status; secretaries manage all
+      allow create: if isLoggedIn() && (hasRole('resident') || hasRole('student') || hasRole('security'));
+      allow update: if isLoggedIn() && (
+        resource.data.raisedBy == request.auth.uid ||
+        hasRole('worker') ||
+        hasRole('secretary') ||
+        hasRole('warden')
+      );
+      allow delete: if isLoggedIn() && (hasRole('secretary') || hasRole('warden'));
+    }
+
+    // ✈️ Leave Requests
+    match /leaveRequests/{leaveId} {
+      allow read: if isLoggedIn();
+      allow create: if isLoggedIn() && hasRole('student');
+      allow update, delete: if isLoggedIn() && (hasRole('warden') || resource.data.studentId == request.auth.uid);
+    }
+
+    // 🚪 Visitor Requests
+    match /visitors/{visitorId} {
+      allow read: if isLoggedIn();
+      allow create: if isLoggedIn() && (hasRole('resident') || hasRole('secretary'));
+      allow update: if isLoggedIn() && (hasRole('security') || hasRole('secretary') || resource.data.userId == request.auth.uid);
+      allow delete: if isLoggedIn() && hasRole('secretary');
+    }
+
+    // 🧺 Laundry Slots Bookings
+    match /laundrySlots/{slotId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && (hasRole('student') || hasRole('warden'));
+    }
+
+    // 📦 Parcels Ledger
+    match /parcels/{parcelId} {
+      allow read: if isLoggedIn();
+      allow create, update: if isLoggedIn() && (hasRole('security') || hasRole('warden') || hasRole('secretary'));
+      allow delete: if isLoggedIn() && (hasRole('secretary') || hasRole('warden'));
+    }
+
+    // 🛌 Room Change Requests
+    match /roomChangeRequests/{reqId} {
+      allow read: if isLoggedIn();
+      allow create: if isLoggedIn() && hasRole('student');
+      allow update: if isLoggedIn() && (hasRole('warden') || resource.data.studentId == request.auth.uid);
+      allow delete: if isLoggedIn() && hasRole('warden');
+    }
+
+    // 🧾 Maintenance Bills
+    match /maintenanceBills/{billId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && hasRole('secretary');
+    }
+
+    // 📅 Community Events
+    match /communityEvents/{eventId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && (hasRole('secretary') || hasRole('warden'));
+    }
+
+    // 🔔 Notifications
+    match /notifications/{ntfId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn();
+    }
+
+    // 🚨 Emergency Alerts
+    match /emergencies/{alertId} {
+      allow read: if isLoggedIn();
+      allow create: if isLoggedIn() && (hasRole('resident') || hasRole('security'));
+      allow update: if isLoggedIn() && (hasRole('security') || hasRole('secretary'));
+    }
+
+    // 🎟️ Gate Passes
+    match /gatePasses/{passId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && (hasRole('resident') || hasRole('security') || hasRole('secretary'));
+    }
+
+    // 🚗 Vehicle Logs
+    match /vehicleLogs/{logId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && (hasRole('security') || hasRole('secretary'));
+    }
+
+    // ⚠️ Incidents Reports
+    match /incidents/{incidentId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && (hasRole('security') || hasRole('secretary'));
+    }
+
+    // 📢 Announcements
+    match /announcements/{annId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && (hasRole('secretary') || hasRole('warden') || hasRole('security'));
+    }
+
+    // 🛠️ Marketplace Items
+    match /marketplaceItems/{itemId} {
+      allow read: if isLoggedIn();
+      allow create: if isLoggedIn() && (hasRole('resident') || hasRole('student'));
+      allow update, delete: if isLoggedIn() && (resource.data.sellerId == request.auth.uid || hasRole('secretary') || hasRole('warden'));
+    }
+
+    // 🧸 Lost & Found Items
+    match /lostFoundItems/{itemId} {
+      allow read: if isLoggedIn();
+      allow create: if isLoggedIn();
+      allow update: if isLoggedIn() && (resource.data.reporterId == request.auth.uid || hasRole('secretary') || hasRole('warden') || hasRole('security'));
+      allow delete: if isLoggedIn() && (hasRole('secretary') || hasRole('warden'));
+    }
+
+    // 🏢 Flats Directory
+    match /flats/{flatId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && hasRole('secretary');
+    }
+
+    // 💰 Society Expenses
+    match /expenses/{expenseId} {
+      allow read: if isLoggedIn() && hasRole('secretary');
+      allow write: if isLoggedIn() && hasRole('secretary');
+    }
+
+    // 🔑 Rent Records
+    match /rentRecords/{rentId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && (hasRole('secretary') || hasRole('warden'));
+    }
+
+    // 🤝 Roommate Preferences
+    match /roommatePreferences/{prefId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && (isOwner(prefId) || hasRole('warden'));
+    }
+
+    // 🏟️ Facility Bookings
+    match /facilityBookings/{bookingId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && (hasRole('resident') || hasRole('secretary'));
+    }
+  }
+}

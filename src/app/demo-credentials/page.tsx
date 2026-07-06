@@ -99,7 +99,7 @@ function DemoCredentialsContent() {
     setLoadingUser(user.id);
     try {
       await logout(); // Clean session first
-      const success = await login(user.email, user.role, user.portal);
+      const success = await login(user.email, user.password || "Sara@123", user.role, user.portal);
       if (success) {
         router.replace(user.portal === "society" ? "/society/dashboard" : "/hostel/dashboard");
       } else {
