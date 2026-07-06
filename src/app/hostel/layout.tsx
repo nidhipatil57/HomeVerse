@@ -7,12 +7,47 @@ import { HOSTEL_SIDEBAR_ITEMS, WARDEN_SIDEBAR_ITEMS } from "@/lib/constants";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 
-const WARDEN_ONLY_PATHS = [
-  "/hostel/students",
-  "/hostel/analytics",
-  "/hostel/rooms",
-  "/hostel/reports"
-];
+const getAllowedPaths = (role: string): string[] => {
+  switch (role) {
+    case "student":
+      return [
+        "/hostel/dashboard",
+        "/hostel/ai-assistant",
+        "/hostel/mess",
+        "/hostel/laundry",
+        "/hostel/complaints",
+        "/hostel/leaves",
+        "/hostel/attendance",
+        "/hostel/study-rooms",
+        "/hostel/marketplace",
+        "/hostel/lost-found",
+        "/hostel/events",
+        "/hostel/roommate-finder",
+        "/hostel/parcels",
+        "/hostel/notifications",
+        "/hostel/settings"
+      ];
+    case "warden":
+      return [
+        "/hostel/dashboard",
+        "/hostel/students",
+        "/hostel/rooms",
+        "/hostel/attendance-mgmt",
+        "/hostel/complaints",
+        "/hostel/mess-management",
+        "/hostel/laundry-management",
+        "/hostel/visitors",
+        "/hostel/parcel-management",
+        "/hostel/announcements",
+        "/hostel/reports",
+        "/hostel/analytics",
+        "/hostel/notifications",
+        "/hostel/settings"
+      ];
+    default:
+      return [];
+  }
+};
 
 export default function HostelLayout({
   children,
@@ -50,15 +85,9 @@ export default function HostelLayout({
     }
 
     // 3. Role Authorization check
-    if (user.role === "student") {
-      // Student attempting warden-only routes
-      const isWardenRoute = WARDEN_ONLY_PATHS.some(path => pathname.startsWith(path));
-      if (isWardenRoute) {
-        logout();
-        router.replace("/login?portal=hostel");
-      }
-    } else if (user.role !== "warden") {
-      // Unrecognized role for hostel
+    const allowedPaths = getAllowedPaths(user.role);
+    const isAllowed = allowedPaths.some(path => pathname.startsWith(path));
+    if (!isAllowed) {
       logout();
       router.replace("/login?portal=hostel");
     }
@@ -73,8 +102,9 @@ export default function HostelLayout({
     );
   }
 
-  // Prevent rendering if student tries warden path
-  if (user.role === "student" && WARDEN_ONLY_PATHS.some(path => pathname.startsWith(path))) {
+  // Prevent rendering if role and path mismatch
+  const allowedPaths = getAllowedPaths(user.role);
+  if (!allowedPaths.some(path => pathname.startsWith(path))) {
     return null;
   }
 

@@ -1,5 +1,16 @@
 "use client";
 
+<<<<<<< HEAD
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+export default function SocietyMarketplaceRedirect() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/society/buy-sell");
+  }, [router]);
+=======
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -227,6 +238,7 @@ export default function SocietyMarketplacePage() {
     setVendorsList(vendorsList.filter(v => v.name !== name));
     alert("Vendor removed from verified registry.");
   };
+>>>>>>> 0fd2d3268fdddb9105791a430a8c36076b489b75
 
   const handleContactWorker = (worker: any) => {
     setContactWorker(worker);
@@ -256,6 +268,10 @@ export default function SocietyMarketplacePage() {
   };
 
   return (
+<<<<<<< HEAD
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-primary" />
+=======
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -738,6 +754,7 @@ export default function SocietyMarketplacePage() {
           )}
         </DialogContent>
       </Dialog>
+>>>>>>> 0fd2d3268fdddb9105791a430a8c36076b489b75
     </div>
   );
 }

@@ -37,6 +37,12 @@ import {
   Bed,
   FileText,
   UserCheck,
+  Calendar,
+  BookOpen,
+  CalendarPlus,
+  Key,
+  Clock,
+  Zap,
   Search,
   Car,
   Camera,
@@ -54,7 +60,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Heart, BarChart3, Store, Megaphone, Settings,
   UtensilsCrossed, WashingMachine, ClipboardCheck, Package, GraduationCap,
   Briefcase, MapPin, Wrench, Star, AlertTriangle, Shield, FileCheck, Bed, FileText, UserCheck,
-  Search, Car, Camera,
+  Search, Car, Camera, Calendar, BookOpen, CalendarPlus, Key, Clock, Zap,
 };
 
 interface SidebarProps {
