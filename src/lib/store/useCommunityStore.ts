@@ -244,6 +244,13 @@ interface CommunityState {
   payRentRecord: (id: string) => void;
   generateBulkMaintenanceBills: (billDetails: { month: string; amount: number; breakdown: { label: string; amount: number }[] }) => void;
   deleteMarketplaceItem: (itemId: string) => void;
+  updateWorkerServices: (workerId: string, details: {
+    specializations: string[];
+    experience: string;
+    workingShift: string;
+    phone: string;
+    availability: string;
+  }) => void;
 }
 
 export const useCommunityStore = create<CommunityState>((set, get) => ({
@@ -275,7 +282,18 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     try {
       const stored = localStorage.getItem("homeverse_db");
       if (stored) {
-        set(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        const { getPrepopulatedUsers } = require("@/data/mock-db-seed");
+        const seedUsers = getPrepopulatedUsers();
+        // If users list is missing or size is different, force re-seed to include new mock users
+        if (!parsed.users || parsed.users.length !== seedUsers.length) {
+          const { getInitialDb } = require("@/data/mock-db-seed");
+          const initialDb = getInitialDb();
+          set(initialDb);
+          localStorage.setItem("homeverse_db", JSON.stringify(initialDb));
+          return;
+        }
+        set(parsed);
         return;
       }
     } catch (e) {
@@ -1218,6 +1236,13 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   deleteMarketplaceItem: (itemId) => {
     set(state => ({
       marketplaceItems: state.marketplaceItems.filter(item => item.id !== itemId)
+    }));
+    get().saveDb();
+  },
+
+  updateWorkerServices: (workerId, details) => {
+    set(state => ({
+      users: state.users.map(u => u.id === workerId ? { ...u, ...details } : u)
     }));
     get().saveDb();
   }

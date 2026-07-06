@@ -1,13 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { AnimatedCounter } from "@/components/shared/AnimatedCounter";
 import {
-  Building2,
-  GraduationCap,
-  ArrowRight,
   Shield,
   Cpu,
   BarChart3,
@@ -115,35 +110,6 @@ export function Hero() {
           seamless digital experiences, all in one platform.
         </motion.p>
 
-        {/* CTA Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.7 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
-        >
-          <Link href="/society/dashboard">
-            <Button
-              size="lg"
-              className="rounded-2xl px-8 h-14 text-base font-semibold gradient-primary text-white border-0 shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all duration-300 hover:scale-[1.03] group"
-            >
-              <Building2 className="w-5 h-5 mr-2" />
-              Society Portal
-              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-            </Button>
-          </Link>
-          <Link href="/hostel/dashboard">
-            <Button
-              size="lg"
-              variant="outline"
-              className="rounded-2xl px-8 h-14 text-base font-semibold glass border-border/50 hover:border-primary/30 shadow-premium hover:shadow-lg transition-all duration-300 hover:scale-[1.03] group"
-            >
-              <GraduationCap className="w-5 h-5 mr-2" />
-              Hostel Portal
-              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-            </Button>
-          </Link>
-        </motion.div>
 
         {/* Feature Pills */}
         <motion.div

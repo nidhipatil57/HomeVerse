@@ -16,7 +16,7 @@ import { useAuth, MOCK_USERS } from "@/lib/store/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginAsMock, logout, user, initialize } = useAuth();
+  const { login, logout, user, initialize } = useAuth();
   const [selectedEcosystem, setSelectedEcosystem] = useState<"society" | "hostel" | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [email, setEmail] = useState("");
@@ -42,24 +42,37 @@ export default function LoginPage() {
   useEffect(() => {
     if (selectedEcosystem === "society") {
       setSelectedRole("resident");
-      setEmail("nidhi@sunshinecomplex.com");
+      setEmail("sara@sunshinecomplex.com");
+      setPassword("Sara@123");
     } else if (selectedEcosystem === "hostel") {
       setSelectedRole("student");
       setEmail("aarav@vesit.edu");
+      setPassword("Aarav@123");
     }
-    setPassword("password");
     setError("");
   }, [selectedEcosystem]);
 
   const handleRoleChange = (role: string) => {
     setSelectedRole(role);
-    if (role === "resident") setEmail("nidhi@sunshinecomplex.com");
-    else if (role === "worker") setEmail("ramesh@sunshinecomplex.com");
-    else if (role === "security") setEmail("security@sunshinecomplex.com");
-    else if (role === "secretary") setEmail("rahul@sunshinecomplex.com");
-    else if (role === "student") setEmail("aarav@vesit.edu");
-    else if (role === "warden") setEmail("pillai@vesit.edu");
-    setPassword("password");
+    if (role === "resident") {
+      setEmail("sara@sunshinecomplex.com");
+      setPassword("Sara@123");
+    } else if (role === "worker") {
+      setEmail("amit@sunshinecomplex.com");
+      setPassword("Amit@123");
+    } else if (role === "security") {
+      setEmail("raj@sunshinecomplex.com");
+      setPassword("Raj@123");
+    } else if (role === "secretary") {
+      setEmail("rahul@sunshinecomplex.com");
+      setPassword("Rahul@123");
+    } else if (role === "student") {
+      setEmail("aarav@vesit.edu");
+      setPassword("Aarav@123");
+    } else if (role === "warden") {
+      setEmail("pillai@vesit.edu");
+      setPassword("Pillai@123");
+    }
   };
 
   const handleManualLogin = async (e: React.FormEvent) => {
@@ -85,10 +98,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleInstantLogin = (role: "resident" | "worker" | "student" | "warden" | "security" | "secretary") => {
-    loginAsMock(role);
-    router.replace(role === "resident" || role === "worker" || role === "security" || role === "secretary" ? "/society/dashboard" : "/hostel/dashboard");
-  };
 
   const getEcosystemRoles = () => {
     if (selectedEcosystem === "society") {
@@ -263,9 +272,17 @@ export default function LoginPage() {
                   {selectedEcosystem} Portal
                 </span>
               </h2>
-              <p className="text-muted-foreground mb-6">
-                Choose your role and enter your credentials
-              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                <p className="text-sm text-muted-foreground">
+                  Choose your role and enter details
+                </p>
+                <Link
+                  href={`/demo-credentials?portal=${selectedEcosystem}`}
+                  className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1.5 bg-primary/5 px-2.5 py-1.5 rounded-lg border border-primary/10 transition-all hover:bg-primary/15 w-fit"
+                >
+                  <Sparkles className="w-3 h-3" /> Click to view demo credentials
+                </Link>
+              </div>
 
               {/* Dynamic Role Selector */}
               <div className="grid grid-cols-2 gap-2 mb-6">
@@ -349,63 +366,6 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              {/* Quick Demo Login Cards */}
-              <div className="mt-6 space-y-3 p-4 rounded-2xl bg-secondary/20 border border-border/50">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Quick Login Demo Accounts
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {selectedEcosystem === "society" ? (
-                    <>
-                      <button
-                        onClick={() => handleInstantLogin("resident")}
-                        className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
-                      >
-                        <span className="font-semibold text-foreground">Nidhi (Resident)</span>
-                        <span className="text-[10px] text-muted-foreground">nidhi@sunshinecomplex.com</span>
-                      </button>
-                      <button
-                        onClick={() => handleInstantLogin("worker")}
-                        className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
-                      >
-                        <span className="font-semibold text-foreground">Ramesh (Worker)</span>
-                        <span className="text-[10px] text-muted-foreground">ramesh@sunshinecomplex.com</span>
-                      </button>
-                      <button
-                        onClick={() => handleInstantLogin("security")}
-                        className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
-                      >
-                        <span className="font-semibold text-foreground">Rahul (Security)</span>
-                        <span className="text-[10px] text-muted-foreground">security@sunshinecomplex.com</span>
-                      </button>
-                      <button
-                        onClick={() => handleInstantLogin("secretary")}
-                        className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
-                      >
-                        <span className="font-semibold text-foreground">Rahul V. (Secretary)</span>
-                        <span className="text-[10px] text-muted-foreground">rahul@sunshinecomplex.com</span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => handleInstantLogin("student")}
-                        className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
-                      >
-                        <span className="font-semibold text-foreground">Aarav (Student)</span>
-                        <span className="text-[10px] text-muted-foreground">aarav@vesit.edu</span>
-                      </button>
-                      <button
-                        onClick={() => handleInstantLogin("warden")}
-                        className="p-2.5 rounded-xl border border-border/50 bg-card hover:bg-secondary/40 text-left transition-colors text-xs flex flex-col gap-0.5"
-                      >
-                        <span className="font-semibold text-foreground">Dr. Pillai (Warden)</span>
-                        <span className="text-[10px] text-muted-foreground">pillai@vesit.edu</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
 
               <div className="relative my-5">
                 <Separator />

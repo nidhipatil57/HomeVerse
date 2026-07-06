@@ -20,6 +20,23 @@ export interface User {
   status?: 'pending' | 'approved' | 'rejected' | 'deactivated';
   designation?: string;
   committeeId?: string;
+  // Worker-specific properties
+  workerCategory?: string;
+  workingShift?: string;
+  specializations?: string[];
+  experience?: string;
+  rating?: number;
+  availability?: string; // e.g. "Available" | "Busy"
+  ownerOrTenant?: string;
+  // Student/Hostel-specific properties
+  course?: string;
+  year?: string;
+  branch?: string;
+  gender?: string;
+  hostelName?: string;
+  collegeName?: string;
+  communityCode?: string;
+  employeeId?: string;
 }
 
 // --- Complaints ---

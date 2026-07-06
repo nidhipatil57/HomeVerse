@@ -2,19 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Store, Star, Search, Plus, ShoppingBag, Tag, Check, Trash2, ShieldCheck, PhoneCall } from "lucide-react";
+import {
+  Store, Star, Search, Plus, ShoppingBag, Tag, Check, Trash2, ShieldCheck,
+  PhoneCall, Briefcase, MapPin, Award, Clock, Phone, AlertCircle
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
-import Link from "next/link";
 
 const localVendors = [
   { name: "Ramesh Plumbing Services", category: "Plumber", rating: 4.8, reviews: 124, verified: true, initials: "RP", color: "from-blue-500 to-cyan-500", phone: "+91 98765 43210" },
@@ -31,6 +33,7 @@ export default function SocietyMarketplacePage() {
     listMarketplaceItem,
     sellMarketplaceItem,
     deleteMarketplaceItem,
+    sendNotification,
     initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
@@ -39,6 +42,7 @@ export default function SocietyMarketplacePage() {
       listMarketplaceItem: state.listMarketplaceItem,
       sellMarketplaceItem: state.sellMarketplaceItem,
       deleteMarketplaceItem: state.deleteMarketplaceItem,
+      sendNotification: state.sendNotification,
       initializeDb: state.initializeDb,
     }))
   );
@@ -46,9 +50,9 @@ export default function SocietyMarketplacePage() {
   const [mounted, setMounted] = useState(false);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"services" | "buysell">("buysell");
+  const [activeTab, setActiveTab] = useState<"buysell" | "services" | "localhelp">("buysell");
 
-  // Form State
+  // Buy & Sell Form State
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
@@ -64,8 +68,14 @@ export default function SocietyMarketplacePage() {
   // Dynamic state for vendors
   const [vendorsList, setVendorsList] = useState(localVendors);
 
-  // Filter State
+  // Filter & Search States
   const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [sortBy, setSortBy] = useState<"rating" | "nearest" | "experience" | "active">("rating");
+
+  // Contact Dialog State
+  const [contactWorker, setContactWorker] = useState<any>(null);
+  const [bookingSuccessWorker, setBookingSuccessWorker] = useState<string | null>(null);
 
   useEffect(() => {
     initialize();
@@ -77,15 +87,15 @@ export default function SocietyMarketplacePage() {
 
   const isSecretary = user?.role === "secretary";
 
-  // Load registered workers for this resident's society
-  const registeredWorkers = users.filter(
+  // 1. Get verified vendors for "Verified Service Registry"
+  const registeredWorkersForRegistry = users.filter(
     (u) => u.role === "worker" && u.communityCode === user?.communityCode
   );
 
-  const dbWorkers = registeredWorkers.map(w => ({
+  const dbWorkers = registeredWorkersForRegistry.map(w => ({
     name: w.name,
     category: w.workerCategory || "Staff",
-    rating: 4.8,
+    rating: w.rating || 4.8,
     reviews: 14,
     verified: true,
     initials: w.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2),
@@ -105,12 +115,69 @@ export default function SocietyMarketplacePage() {
     return nameMatch || categoryMatch;
   });
 
+  // 2. Filter Goods
   const filteredItems = marketplaceItems.filter((item) => {
     if (item.portal !== "society") return false;
     const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase()) ||
       item.description.toLowerCase().includes(search.toLowerCase());
     return matchesSearch;
   });
+
+  // 3. Find Local Help (Workers List)
+  const societyWorkers = users.filter(
+    (u) => u.role === "worker" && u.communityCode === user?.communityCode && u.status === "approved"
+  );
+
+  // Generate stable mock distance
+  const getDistance = (workerId: string) => {
+    const code = workerId.charCodeAt(workerId.length - 1) || 0;
+    return ((code % 7 + 1) * 0.2).toFixed(1);
+  };
+
+  // Filter and Sort Workers
+  const getFilteredWorkers = () => {
+    let result = [...societyWorkers];
+
+    // Filter by category
+    if (selectedCategory !== "All") {
+      result = result.filter(w => (w.workerCategory || "").toLowerCase() === selectedCategory.toLowerCase());
+    }
+
+    // Filter by search query (matches name or specific specializations/services)
+    if (search.trim() !== "") {
+      const query = search.toLowerCase();
+      result = result.filter(w => {
+        const nameMatch = w.name.toLowerCase().includes(query);
+        const specMatch = w.specializations?.some(s => s.toLowerCase().includes(query)) || false;
+        const categoryMatch = (w.workerCategory || "").toLowerCase().includes(query);
+        return nameMatch || specMatch || categoryMatch;
+      });
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      if (sortBy === "rating") {
+        return (b.rating || 0) - (a.rating || 0);
+      }
+      if (sortBy === "experience") {
+        const expA = parseInt(a.experience || "0", 10);
+        const expB = parseInt(b.experience || "0", 10);
+        return expB - expA;
+      }
+      if (sortBy === "nearest") {
+        const distA = parseFloat(getDistance(a.id));
+        const distB = parseFloat(getDistance(b.id));
+        return distA - distB;
+      }
+      if (sortBy === "active") {
+        // Mock recent activity sort
+        return b.joinedAt.localeCompare(a.joinedAt);
+      }
+      return 0;
+    });
+
+    return result;
+  };
 
   const handleListItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,6 +228,33 @@ export default function SocietyMarketplacePage() {
     alert("Vendor removed from verified registry.");
   };
 
+  const handleContactWorker = (worker: any) => {
+    setContactWorker(worker);
+  };
+
+  const handleBookWorker = (worker: any) => {
+    // Send notification to worker
+    sendNotification(
+      worker.id,
+      "New Booking Request 📅",
+      `Resident ${user?.name} (Flat ${user?.unit || "N/A"}) has requested your service. Contact: ${user?.phone}`,
+      "info"
+    );
+    
+    // Send success notification to resident
+    sendNotification(
+      user?.id || "resident-user",
+      "Booking Request Sent",
+      `Service booking request has been sent to ${worker.name}.`,
+      "success"
+    );
+
+    setBookingSuccessWorker(worker.name);
+    setTimeout(() => {
+      setBookingSuccessWorker(null);
+    }, 4000);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -170,7 +264,12 @@ export default function SocietyMarketplacePage() {
             HomeVerse Marketplace 🛒
           </h1>
           <p className="text-muted-foreground mt-1">
-            {isSecretary ? "Moderate resident postings and manage verified local service registries" : "Buy and sell items within your society or book verified local service technicians"}
+            {isSecretary 
+              ? "Moderate resident postings and manage verified local service registries" 
+              : activeTab === "localhelp"
+                ? "Find, search, and book domestic help and service providers in your complex"
+                : "Buy and sell items within your society or book verified local service technicians"
+            }
           </p>
         </div>
 
@@ -271,12 +370,16 @@ export default function SocietyMarketplacePage() {
           {[
             { id: "buysell", label: "Buy & Sell Listings", icon: Tag },
             { id: "services", label: "Verified Service Registry", icon: Store },
+            { id: "localhelp", label: "Find Local Help 🛠️", icon: Briefcase },
           ].map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  setSearch(""); // Reset search
+                }}
                 className={`flex items-center gap-1.5 pb-3.5 text-sm font-semibold transition-all relative ${
                   activeTab === tab.id
                     ? "text-primary border-b-2 border-primary"
@@ -291,26 +394,89 @@ export default function SocietyMarketplacePage() {
         </div>
       </div>
 
-      {/* Search Filter */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder={activeTab === "buysell" ? "Search listed goods, furniture, electronics..." : "Search plumbing, electrical, tutors, housekeeping..."}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 rounded-xl h-11 text-xs"
-        />
-      </div>
+      {/* Booking Alert Banner */}
+      <AnimatePresence>
+        {bookingSuccessWorker && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-xs font-semibold rounded-xl flex items-center gap-2.5 shadow-sm"
+          >
+            <Check className="w-4.5 h-4.5 shrink-0" />
+            <span>Success: Service request has been logged. {bookingSuccessWorker} has been notified.</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Search Filter Row */}
+      {activeTab !== "localhelp" ? (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder={activeTab === "buysell" ? "Search listed goods, furniture, electronics..." : "Search plumbing, electrical, tutors, housekeeping..."}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 rounded-xl h-11 text-xs"
+          />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="relative w-full md:flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search worker name or specific services (e.g. Cleaning, Leakage, Fan Installation)..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 rounded-xl h-11 text-xs"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 self-stretch md:self-auto">
+              <span className="text-xs text-muted-foreground shrink-0 font-semibold">Sort By:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="h-11 px-3 border border-input rounded-xl text-xs bg-background flex-1 md:flex-initial"
+              >
+                <option value="rating">⭐️ Highest Rated</option>
+                <option value="nearest">📍 Nearest First</option>
+                <option value="experience">💼 Most Experienced</option>
+                <option value="active">⏱️ Recently Active</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Horizontal Category Selection Bar */}
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide flex-wrap">
+            {["All", "Maid", "Electrician", "Plumber", "Carpenter", "Painter", "Housekeeping", "Gardener"].map((cat) => (
+              <Button
+                key={cat}
+                type="button"
+                variant={selectedCategory === cat ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedCategory(cat)}
+                className={`rounded-full text-xs h-8 px-4 font-semibold ${
+                  selectedCategory === cat ? "gradient-primary text-white border-0 shadow-sm" : ""
+                }`}
+              >
+                {cat}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Main Content Split */}
       <AnimatePresence mode="wait">
-        {activeTab === "buysell" ? (
+        {activeTab === "buysell" && (
           <motion.div key="buysell" variants={staggerContainer} initial="hidden" animate="visible" className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems.map((item) => {
               const isOwner = item.sellerId === user?.id;
               return (
                 <motion.div key={item.id} variants={fadeInUp}>
-                  <Card className="overflow-hidden border-border/50 hover:shadow-lg transition-all duration-300 flex flex-col h-full">
+                  <Card className="overflow-hidden border-border/50 hover:shadow-lg transition-all duration-300 flex flex-col h-full bg-card/60 backdrop-blur-md">
                     <div className="aspect-[4/3] bg-secondary/30 relative flex items-center justify-center text-muted-foreground/30 font-bold border-b">
                       <ShoppingBag className="w-12 h-12" />
                       <Badge className="absolute top-3 left-3 bg-secondary/80 text-foreground border-border text-[9px] hover:bg-secondary">
@@ -376,11 +542,13 @@ export default function SocietyMarketplacePage() {
               </div>
             )}
           </motion.div>
-        ) : (
+        )}
+
+        {activeTab === "services" && (
           <motion.div key="services" variants={staggerContainer} initial="hidden" animate="visible" className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredVendors.map((vendor, idx) => (
               <motion.div key={idx} variants={fadeInUp}>
-                <Card className="border-border/50 hover:shadow-md transition-shadow relative">
+                <Card className="border-border/50 hover:shadow-md transition-shadow relative bg-card/60 backdrop-blur-md">
                   {isSecretary && localVendors.some(v => v.name === vendor.name) && (
                     <Button
                       onClick={() => handleRemoveVendor(vendor.name)}
@@ -426,7 +594,150 @@ export default function SocietyMarketplacePage() {
             )}
           </motion.div>
         )}
+
+        {activeTab === "localhelp" && (
+          <motion.div key="localhelp" variants={staggerContainer} initial="hidden" animate="visible" className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {getFilteredWorkers().map((worker) => (
+              <motion.div key={worker.id} variants={fadeInUp}>
+                <Card className="border-border/50 hover:shadow-lg transition-all duration-300 flex flex-col h-full bg-card/60 backdrop-blur-md">
+                  <CardHeader className="p-4 pb-2">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-primary/10 text-primary border-0 text-[10px] font-bold">
+                            {worker.workerCategory}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-muted-foreground" /> {getDistance(worker.id)} km
+                          </span>
+                        </div>
+                        <CardTitle className="text-base font-bold mt-1">{worker.name}</CardTitle>
+                      </div>
+                      <Badge className={
+                        worker.availability === "Available" 
+                          ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 border-0 text-[9px] font-bold"
+                          : worker.availability === "Busy"
+                            ? "bg-red-500/10 text-red-600 hover:bg-red-500/15 border-0 text-[9px] font-bold"
+                            : "bg-muted text-muted-foreground border-0 text-[9px] font-bold"
+                      }>
+                        {worker.availability === "Available" ? "🟢 Available" : worker.availability === "Busy" ? "🔴 Busy" : "⚪ Off Duty"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0 flex-1 flex flex-col justify-between">
+                    <div className="space-y-3">
+                      {/* Rating & Experience */}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1 text-foreground font-semibold">
+                          <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
+                          {worker.rating || 4.7}
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <Award className="w-3.5 h-3.5 text-muted-foreground" />
+                          {worker.experience || "3 years"}
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                          {worker.workingShift ? worker.workingShift.split(" ")[0] : "Day"}
+                        </span>
+                      </div>
+
+                      {/* Services Offered */}
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Services Offered</p>
+                        <div className="flex flex-wrap gap-1">
+                          {worker.specializations && worker.specializations.length > 0 ? (
+                            worker.specializations.map((spec) => (
+                              <Badge key={spec} variant="secondary" className="text-[9px] font-medium py-0 px-1.5">
+                                {spec}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground italic">No specific services selected</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-border/20">
+                      <Button 
+                        onClick={() => handleContactWorker(worker)} 
+                        variant="outline" 
+                        className="rounded-xl h-9 text-[11px] font-semibold flex items-center justify-center gap-1.5 hover:bg-secondary/50"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-emerald-500" /> Contact
+                      </Button>
+                      <Button 
+                        onClick={() => handleBookWorker(worker)} 
+                        disabled={worker.availability !== "Available"}
+                        className="rounded-xl h-9 text-[11px] font-semibold gradient-primary text-white border-0 shadow-sm"
+                      >
+                        Book Service
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+            {getFilteredWorkers().length === 0 && (
+              <div className="sm:col-span-2 lg:col-span-3 text-center py-20 text-muted-foreground border rounded-2xl bg-secondary/5">
+                No workers found matching selected category and services query.
+              </div>
+            )}
+          </motion.div>
+        )}
       </AnimatePresence>
+
+      {/* Contact dialog */}
+      <Dialog open={!!contactWorker} onOpenChange={() => setContactWorker(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          {contactWorker && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-[family-name:var(--font-heading)]">Worker Contact Profile</DialogTitle>
+                <DialogDescription>Get in touch directly with local help</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2 mt-1">
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-12 h-12">
+                    <AvatarFallback className="text-base bg-secondary border">
+                      {contactWorker.name.split(" ").map((n: string) => n[0]).join("")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="text-base font-bold">{contactWorker.name}</h3>
+                    <p className="text-xs text-muted-foreground">{contactWorker.workerCategory} • {contactWorker.experience || "3 years"}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3.5 bg-secondary/30 p-4 rounded-xl text-xs border border-border/30">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Call Line</span>
+                    <a href={`tel:${contactWorker.phone}`} className="font-bold text-primary hover:underline">{contactWorker.phone}</a>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-border/20 pt-2.5">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Shift / Hours</span>
+                    <span className="font-semibold">{contactWorker.workingShift || "Morning (9 AM - 5 PM)"}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-border/20 pt-2.5">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" /> Rating</span>
+                    <span className="font-bold">{contactWorker.rating || 4.7} / 5.0</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button onClick={() => setContactWorker(null)} className="rounded-xl h-10 text-xs font-semibold px-5">
+                    Close Details
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
