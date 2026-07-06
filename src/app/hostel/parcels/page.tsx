@@ -97,12 +97,12 @@ export default function ParcelsPage() {
     alert(`Parcel registered successfully! Code OTP generated: ${randomOtp}`);
   };
 
-  const handleVerifyOtpSubmit = (e: React.FormEvent) => {
+  const handleVerifyOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setOtpError("");
     if (!activePickupId) return;
 
-    const success = pickupParcelWithOTP(activePickupId, enteredOtp);
+    const success = await pickupParcelWithOTP(activePickupId, enteredOtp);
     if (success) {
       setEnteredOtp("");
       setActivePickupId(null);

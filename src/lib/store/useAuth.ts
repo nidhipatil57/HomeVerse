@@ -5,34 +5,36 @@ import { User, UserRole, PortalType } from "@/types";
 export const MOCK_USERS: Record<string, User & Record<string, any>> = {
   resident: {
     id: "user-resident-1",
-    name: "Nidhi Kumar",
-    email: "nidhi@sunshinecomplex.com",
+    name: "Sara Shah",
+    email: "sara@sunshinecomplex.com",
     phone: "+91 98765 43210",
     role: "resident",
     portal: "society",
-    unit: "301",
+    unit: "204",
     building: "A Wing",
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
     ownerOrTenant: "Owner",
     joinedAt: "2026-01-10",
     status: "approved",
+    password: "Sara@123",
   },
   worker: {
-    id: "user-worker-1",
-    name: "Ramesh Kumar",
-    email: "ramesh@sunshinecomplex.com",
-    phone: "+91 87654 32109",
+    id: "user-worker-2",
+    name: "Amit Kumar",
+    email: "amit@sunshinecomplex.com",
+    phone: "+91 87654 32110",
     role: "worker",
     portal: "society",
-    building: "A Wing",
+    building: "B Wing",
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
-    workerCategory: "Electrician",
-    employeeId: "EMP-2940",
-    workingShift: "Morning (9 AM - 5 PM)",
-    joinedAt: "2026-02-15",
+    workerCategory: "Plumber",
+    employeeId: "EMP-2941",
+    workingShift: "General (10 AM - 6 PM)",
+    joinedAt: "2026-02-20",
     status: "approved",
+    password: "Amit@123",
   },
   student: {
     id: "user-student-1",
@@ -46,11 +48,13 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
     hostelName: "Boys Hostel",
     collegeName: "Vivekanand Education Society Institute of Technology",
     communityCode: "VESIT26",
-    rollNumber: "NIT-2024-089",
     course: "Computer Science",
-    year: "3rd Year",
+    year: "FY",
+    branch: "EXTC",
+    gender: "Male",
     joinedAt: "2026-07-01",
     status: "approved",
+    password: "Aarav@123",
   },
   warden: {
     id: "user-warden-1",
@@ -60,27 +64,29 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
     role: "warden",
     portal: "hostel",
     assignedWing: "Wing A",
-    hostelName: "Boys Hostel",
+    hostelName: "Girls Hostel",
     collegeName: "Vivekanand Education Society Institute of Technology",
     communityCode: "VESIT26",
     employeeId: "WDN-1082",
     joinedAt: "2026-05-20",
     status: "approved",
+    password: "Pillai@123",
   },
   security: {
     id: "user-security-1",
-    name: "Rahul Sharma",
-    email: "security@sunshinecomplex.com",
+    name: "Raj Singh",
+    email: "raj@sunshinecomplex.com",
     phone: "+91 99887 76655",
     role: "security",
     portal: "society",
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
     employeeId: "SEC-9040",
-    workingShift: "Morning",
+    workingShift: "Morning (9 AM - 5 PM)",
     gate: "Gate 1",
     joinedAt: "2026-03-01",
     status: "approved",
+    password: "Raj@123",
   },
   secretary: {
     id: "user-secretary-1",
@@ -98,18 +104,25 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
     committeeId: "SEC-COM-1",
     status: "approved",
     joinedAt: "2026-03-15",
+    password: "Rahul@123",
   },
 };
+
+import { auth, db } from "@/lib/firebase/config";
+import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 interface AuthState {
   user: (User & Record<string, any>) | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, role: UserRole, portal: PortalType) => Promise<boolean>;
-  loginAsMock: (role: UserRole) => void;
+  login: (email: string, password: string, role: UserRole, portal: PortalType) => Promise<boolean>;
+  loginWithGoogle: (role: UserRole, portal: PortalType) => Promise<"success" | "pending">;
+  loginAsMock: (role: UserRole) => Promise<void> | void;
   registerUser: (userData: Partial<User & Record<string, any>>) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   initialize: () => void;
+  updateProfile: (details: Partial<User & Record<string, any>>) => Promise<void>;
 }
 
 export const useAuth = create<AuthState>((set, get) => ({
@@ -132,105 +145,181 @@ export const useAuth = create<AuthState>((set, get) => ({
     }
   },
 
-  login: async (email: string, role: UserRole, portal: PortalType) => {
+  login: async (email, password, role, portal) => {
     set({ isLoading: true });
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Try to match email with registered users in useCommunityStore
-    const { useCommunityStore } = require("./useCommunityStore");
-    const existingUsers = useCommunityStore.getState().users || [];
-
-    let loggedInUser = existingUsers.find(
-      (u: any) => u.email.toLowerCase() === email.toLowerCase() && u.role === role && u.portal === portal
-    );
-
-    if (!loggedInUser) {
-      // Fallback: check static mock users list
-      const matchingMock = Object.values(MOCK_USERS).find(
-        (u) => u.email.toLowerCase() === email.toLowerCase() && u.role === role && u.portal === portal
-      );
-      if (matchingMock) {
-        loggedInUser = matchingMock;
-        // Seed into community store database so they are linked
-        useCommunityStore.getState().addRegisteredUser(matchingMock);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const uid = userCredential.user.uid;
+      const userDoc = await getDoc(doc(db, "users", uid));
+      
+      if (!userDoc.exists()) {
+        await signOut(auth);
+        set({ isLoading: false });
+        throw new Error("User record not found in database.");
       }
-    }
-
-    if (!loggedInUser) {
+      
+      const profile = userDoc.data() as User & Record<string, any>;
+      if (profile.role !== role || profile.portal !== portal) {
+        await signOut(auth);
+        set({ isLoading: false });
+        throw new Error("Invalid portal or role for this account.");
+      }
+      
+      if (profile.status === "pending") {
+        await signOut(auth);
+        set({ isLoading: false });
+        throw new Error("Your account is pending Secretary approval.");
+      }
+      
+      if (profile.status === "rejected" || profile.status === "deactivated") {
+        await signOut(auth);
+        set({ isLoading: false });
+        throw new Error(`Your account status is ${profile.status}.`);
+      }
+      
+      if (typeof window !== "undefined") {
+        localStorage.setItem("homeverse_auth", JSON.stringify(profile));
+      }
+      set({ user: profile, isAuthenticated: true, isLoading: false });
+      return true;
+    } catch (err: any) {
       set({ isLoading: false });
-      return false;
+      throw err;
     }
-
-    if (loggedInUser.status === "pending") {
-      set({ isLoading: false });
-      throw new Error("Your account is pending Secretary approval.");
-    }
-
-    if (loggedInUser.status === "rejected") {
-      set({ isLoading: false });
-      throw new Error("Your registration request was rejected.");
-    }
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem("homeverse_auth", JSON.stringify(loggedInUser));
-    }
-    set({ user: loggedInUser, isAuthenticated: true, isLoading: false });
-    return true;
   },
 
-  loginAsMock: (role: UserRole) => {
+  loginWithGoogle: async (role, portal) => {
+    set({ isLoading: true });
+    try {
+      const provider = new GoogleAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      const uid = userCredential.user.uid;
+      const userDoc = await getDoc(doc(db, "users", uid));
+      
+      let profile: any;
+      if (userDoc.exists()) {
+        profile = userDoc.data();
+        if (profile.role !== role || profile.portal !== portal) {
+          await signOut(auth);
+          set({ isLoading: false });
+          throw new Error(`This Google account is already registered as ${profile.role.toUpperCase()} under ${profile.portal.toUpperCase()} portal.`);
+        }
+      } else {
+        // Auto register
+        const status = (role === "resident" || role === "worker") ? "pending" : "approved";
+        profile = {
+          id: uid,
+          name: userCredential.user.displayName || "Google User",
+          email: userCredential.user.email || "",
+          phone: userCredential.user.phoneNumber || "+91 00000 00000",
+          role: role,
+          portal: portal,
+          avatar: userCredential.user.photoURL || "",
+          unit: "",
+          building: "",
+          joinedAt: new Date().toISOString().split("T")[0],
+          status: status,
+        };
+        await setDoc(doc(db, "users", uid), profile);
+      }
+
+      if (profile.status === "pending") {
+        await signOut(auth);
+        set({ user: null, isAuthenticated: false, isLoading: false });
+        return "pending";
+      }
+
+      if (profile.status === "rejected" || profile.status === "deactivated") {
+        await signOut(auth);
+        set({ isLoading: false });
+        throw new Error(`Your account status is ${profile.status}.`);
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("homeverse_auth", JSON.stringify(profile));
+      }
+      set({ user: profile, isAuthenticated: true, isLoading: false });
+      return "success";
+    } catch (err: any) {
+      set({ isLoading: false });
+      throw err;
+    }
+  },
+
+  loginAsMock: async (role) => {
     const mockUser = MOCK_USERS[role];
     if (mockUser) {
-      const { useCommunityStore } = require("./useCommunityStore");
-      useCommunityStore.getState().addRegisteredUser(mockUser);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("homeverse_auth", JSON.stringify(mockUser));
-      }
-      set({ user: mockUser, isAuthenticated: true, isLoading: false });
+      await get().login(mockUser.email, mockUser.password || "Sara@123", mockUser.role, mockUser.portal);
     }
   },
 
-  registerUser: async (userData: Partial<User & Record<string, any>>) => {
+  registerUser: async (userData) => {
     set({ isLoading: true });
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    try {
+      const email = userData.email || "";
+      const password = userData.password || "NewUser@123";
+      const role = userData.role || "resident";
+      const status = (role === "resident" || role === "worker") ? "pending" : "approved";
 
-    const role = userData.role || "resident";
-    const status = (role === "resident" || role === "worker") ? "pending" : "approved";
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const uid = userCredential.user.uid;
 
-    const newUser: User & Record<string, any> = {
-      id: `user-${Date.now()}`,
-      name: userData.name || "New User",
-      email: userData.email || "new@example.com",
-      phone: userData.phone || "+91 00000 00000",
-      role: role,
-      portal: userData.portal || "society",
-      avatar: userData.avatar,
-      unit: userData.unit,
-      building: userData.building,
-      joinedAt: new Date().toISOString().split("T")[0],
-      status: status,
-      ...userData,
-    };
+      const newUser: User & Record<string, any> = {
+        id: uid,
+        name: userData.name || "New User",
+        email: email,
+        phone: userData.phone || "+91 00000 00000",
+        role: role,
+        portal: userData.portal || "society",
+        avatar: userData.avatar || "",
+        unit: userData.unit || "",
+        building: userData.building || "",
+        joinedAt: new Date().toISOString().split("T")[0],
+        status: status,
+        ...userData,
+      };
 
-    const { useCommunityStore } = require("./useCommunityStore");
-    useCommunityStore.getState().addRegisteredUser(newUser);
+      await setDoc(doc(db, "users", uid), newUser);
 
-    if (status === "approved") {
-      if (typeof window !== "undefined") {
-        localStorage.setItem("homeverse_auth", JSON.stringify(newUser));
+      if (status === "approved") {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("homeverse_auth", JSON.stringify(newUser));
+        }
+        set({ user: newUser, isAuthenticated: true, isLoading: false });
+      } else {
+        await signOut(auth);
+        set({ user: null, isAuthenticated: false, isLoading: false });
       }
-      set({ user: newUser, isAuthenticated: true, isLoading: false });
-    } else {
-      set({ user: null, isAuthenticated: false, isLoading: false });
+      return true;
+    } catch (err: any) {
+      set({ isLoading: false });
+      throw err;
     }
-    return true;
   },
 
-  logout: () => {
+  logout: async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {}
     if (typeof window !== "undefined") {
       localStorage.removeItem("homeverse_auth");
     }
     set({ user: null, isAuthenticated: false });
+  },
+
+  updateProfile: async (details) => {
+    const user = get().user;
+    if (user) {
+      const updated = { ...user, ...details };
+      set({ user: updated });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_auth", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      try {
+        await updateDoc(doc(db, "users", user.id), details);
+      } catch (e) {}
+    }
   },
 }));
