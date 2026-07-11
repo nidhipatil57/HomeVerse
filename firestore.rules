@@ -168,5 +168,21 @@ service cloud.firestore {
       allow read: if isLoggedIn();
       allow write: if isLoggedIn() && (hasRole('resident') || hasRole('secretary'));
     }
+
+    // ❤️ Favorite Visitors
+    match /favorites/{favoriteId} {
+      allow read: if isLoggedIn();
+      allow write: if isLoggedIn() && (hasRole('resident') || hasRole('secretary'));
+    }
+
+    // 🤝 Registered Helpers
+    match /helpers/{helperId} {
+      allow read, write: if isLoggedIn();
+    }
+
+    // 📅 Helper Attendance
+    match /attendance/{attendanceId} {
+      allow read, write: if isLoggedIn();
+    }
   }
 }
