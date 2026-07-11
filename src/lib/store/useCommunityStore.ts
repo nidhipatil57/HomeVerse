@@ -3,7 +3,8 @@
 import { create } from "zustand";
 import {
   Complaint, Visitor, UserRole, PortalType, User, Announcement, EmergencyAlert,
-  GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord
+  GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord,
+  ComplaintPriority, AiAnalysis, ComplaintChatMessage
 } from "@/types";
 import { db, auth } from "@/lib/firebase/config";
 import {
@@ -183,7 +184,11 @@ interface CommunityState {
   addComplaint: (c: Omit<Complaint, "id" | "createdAt" | "updatedAt" | "timeline">) => Promise<void>;
   updateComplaintStatus: (id: string, status: Complaint["status"], details?: { by?: string; note?: string; afterPhoto?: string }) => Promise<void>;
   assignComplaintWorker: (id: string, workerName: string, workerId: string, eta: string) => Promise<void>;
-  rateComplaint: (id: string, rating: number) => Promise<void>;
+  rateComplaint: (id: string, rating: number, review?: string) => Promise<void>;
+  addComplaintChatMessage: (id: string, message: Omit<ComplaintChatMessage, "id" | "timestamp">) => Promise<void>;
+  mergeComplaints: (parentTicketId: string, duplicateTicketIds: string[]) => Promise<void>;
+  subscribeToComplaint: (id: string, userId: string, userName: string, unit: string) => Promise<void>;
+  updateComplaintEta: (id: string, eta: string) => Promise<void>;
 
   // Leaves Transactions
   submitLeaveRequest: (req: Omit<LeaveRequest, "id" | "status" | "createdAt">) => Promise<void>;
@@ -296,36 +301,51 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         if ((globalThis as any).__homeverse_listeners_active) return;
         (globalThis as any).__homeverse_listeners_active = true;
 
-        const collectionsToListen = [
-          { key: "complaints", coll: "complaints" },
-          { key: "leaveRequests", coll: "leaveRequests" },
-          { key: "visitors", coll: "visitors" },
-          { key: "laundrySlots", coll: "laundrySlots" },
-          { key: "parcels", coll: "parcels" },
-          { key: "facilityBookings", coll: "facilityBookings" },
-          { key: "marketplaceItems", coll: "marketplaceItems" },
-          { key: "lostFoundItems", coll: "lostFoundItems" },
-          { key: "roomChangeRequests", coll: "roomChangeRequests" },
-          { key: "maintenanceBills", coll: "maintenanceBills" },
-          { key: "communityEvents", coll: "communityEvents" },
-          { key: "notifications", coll: "notifications" },
-          { key: "roommatePreferences", coll: "roommatePreferences" },
-          { key: "users", coll: "users" },
-          { key: "emergencies", coll: "emergencies" },
-          { key: "gatePasses", coll: "gatePasses" },
-          { key: "vehicleLogs", coll: "vehicleLogs" },
-          { key: "incidents", coll: "incidents" },
-          { key: "announcements", coll: "announcements" },
-          { key: "expenses", coll: "expenses" },
-          { key: "flats", coll: "flats" },
-          { key: "rentRecords", coll: "rentRecords" }
-        ];
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        getDoc(userDocRef).then((userDoc) => {
+          const isSec = userDoc.exists() && userDoc.data()?.role === "secretary";
 
-        (globalThis as any).__homeverse_unsubscribers = collectionsToListen.map(({ key, coll }) => {
-          return onSnapshot(collection(db, coll), (snapshot) => {
-            const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-            set({ [key]: list } as any);
+          const collectionsToListen = [
+            { key: "complaints", coll: "complaints" },
+            { key: "leaveRequests", coll: "leaveRequests" },
+            { key: "visitors", coll: "visitors" },
+            { key: "laundrySlots", coll: "laundrySlots" },
+            { key: "parcels", coll: "parcels" },
+            { key: "facilityBookings", coll: "facilityBookings" },
+            { key: "marketplaceItems", coll: "marketplaceItems" },
+            { key: "lostFoundItems", coll: "lostFoundItems" },
+            { key: "roomChangeRequests", coll: "roomChangeRequests" },
+            { key: "maintenanceBills", coll: "maintenanceBills" },
+            { key: "communityEvents", coll: "communityEvents" },
+            { key: "notifications", coll: "notifications" },
+            { key: "roommatePreferences", coll: "roommatePreferences" },
+            { key: "users", coll: "users" },
+            { key: "emergencies", coll: "emergencies" },
+            { key: "gatePasses", coll: "gatePasses" },
+            { key: "vehicleLogs", coll: "vehicleLogs" },
+            { key: "incidents", coll: "incidents" },
+            { key: "announcements", coll: "announcements" },
+            { key: "flats", coll: "flats" },
+            { key: "rentRecords", coll: "rentRecords" }
+          ];
+
+          if (isSec) {
+            collectionsToListen.push({ key: "expenses", coll: "expenses" });
+          }
+
+          if ((globalThis as any).__homeverse_unsubscribers) {
+            (globalThis as any).__homeverse_unsubscribers.forEach((unsub: any) => unsub());
+          }
+
+          (globalThis as any).__homeverse_unsubscribers = collectionsToListen.map(({ key, coll }) => {
+            return onSnapshot(collection(db, coll), (snapshot) => {
+              const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+              set({ [key]: list } as any);
+            });
           });
+        }).catch((err) => {
+          console.error("Error setting up Firestore snapshot listeners:", err);
+          (globalThis as any).__homeverse_listeners_active = false;
         });
       } else {
         if ((globalThis as any).__homeverse_unsubscribers) {
@@ -348,17 +368,119 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   // COMPLAINT TRANSACTIONS
   // ==========================================
   addComplaint: async (c) => {
-    const id = `CMP-${Math.floor(100 + Math.random() * 900)}`;
+    const year = new Date().getFullYear();
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    const id = `COMP-${year}-${rand}`;
+    
+    // AI Analysis Simulation
+    const titleAndDesc = `${c.title} ${c.description}`.toLowerCase();
+    
+    // Predict priority
+    let predictedPriority: ComplaintPriority = c.priority || 'medium';
+    if (c.emergency || (titleAndDesc.includes("leak") && (titleAndDesc.includes("gas") || titleAndDesc.includes("water enter"))) || titleAndDesc.includes("trapped")) {
+      predictedPriority = 'emergency';
+    } else if (titleAndDesc.includes("spark") || titleAndDesc.includes("fire") || titleAndDesc.includes("theft") || titleAndDesc.includes("short circuit")) {
+      predictedPriority = 'critical';
+    } else if (titleAndDesc.includes("broken") || titleAndDesc.includes("not working") || titleAndDesc.includes("stolen")) {
+      predictedPriority = 'high';
+    }
+
+    // Predict category if not supplied or for suggestion
+    let suggestedCategory = c.category || 'others';
+    if (titleAndDesc.includes("leak") || titleAndDesc.includes("pipe") || titleAndDesc.includes("tap") || titleAndDesc.includes("dripping")) {
+      suggestedCategory = 'water-leakage';
+    } else if (titleAndDesc.includes("wire") || titleAndDesc.includes("spark") || titleAndDesc.includes("mcb") || titleAndDesc.includes("fan") || titleAndDesc.includes("light") || titleAndDesc.includes("short")) {
+      suggestedCategory = 'electrical';
+    } else if (titleAndDesc.includes("lift") || titleAndDesc.includes("elevator") || titleAndDesc.includes("stuck") || titleAndDesc.includes("trapped")) {
+      suggestedCategory = 'lift';
+    } else if (titleAndDesc.includes("park") || titleAndDesc.includes("car") || titleAndDesc.includes("vehicle") || titleAndDesc.includes("double park")) {
+      suggestedCategory = 'parking';
+    } else if (titleAndDesc.includes("cleaning") || titleAndDesc.includes("dirt") || titleAndDesc.includes("dust") || titleAndDesc.includes("sweep")) {
+      suggestedCategory = 'cleaning';
+    } else if (titleAndDesc.includes("guard") || titleAndDesc.includes("gate") || titleAndDesc.includes("suspicious") || titleAndDesc.includes("theft")) {
+      suggestedCategory = 'security';
+    }
+    
+    // Predict required materials & cost
+    let requiredMaterials: string[] = ["Standard inspection kit"];
+    let expectedCost = "₹200 - ₹500";
+    if (suggestedCategory === 'plumbing' || suggestedCategory === 'water-leakage') {
+      requiredMaterials = ["PVC replacement pipe", "Teflon sealing tape", "Silicone thread sealant", "Pipe wrench", "Coupling joints"];
+      expectedCost = "₹450 - ₹1,200";
+    } else if (suggestedCategory === 'electrical') {
+      requiredMaterials = ["Insulated screwdriver set", "Replacement 16A MCB", "Wire strippers", "Electrical insulation tape", "Digital multimeter"];
+      expectedCost = "₹350 - ₹950";
+    } else if (suggestedCategory === 'lift') {
+      requiredMaterials = ["Elevator guide rail lubrication", "Safety brake cleaner", "Control panel spare fuses", "Intercom contact kit"];
+      expectedCost = "₹2,500 - ₹6,500";
+    } else if (suggestedCategory === 'cleaning' || suggestedCategory === 'housekeeping') {
+      requiredMaterials = ["Premium floor disinfectant", "Microfiber cleaning cloths", "High-reach duster", "Heavy-duty broom & mop set"];
+      expectedCost = "₹150 - ₹300";
+    } else if (suggestedCategory === 'pest-control') {
+      requiredMaterials = ["Organic gel pesticides", "Handheld sprayer", "Aerosol sprayers", "Rodent snap traps", "Protective safety gear"];
+      expectedCost = "₹800 - ₹1,800";
+    }
+
+    // Predict estimated completion
+    let estimatedCompletion = "24 Hours";
+    if (predictedPriority === 'emergency') {
+      estimatedCompletion = "2 Hours";
+    } else if (predictedPriority === 'critical') {
+      estimatedCompletion = "4 Hours";
+    } else if (predictedPriority === 'high') {
+      estimatedCompletion = "12 Hours";
+    }
+
+    // Duplicate detection
+    const existingComplaints = get().complaints || [];
+    const duplicateMatch = existingComplaints.find(comp => 
+      comp.status !== 'closed' &&
+      comp.category === c.category &&
+      comp.building === c.building &&
+      (comp.wing === c.wing || !c.wing || !comp.wing) &&
+      (comp.title.toLowerCase().includes(c.title.toLowerCase()) || 
+       c.title.toLowerCase().includes(comp.title.toLowerCase()) ||
+       comp.description.toLowerCase().includes(c.description.toLowerCase()))
+    );
+
+    const aiAnalysis: AiAnalysis = {
+      predictedPriority,
+      suggestedCategory,
+      estimatedCompletion,
+      requiredMaterials,
+      expectedCost,
+      possibleDuplicateOf: duplicateMatch ? duplicateMatch.id : undefined,
+      isDuplicate: duplicateMatch ? true : false
+    };
+
     const newComplaint: Complaint = {
       ...c,
       id,
+      priority: predictedPriority,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       timeline: [
-        { status: "submitted", timestamp: new Date().toISOString(), note: "Complaint registered successfully." }
-      ]
+        { status: "submitted", timestamp: new Date().toISOString(), note: "Complaint registered successfully and AI diagnostics compiled." }
+      ],
+      chat: [],
+      aiAnalysis
     };
+
     await setDoc(doc(db, "complaints", id), newComplaint);
+
+    // If duplicate was found, automatically append to the parent's group
+    if (duplicateMatch) {
+      const parentDoc = await getDoc(doc(db, "complaints", duplicateMatch.id));
+      if (parentDoc.exists()) {
+        const parentData = parentDoc.data() as Complaint;
+        const currentGroup = parentData.duplicateGroup || [];
+        if (!currentGroup.includes(id)) {
+          await updateDoc(doc(db, "complaints", duplicateMatch.id), {
+            duplicateGroup: [...currentGroup, id]
+          });
+        }
+      }
+    }
 
     const title = `New Ticket Raised 📋`;
     const message = `Unit ${c.unit} raised ticket: "${c.title}"`;
@@ -370,51 +492,274 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     if (!compDoc.exists()) return;
     const comp = compDoc.data() as Complaint;
     const newTimeline = [...(comp.timeline || [])];
-    if (details?.note) {
-      newTimeline.push({
-        status,
-        timestamp: new Date().toISOString(),
-        note: details.note,
-        by: details.by,
-        afterPhoto: details.afterPhoto
-      });
-    }
+    
+    const timestamp = new Date().toISOString();
+    newTimeline.push({
+      status,
+      timestamp,
+      note: details?.note || `Status updated to ${status}.`,
+      by: details?.by,
+      afterPhoto: details?.afterPhoto
+    });
+    
     const updates: Partial<Complaint> = {
       status,
-      updatedAt: new Date().toISOString(),
+      updatedAt: timestamp,
       timeline: newTimeline
     };
+    if (details?.afterPhoto) {
+      updates.afterPhoto = details.afterPhoto;
+      updates.completionPhotos = [...(comp.completionPhotos || []), details.afterPhoto];
+    }
+    
     await updateDoc(doc(db, "complaints", id), updates);
 
-    await get().sendNotification(
-      comp.raisedBy,
-      `Ticket Status Updated ⚙️`,
-      `Your ticket "${comp.title}" is now: ${status.toUpperCase()}`,
-      "success"
-    );
+    // Notifications
+    let residentMsg = "";
+    let secretaryMsg = "";
+    let workerMsg = "";
+
+    if (status === "under-review") {
+      residentMsg = `Your ticket "${comp.title}" is now Under Review.`;
+      secretaryMsg = `Ticket ${id} is under review.`;
+    } else if (status === "accepted") {
+      residentMsg = `Worker ${comp.assignedTo || "assigned"} has accepted your ticket: "${comp.title}".`;
+      secretaryMsg = `Worker accepted ticket ${id}.`;
+    } else if (status === "in-progress") {
+      residentMsg = `Work has started on your ticket: "${comp.title}".`;
+      secretaryMsg = `Worker started work on ticket ${id}.`;
+    } else if (status === "completed") {
+      residentMsg = `Worker marked your ticket "${comp.title}" as completed. Please verify!`;
+      secretaryMsg = `Worker completed ticket ${id}, pending resident verification.`;
+    } else if (status === "resolved") {
+      residentMsg = `Ticket "${comp.title}" has been resolved.`;
+      secretaryMsg = `Ticket ${id} has been resolved.`;
+    } else if (status === "resident-verification") {
+      residentMsg = `Please verify resolution of ticket: "${comp.title}".`;
+      secretaryMsg = `Resident verification pending for ${id}.`;
+    } else if (status === "closed") {
+      residentMsg = `Your ticket "${comp.title}" is now Closed. Thank you!`;
+      secretaryMsg = `Ticket ${id} is closed.`;
+      if (comp.assignedToId) {
+        workerMsg = `Ticket ${id} has been closed by resident.`;
+      }
+    }
+
+    if (residentMsg) {
+      await get().sendNotification(comp.raisedBy, `Ticket Update ⚙️`, residentMsg, "info");
+    }
+    if (secretaryMsg) {
+      const secretaryUser = get().users.find(u => u.role === "secretary");
+      const targetSecId = secretaryUser?.id || "user-secretary-1";
+      await get().sendNotification(targetSecId, `Ticket Status Alert 📋`, secretaryMsg, "info");
+    }
+    if (workerMsg && comp.assignedToId) {
+      await get().sendNotification(comp.assignedToId, `Job Closed 🛠️`, workerMsg, "success");
+    }
   },
 
   assignComplaintWorker: async (id, workerName, workerId, eta) => {
     const updates = {
       assignedTo: `${workerName} (ETA: ${eta})`,
       assignedToId: workerId,
+      estimatedArrival: eta,
+      status: "assigned" as const,
       updatedAt: new Date().toISOString()
     };
     await updateDoc(doc(db, "complaints", id), updates);
     
+    // Notify worker
     await get().sendNotification(
       workerId,
       `New Job Assigned 🛠️`,
       `You have been assigned: "${id}". Please review ETA.`,
       "info"
     );
+
+    // Notify resident
+    const compDoc = await getDoc(doc(db, "complaints", id));
+    if (compDoc.exists()) {
+      const comp = compDoc.data() as Complaint;
+      await get().sendNotification(
+        comp.raisedBy,
+        `Contractor Assigned 🛠️`,
+        `${workerName} has been assigned to ticket "${comp.title}". ETA: ${eta}`,
+        "info"
+      );
+    }
   },
 
-  rateComplaint: async (id, rating) => {
+  rateComplaint: async (id, rating, review) => {
+    const compDoc = await getDoc(doc(db, "complaints", id));
+    if (!compDoc.exists()) return;
+    const comp = compDoc.data() as Complaint;
+    
+    const timestamp = new Date().toISOString();
+    const newTimeline = [...(comp.timeline || [])];
+    newTimeline.push({
+      status: "closed",
+      timestamp,
+      note: `Resident closed the ticket and rated it ${rating} stars. Review: ${review || "No review left."}`,
+      by: comp.raisedByName
+    });
+
     await updateDoc(doc(db, "complaints", id), {
       rating,
+      ratingReview: review || "",
+      status: "closed",
+      updatedAt: timestamp,
+      timeline: newTimeline
+    });
+
+    // Update worker rating if worker is assigned
+    if (comp.assignedToId) {
+      const workerId = comp.assignedToId;
+      const allComplaints = get().complaints || [];
+      const ratedComplaints = allComplaints.filter(c => 
+        c.assignedToId === workerId && 
+        c.id !== id && 
+        typeof c.rating === "number"
+      );
+      
+      const ratings = ratedComplaints.map(c => c.rating as number);
+      ratings.push(rating);
+      
+      const averageRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+      
+      await updateDoc(doc(db, "users", workerId), {
+        rating: Number(averageRating.toFixed(2))
+      });
+    }
+
+    const secretaryUser = get().users.find(u => u.role === "secretary");
+    const targetSecId = secretaryUser?.id || "user-secretary-1";
+    await get().sendNotification(
+      targetSecId, 
+      `Ticket Closed & Rated ⭐`, 
+      `Ticket ${id} closed. Rated ${rating} stars by ${comp.raisedByName}.`, 
+      "success"
+    );
+
+    if (comp.assignedToId) {
+      await get().sendNotification(
+        comp.assignedToId,
+        `Job Rated ⭐`,
+        `Your job ${id} was rated ${rating} stars.`,
+        "success"
+      );
+    }
+  },
+
+  addComplaintChatMessage: async (id, msg) => {
+    const compDoc = await getDoc(doc(db, "complaints", id));
+    if (!compDoc.exists()) return;
+    const comp = compDoc.data() as Complaint;
+    const chat = comp.chat || [];
+    
+    const newMsg: ComplaintChatMessage = {
+      ...msg,
+      id: `MSG-${Math.floor(1000 + Math.random() * 9000)}`,
+      timestamp: new Date().toISOString()
+    };
+
+    const senderLabel = msg.senderRole === "resident" ? "Resident" : msg.senderRole === "worker" ? "Worker" : "Secretary";
+    const timelineEntry = {
+      status: comp.status,
+      timestamp: new Date().toISOString(),
+      note: `${senderLabel} Sent Message: "${msg.message.substring(0, 40)}${msg.message.length > 40 ? '...' : ''}"`,
+      by: msg.senderName
+    };
+    const newTimeline = [...(comp.timeline || []), timelineEntry];
+    
+    await updateDoc(doc(db, "complaints", id), {
+      chat: [...chat, newMsg],
+      timeline: newTimeline,
       updatedAt: new Date().toISOString()
     });
+  },
+
+  mergeComplaints: async (parentTicketId, duplicateTicketIds) => {
+    const parentDoc = await getDoc(doc(db, "complaints", parentTicketId));
+    if (!parentDoc.exists()) return;
+    const parentData = parentDoc.data() as Complaint;
+    const currentGroup = parentData.duplicateGroup || [];
+    
+    const newGroup = Array.from(new Set([...currentGroup, ...duplicateTicketIds]));
+    await updateDoc(doc(db, "complaints", parentTicketId), {
+      duplicateGroup: newGroup,
+      updatedAt: new Date().toISOString()
+    });
+
+    for (const childId of duplicateTicketIds) {
+      const childDoc = await getDoc(doc(db, "complaints", childId));
+      if (childDoc.exists()) {
+        const childData = childDoc.data() as Complaint;
+        const newTimeline = [...(childData.timeline || [])];
+        newTimeline.push({
+          status: "closed",
+          timestamp: new Date().toISOString(),
+          note: `Ticket merged into parent ticket ${parentTicketId} as duplicate.`,
+          by: "Secretary"
+        });
+        await updateDoc(doc(db, "complaints", childId), {
+          parentTicketId,
+          status: "closed",
+          timeline: newTimeline,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    }
+  },
+
+  subscribeToComplaint: async (id, userId, userName, unit) => {
+    const compDoc = await getDoc(doc(db, "complaints", id));
+    if (!compDoc.exists()) return;
+    const comp = compDoc.data() as Complaint;
+    const currentSubs = comp.subscribers || [];
+    if (currentSubs.find(s => s.userId === userId)) return; // already subscribed
+
+    const updatedSubs = [...currentSubs, { userId, name: userName, unit }];
+    const newTimeline = [...(comp.timeline || [])];
+    newTimeline.push({
+      status: comp.status,
+      timestamp: new Date().toISOString(),
+      note: `Resident ${userName} (Flat ${unit}) joined this common issue.`,
+      by: userName
+    });
+
+    await updateDoc(doc(db, "complaints", id), {
+      subscribers: updatedSubs,
+      timeline: newTimeline,
+      updatedAt: new Date().toISOString()
+    });
+  },
+
+  updateComplaintEta: async (id, eta) => {
+    const compDoc = await getDoc(doc(db, "complaints", id));
+    if (!compDoc.exists()) return;
+    const comp = compDoc.data() as Complaint;
+    
+    const newTimeline = [...(comp.timeline || [])];
+    newTimeline.push({
+      status: comp.status,
+      timestamp: new Date().toISOString(),
+      note: `Worker updated Estimated Arrival Time (ETA) to: ${eta}`,
+      by: comp.assignedTo || "Worker"
+    });
+
+    await updateDoc(doc(db, "complaints", id), {
+      estimatedArrival: eta,
+      timeline: newTimeline,
+      updatedAt: new Date().toISOString()
+    });
+
+    // Notify resident
+    await get().sendNotification(
+      comp.raisedBy,
+      `ETA Update ⚙️`,
+      `Worker has updated the ETA for your ticket "${comp.title}" to: ${eta}`,
+      "info"
+    );
   },
 
   // ==========================================
