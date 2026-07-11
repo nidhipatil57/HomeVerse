@@ -153,7 +153,24 @@ export interface ComplaintTimelineEntry {
 }
 
 // --- Visitors ---
-export type VisitorStatus = 'expected' | 'checked-in' | 'checked-out' | 'denied';
+export type VisitorStatus =
+  | 'pending'
+  | 'approved'
+  | 'at-gate'
+  | 'checked-in'
+  | 'inside'
+  | 'checked-out'
+  | 'expired'
+  | 'cancelled'
+  | 'denied'
+  | 'expected';
+
+export interface VisitorTimelineEvent {
+  status: VisitorStatus;
+  timestamp: string;
+  note?: string;
+  by?: string;
+}
 
 export interface Visitor {
   id: string;
@@ -162,16 +179,35 @@ export interface Visitor {
   purpose: string;
   visitingUnit: string;
   visitingResident: string;
+  visitingResidentId?: string;
   status: VisitorStatus;
   photo?: string;
   qrCode?: string;
+  otp?: string;
   expectedAt?: string;
+  expectedExit?: string;
   checkInTime?: string;
   checkOutTime?: string;
   approvedBy?: string;
   vehicleNumber?: string;
+  vehicleType?: 'two-wheeler' | 'four-wheeler' | 'none';
+  parkingSlot?: string;
+  numberOfVisitors?: number;
+  specialInstructions?: string;
   date: string;
   portal?: PortalType;
+  
+  // Redesign fields
+  visitorType?: string;
+  visitType?: 'one-time' | 'recurring';
+  recurringSchedule?: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    days?: string[];
+    time?: string;
+  };
+  timeline?: VisitorTimelineEvent[];
+  isFavorite?: boolean;
+  remarks?: string;
 }
 
 // --- Maintenance ---
@@ -443,4 +479,34 @@ export interface RentRecord {
   dueDate: string;
   status: 'paid' | 'pending';
   paidOn?: string;
+}
+
+export interface Helper {
+  id: string;
+  name: string;
+  category: string;
+  phone: string;
+  workingDays: string[];
+  expectedArrival: string;
+  expectedExit: string;
+  assignedFlats: string[];
+  assignedResidents: string[];
+  residentIds: string[];
+  joinedAt: string;
+  portal: 'society';
+}
+
+export interface HelperAttendance {
+  id: string;
+  workerId: string;
+  workerName: string;
+  workerCategory: string;
+  date: string;
+  checkInTime: string;
+  checkOutTime?: string;
+  entryGate: string;
+  exitGate?: string;
+  status: 'present' | 'late' | 'checked-in' | 'checked-out';
+  assignedFlats: string[];
+  duration?: number;
 }

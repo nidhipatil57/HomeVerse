@@ -2,9 +2,9 @@
 
 import { create } from "zustand";
 import {
-  Complaint, Visitor, UserRole, PortalType, User, Announcement, EmergencyAlert,
+  Complaint, Visitor, VisitorStatus, UserRole, PortalType, User, Announcement, EmergencyAlert,
   GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord,
-  ComplaintPriority, AiAnalysis, ComplaintChatMessage
+  ComplaintPriority, AiAnalysis, ComplaintChatMessage, Helper, HelperAttendance
 } from "@/types";
 import { db, auth } from "@/lib/firebase/config";
 import {
@@ -175,6 +175,9 @@ interface CommunityState {
   expenses: SocietyExpense[];
   flats: FlatInfo[];
   rentRecords: RentRecord[];
+  favorites: Visitor[];
+  helpers: Helper[];
+  attendance: HelperAttendance[];
 
   initializeDb: () => void;
   saveDb: () => void;
@@ -195,10 +198,21 @@ interface CommunityState {
   approveRejectLeave: (id: string, status: "approved" | "rejected") => Promise<void>;
 
   // Visitors Transactions
-  submitVisitorRequest: (v: Omit<Visitor, "id" | "status" | "qrCode">) => Promise<void>;
-  checkInVisitor: (id: string) => Promise<void>;
+  submitVisitorRequest: (v: Omit<Visitor, "id" | "qrCode" | "otp" | "timeline" | "status"> & Partial<Pick<Visitor, "status" | "visitorType" | "visitType">>) => Promise<void>;
+  checkInVisitor: (id: string, remarks?: string) => Promise<void>;
   checkOutVisitor: (id: string) => Promise<void>;
-  denyVisitorEntry: (id: string, reason: string) => Promise<void>;
+  denyVisitorEntry: (id: string, reason: string, remarks?: string) => Promise<void>;
+  cancelVisitorRequest: (id: string) => Promise<void>;
+  approveVisitorRequest: (id: string) => Promise<void>;
+  addFavoriteVisitor: (visitor: Omit<Visitor, "id" | "status" | "timeline" | "qrCode" | "otp" | "date">) => Promise<void>;
+  removeFavoriteVisitor: (id: string) => Promise<void>;
+  logEmergencyVisitor: (agency: string, reason: string, vehicleNumber?: string) => Promise<void>;
+
+  // Daily Helpers & Attendance Transactions
+  registerHelper: (h: Omit<Helper, "id" | "joinedAt">) => Promise<void>;
+  deleteHelper: (id: string) => Promise<void>;
+  checkInHelper: (workerId: string, workerName: string, category: string, gate: string, assignedFlats: string[]) => Promise<void>;
+  checkOutHelper: (attendanceId: string, gate: string) => Promise<void>;
 
   // Laundry Transactions
   bookLaundrySlot: (machineId: string, slot: string, date: string, studentId: string, studentName: string) => Promise<boolean>;
@@ -267,6 +281,17 @@ interface CommunityState {
   }) => Promise<void>;
 }
 
+function cleanObject<T extends Record<string, any>>(obj: T): T {
+  const result: any = {};
+  Object.keys(obj).forEach((key) => {
+    const val = obj[key];
+    if (val !== undefined) {
+      result[key] = val;
+    }
+  });
+  return result;
+}
+
 export const useCommunityStore = create<CommunityState>((set, get) => ({
   complaints: [],
   leaveRequests: [],
@@ -290,6 +315,9 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   expenses: [],
   flats: [],
   rentRecords: [],
+  favorites: [],
+  helpers: [],
+  attendance: [],
 
   initializeDb: () => {
     if (typeof window === "undefined") return;
@@ -326,7 +354,10 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
             { key: "incidents", coll: "incidents" },
             { key: "announcements", coll: "announcements" },
             { key: "flats", coll: "flats" },
-            { key: "rentRecords", coll: "rentRecords" }
+            { key: "rentRecords", coll: "rentRecords" },
+            { key: "favorites", coll: "favorites" },
+            { key: "helpers", coll: "helpers" },
+            { key: "attendance", coll: "attendance" }
           ];
 
           if (isSec) {
@@ -803,55 +834,278 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   submitVisitorRequest: async (v) => {
     const id = `VIS-${Math.floor(100 + Math.random() * 900)}`;
     const qrCode = `QR-HOMEVERSE-${id}`;
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    
+    let initialStatus: VisitorStatus = 'approved';
+    if (v.portal === 'hostel') {
+      initialStatus = 'expected';
+    } else if (v.status) {
+      initialStatus = v.status as VisitorStatus;
+    }
+
+    const timestamp = new Date().toISOString();
+    const visitorType = v.visitorType || "Guests";
+    const visitType = v.visitType || "one-time";
+    
+    const timelineEntry = {
+      status: initialStatus,
+      timestamp,
+      note: `Visit created: ${visitType} pass for ${v.name} (${visitorType})`,
+      by: v.visitingResident || "Resident"
+    };
+
     const newVisitor: Visitor = {
       ...v,
       id,
-      status: "expected",
-      qrCode
+      status: initialStatus,
+      qrCode,
+      otp,
+      visitorType,
+      visitType,
+      timeline: [timelineEntry]
     };
-    await setDoc(doc(db, "visitors", id), newVisitor);
+    
+    await setDoc(doc(db, "visitors", id), cleanObject(newVisitor));
 
     await get().sendNotification(
       "user-security-1",
-      "Pre-approved Visitor Scheduled 🚪",
-      `Visitor ${v.name} scheduled for unit ${v.visitingUnit}.`,
+      "Visitor Pass Scheduled 🚪",
+      `${visitorType} - ${v.name} scheduled for Unit ${v.visitingUnit}. Code: ${otp}`,
       "info"
     );
+
+    const secretaryUser = get().users.find(u => u.role === "secretary");
+    if (secretaryUser) {
+      await get().sendNotification(
+        secretaryUser.id,
+        "New Visitor Pass Created 📋",
+        `Unit ${v.visitingUnit} created ${visitType} pass for ${v.name} (${visitorType}).`,
+        "info"
+      );
+    }
   },
 
-  checkInVisitor: async (id) => {
+  checkInVisitor: async (id, remarks) => {
+    const timestamp = new Date().toISOString();
+    const visDoc = await getDoc(doc(db, "visitors", id));
+    if (!visDoc.exists()) return;
+    const vis = visDoc.data() as Visitor;
+    
+    const timelineEntry = {
+      status: "checked-in" as VisitorStatus,
+      timestamp,
+      note: `Checked In by Security Gate. ${remarks ? `Remarks: ${remarks}` : ""}`,
+      by: "Security"
+    };
+    const newTimeline = [...(vis.timeline || []), timelineEntry];
+
     await updateDoc(doc(db, "visitors", id), {
       status: "checked-in",
-      checkInTime: new Date().toISOString()
+      checkInTime: timestamp,
+      timeline: newTimeline,
+      ...(remarks ? { remarks } : {})
     });
     
-    const visDoc = await getDoc(doc(db, "visitors", id));
-    if (visDoc.exists()) {
-      const vis = visDoc.data() as Visitor;
-      const resident = get().users.find(u => u.role === "resident" && u.unit === vis.visitingUnit);
-      if (resident) {
-        await get().sendNotification(
-          resident.id,
-          "Visitor Checked In 🔔",
-          `Your visitor ${vis.name} has checked in at the gate.`,
-          "success"
-        );
-      }
+    const resident = get().users.find(u => u.role === "resident" && u.unit === vis.visitingUnit);
+    if (resident) {
+      await get().sendNotification(
+        resident.id,
+        "Visitor Checked In 🔔",
+        `Your visitor ${vis.name} (${vis.visitorType || "Guest"}) has checked in at the gate.`,
+        "success"
+      );
     }
   },
 
   checkOutVisitor: async (id) => {
+    const timestamp = new Date().toISOString();
+    const visDoc = await getDoc(doc(db, "visitors", id));
+    if (!visDoc.exists()) return;
+    const vis = visDoc.data() as Visitor;
+
+    const timelineEntry = {
+      status: "checked-out" as VisitorStatus,
+      timestamp,
+      note: `Checked Out. Left society premises.`,
+      by: "Security"
+    };
+    const newTimeline = [...(vis.timeline || []), timelineEntry];
+
     await updateDoc(doc(db, "visitors", id), {
       status: "checked-out",
-      checkOutTime: new Date().toISOString()
+      checkOutTime: timestamp,
+      timeline: newTimeline
     });
+
+    const resident = get().users.find(u => u.role === "resident" && u.unit === vis.visitingUnit);
+    if (resident) {
+      await get().sendNotification(
+        resident.id,
+        "Visitor Checked Out 🚪",
+        `Your visitor ${vis.name} has checked out and left the society.`,
+        "info"
+      );
+    }
   },
 
-  denyVisitorEntry: async (id, reason) => {
+  denyVisitorEntry: async (id, reason, remarks) => {
+    const timestamp = new Date().toISOString();
+    const visDoc = await getDoc(doc(db, "visitors", id));
+    if (!visDoc.exists()) return;
+    const vis = visDoc.data() as Visitor;
+
+    const timelineEntry = {
+      status: "denied" as VisitorStatus,
+      timestamp,
+      note: `Entry Denied. Reason: ${reason}. ${remarks ? `Remarks: ${remarks}` : ""}`,
+      by: "Security"
+    };
+    const newTimeline = [...(vis.timeline || []), timelineEntry];
+
     await updateDoc(doc(db, "visitors", id), {
       status: "denied",
-      denialReason: reason
+      denialReason: reason,
+      timeline: newTimeline,
+      ...(remarks ? { remarks } : {})
     });
+
+    await get().addIncidentReport({
+      date: timestamp.split("T")[0],
+      time: timestamp.split("T")[1].substring(0, 5),
+      location: "Main Gate",
+      description: `Visitor entry denied for ${vis.name} (Unit ${vis.visitingUnit}). Reason: ${reason}. Remarks: ${remarks || "None"}`,
+      type: "Visitor Dispute",
+      status: "logged",
+      reporter: "Security Guard"
+    });
+
+    const resident = get().users.find(u => u.role === "resident" && u.unit === vis.visitingUnit);
+    if (resident) {
+      await get().sendNotification(
+        resident.id,
+        "Visitor Access Denied 🚫",
+        `Entry denied for your visitor ${vis.name}. Reason: ${reason}`,
+        "error"
+      );
+    }
+
+    const secretaryUser = get().users.find(u => u.role === "secretary");
+    if (secretaryUser) {
+      await get().sendNotification(
+        secretaryUser.id,
+        "Security Alert: Entry Denied ⚠️",
+        `Visitor ${vis.name} denied entry for Unit ${vis.visitingUnit}. Reason: ${reason}`,
+        "warning"
+      );
+    }
+  },
+
+  cancelVisitorRequest: async (id) => {
+    const timestamp = new Date().toISOString();
+    const visDoc = await getDoc(doc(db, "visitors", id));
+    if (!visDoc.exists()) return;
+    const vis = visDoc.data() as Visitor;
+
+    const timelineEntry = {
+      status: "cancelled" as VisitorStatus,
+      timestamp,
+      note: `Visit cancelled by resident.`,
+      by: vis.visitingResident
+    };
+    const newTimeline = [...(vis.timeline || []), timelineEntry];
+
+    await updateDoc(doc(db, "visitors", id), {
+      status: "cancelled",
+      timeline: newTimeline
+    });
+
+    await get().sendNotification(
+      "user-security-1",
+      "Visitor Pass Cancelled ❌",
+      `Expected pass for ${vis.name} (Unit ${vis.visitingUnit}) was cancelled by resident.`,
+      "info"
+    );
+  },
+
+  approveVisitorRequest: async (id) => {
+    const timestamp = new Date().toISOString();
+    const visDoc = await getDoc(doc(db, "visitors", id));
+    if (!visDoc.exists()) return;
+    const vis = visDoc.data() as Visitor;
+
+    const timelineEntry = {
+      status: "approved" as VisitorStatus,
+      timestamp,
+      note: `Visit approved by resident.`,
+      by: vis.visitingResident
+    };
+    const newTimeline = [...(vis.timeline || []), timelineEntry];
+
+    await updateDoc(doc(db, "visitors", id), {
+      status: "approved",
+      timeline: newTimeline
+    });
+
+    await get().sendNotification(
+      "user-security-1",
+      "Visitor Request Approved ✅",
+      `Resident approved entry for ${vis.name} visiting flat ${vis.visitingUnit}.`,
+      "success"
+    );
+  },
+
+  addFavoriteVisitor: async (visitor) => {
+    const id = `FAV-${Math.floor(100 + Math.random() * 900)}`;
+    const favItem = {
+      ...visitor,
+      id,
+      isFavorite: true,
+      status: "approved" as VisitorStatus,
+      date: new Date().toISOString().split("T")[0]
+    };
+    await setDoc(doc(db, "favorites", id), favItem);
+  },
+
+  removeFavoriteVisitor: async (id) => {
+    await deleteDoc(doc(db, "favorites", id));
+  },
+
+  logEmergencyVisitor: async (agency, reason, vehicleNumber) => {
+    const id = `VIS-EMG-${Math.floor(100 + Math.random() * 900)}`;
+    const timestamp = new Date().toISOString();
+    
+    const timelineEntry = {
+      status: "checked-in" as VisitorStatus,
+      timestamp,
+      note: `Emergency responder entered: ${agency} for ${reason}`,
+      by: "Security Gate"
+    };
+
+    const newVisitor: Visitor = {
+      id,
+      name: `${agency} Emergency`,
+      phone: "108",
+      purpose: `Emergency - ${reason}`,
+      visitingUnit: "All / Common",
+      visitingResident: "Society Committee",
+      status: "checked-in",
+      checkInTime: timestamp,
+      vehicleNumber: vehicleNumber || "Emergency",
+      date: timestamp.split("T")[0],
+      portal: "society",
+      visitorType: "Emergency",
+      visitType: "one-time",
+      timeline: [timelineEntry]
+    };
+
+    await setDoc(doc(db, "visitors", id), newVisitor);
+
+    await get().sendNotification(
+      "all_residents",
+      "🚨 EMERGENCY ACCESS GRANTED 🚨",
+      `${agency} (${reason}) has entered the society premises. Please clear internal driveways.`,
+      "alert"
+    );
   },
 
   // ==========================================
@@ -1251,5 +1505,109 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
   updateWorkerServices: async (workerId, details) => {
     await updateDoc(doc(db, "users", workerId), details);
+  },
+
+  // Daily Helpers Actions
+  registerHelper: async (h) => {
+    const id = `HLP-${Math.floor(100 + Math.random() * 900)}`;
+    const joinedAt = new Date().toISOString();
+    const newHelper: Helper = { id, joinedAt, ...h, portal: "society" };
+    await setDoc(doc(db, "helpers", id), cleanObject(newHelper));
+  },
+
+  deleteHelper: async (id) => {
+    await deleteDoc(doc(db, "helpers", id));
+  },
+
+  checkInHelper: async (workerId, workerName, category, gate, assignedFlats) => {
+    const id = `ATT-${Math.floor(100 + Math.random() * 900)}`;
+    const date = new Date().toISOString().split("T")[0];
+    const checkInTime = new Date().toISOString();
+
+    let status: 'present' | 'late' | 'checked-in' | 'checked-out' = 'checked-in';
+    const helper = get().helpers.find(h => h.id === workerId || h.name === workerName);
+    let isLate = false;
+    let minutesLate = 0;
+
+    if (helper && helper.expectedArrival) {
+      try {
+        const [time, modifier] = helper.expectedArrival.split(" ");
+        let [expHours, expMins] = time.split(":").map(Number);
+        if (modifier === "PM" && expHours < 12) expHours += 12;
+        if (modifier === "AM" && expHours === 12) expHours = 0;
+
+        const checkInDate = new Date(checkInTime);
+        const expDate = new Date(checkInTime);
+        expDate.setHours(expHours, expMins, 0, 0);
+
+        const diffMs = checkInDate.getTime() - expDate.getTime();
+        if (diffMs > 5 * 60 * 1000) { // 5 minutes grace
+          isLate = true;
+          status = 'late';
+          minutesLate = Math.round(diffMs / (60 * 1000));
+        }
+      } catch (err) {
+        console.error("Error parsing expectedArrival:", err);
+      }
+    }
+
+    const newAttendance: HelperAttendance = {
+      id,
+      workerId,
+      workerName,
+      workerCategory: category,
+      date,
+      checkInTime,
+      entryGate: gate,
+      status,
+      assignedFlats
+    };
+
+    await setDoc(doc(db, "attendance", id), newAttendance);
+
+    // Notify residents
+    const residents = get().users.filter(u => u.role === "resident" && u.unit && assignedFlats.includes(u.unit));
+    for (const r of residents) {
+      await get().sendNotification(
+        r.id,
+        "Helper Checked In 🏢",
+        isLate
+          ? `${workerName} checked in through ${gate} Gate, running ${minutesLate} minutes late.`
+          : `${workerName} checked in through ${gate} Gate.`,
+        isLate ? "warning" : "success"
+      );
+    }
+  },
+
+  checkOutHelper: async (attendanceId, gate) => {
+    const checkOutTime = new Date().toISOString();
+    const attDocRef = doc(db, "attendance", attendanceId);
+    const attDoc = get().attendance.find(a => a.id === attendanceId);
+    if (!attDoc) return;
+
+    let duration = 0;
+    if (attDoc.checkInTime) {
+      const checkIn = new Date(attDoc.checkInTime).getTime();
+      const checkOut = new Date(checkOutTime).getTime();
+      duration = Math.round((checkOut - checkIn) / (60 * 1000));
+    }
+
+    await updateDoc(attDocRef, {
+      checkOutTime,
+      exitGate: gate,
+      status: 'checked-out',
+      duration
+    });
+
+    // Notify residents
+    const residents = get().users.filter(u => u.role === "resident" && u.unit && attDoc.assignedFlats.includes(u.unit));
+    for (const r of residents) {
+      await get().sendNotification(
+        r.id,
+        "Helper Checked Out 🚪",
+        `${attDoc.workerName} checked out from ${gate} Gate. Duration: ${duration} mins.`,
+        "info"
+      );
+    }
   }
 }));
