@@ -1,16 +1,10 @@
-"use client";
-
 import { create } from "zustand";
+import { io } from "socket.io-client";
 import {
   Complaint, Visitor, VisitorStatus, UserRole, PortalType, User, Announcement, EmergencyAlert,
   GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord,
   ComplaintPriority, AiAnalysis, ComplaintChatMessage, Helper, HelperAttendance
 } from "@/types";
-import { db, auth } from "@/lib/firebase/config";
-import {
-  collection, doc, setDoc, updateDoc, deleteDoc, getDoc, onSnapshot
-} from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
 
 // ==========================================
 // Centralized Database Interfaces
@@ -30,12 +24,12 @@ export interface LeaveRequest {
 
 export interface LaundrySlot {
   id: string;
-  machineId: string; // e.g. "M1", "M2", "M3", "M4"
+  machineId: string;
   machineName: string;
-  slot: string; // e.g. "09:00 - 10:00 AM"
+  slot: string;
   date: string;
-  bookedBy?: string; // Student ID
-  bookedByName?: string; // Student Name
+  bookedBy?: string;
+  bookedByName?: string;
   status: "available" | "booked";
 }
 
@@ -43,7 +37,7 @@ export interface Parcel {
   id: string;
   recipientId: string;
   recipientName: string;
-  unit: string; // flat or room
+  unit: string;
   courier: string;
   description: string;
   image?: string;
@@ -57,12 +51,12 @@ export interface Parcel {
 
 export interface FacilityBooking {
   id: string;
-  facility: string; // Gym, Badminton Court, Swimming Pool, Clubhouse, Party Hall
+  facility: string;
   userId: string;
   userName: string;
   unit: string;
   date: string;
-  slot: string; // e.g. "10:00 AM - 11:00 AM"
+  slot: string;
   status: "booked" | "cancelled";
 }
 
@@ -74,7 +68,7 @@ export interface MarketplaceItem {
   sellerId: string;
   sellerName: string;
   image?: string;
-  category: string; // Books, Cycles, Furniture, Electronics, Notes
+  category: string;
   status: "available" | "sold";
   portal: PortalType;
   createdAt: string;
@@ -129,12 +123,12 @@ export interface CommunityEvent {
   location: string;
   organizer: string;
   priority: "normal" | "important" | "urgent";
-  rsvps: string[]; // User IDs
+  rsvps: string[];
 }
 
 export interface Notification {
   id: string;
-  userId: string; // Target user or "all_residents" or "all_students"
+  userId: string;
   title: string;
   message: string;
   type: "info" | "warning" | "success" | "error" | "alert";
@@ -145,11 +139,11 @@ export interface Notification {
 export interface RoommatePreference {
   userId: string;
   userName: string;
-  lifestyle: string; // "Early Bird" | "Night Owl"
-  food: string; // "Veg" | "Non-Veg" | "No preference"
-  cleanliness: string; // "Neat Freak" | "Moderate" | "Relaxed"
-  budget: string; // "Low" | "Medium" | "High"
-  sleeping: string; // "Light Sleeper" | "Heavy Sleeper"
+  lifestyle: string;
+  food: string;
+  cleanliness: string;
+  budget: string;
+  sleeping: string;
 }
 
 interface CommunityState {
@@ -281,17 +275,6 @@ interface CommunityState {
   }) => Promise<void>;
 }
 
-function cleanObject<T extends Record<string, any>>(obj: T): T {
-  const result: any = {};
-  Object.keys(obj).forEach((key) => {
-    const val = obj[key];
-    if (val !== undefined) {
-      result[key] = val;
-    }
-  });
-  return result;
-}
-
 export const useCommunityStore = create<CommunityState>((set, get) => ({
   complaints: [],
   leaveRequests: [],
@@ -321,1293 +304,843 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
   initializeDb: () => {
     if (typeof window === "undefined") return;
-    if ((globalThis as any).__homeverse_auth_listener_active) return;
-    (globalThis as any).__homeverse_auth_listener_active = true;
+    if ((globalThis as any).__homeverse_listeners_active) return;
+    (globalThis as any).__homeverse_listeners_active = true;
 
-    onAuthStateChanged(auth, (firebaseUser: any) => {
-      if (firebaseUser) {
-        if ((globalThis as any).__homeverse_listeners_active) return;
-        (globalThis as any).__homeverse_listeners_active = true;
+    // 1. Initial REST state fetch
+    const fetchInitialState = async () => {
+      try {
+        const endpoints = [
+          { key: "complaints", path: "/api/complaints" },
+          { key: "visitors", path: "/api/visitors" },
+          { key: "helpers", path: "/api/visitors/helpers" },
+          { key: "attendance", path: "/api/visitors/attendance" },
+          { key: "favorites", path: "/api/visitors/favorites" },
+          { key: "announcements", path: "/api/announcements" },
+          { key: "leaveRequests", path: "/api/leaveRequests" },
+          { key: "laundrySlots", path: "/api/laundry" },
+          { key: "parcels", path: "/api/parcels" },
+          { key: "roomChangeRequests", path: "/api/roomchange" },
+          { key: "maintenanceBills", path: "/api/maintenance" },
+          { key: "rentRecords", path: "/api/rent" },
+          { key: "communityEvents", path: "/api/events" },
+          { key: "notifications", path: "/api/notifications" },
+          { key: "roommatePreferences", path: "/api/roommates" },
+          { key: "emergencies", path: "/api/emergencies" },
+          { key: "gatePasses", path: "/api/gatepasses" },
+          { key: "vehicleLogs", path: "/api/vehiclelogs" },
+          { key: "incidents", path: "/api/incidents" },
+          { key: "marketplaceItems", path: "/api/marketplace" },
+          { key: "lostFoundItems", path: "/api/lostfound" },
+          { key: "flats", path: "/api/flats" },
+          { key: "expenses", path: "/api/expenses" },
+          { key: "users", path: "/api/users" }
+        ];
 
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        getDoc(userDocRef).then((userDoc) => {
-          const isSec = userDoc.exists() && userDoc.data()?.role === "secretary";
-
-          const collectionsToListen = [
-            { key: "complaints", coll: "complaints" },
-            { key: "leaveRequests", coll: "leaveRequests" },
-            { key: "visitors", coll: "visitors" },
-            { key: "laundrySlots", coll: "laundrySlots" },
-            { key: "parcels", coll: "parcels" },
-            { key: "facilityBookings", coll: "facilityBookings" },
-            { key: "marketplaceItems", coll: "marketplaceItems" },
-            { key: "lostFoundItems", coll: "lostFoundItems" },
-            { key: "roomChangeRequests", coll: "roomChangeRequests" },
-            { key: "maintenanceBills", coll: "maintenanceBills" },
-            { key: "communityEvents", coll: "communityEvents" },
-            { key: "notifications", coll: "notifications" },
-            { key: "roommatePreferences", coll: "roommatePreferences" },
-            { key: "users", coll: "users" },
-            { key: "emergencies", coll: "emergencies" },
-            { key: "gatePasses", coll: "gatePasses" },
-            { key: "vehicleLogs", coll: "vehicleLogs" },
-            { key: "incidents", coll: "incidents" },
-            { key: "announcements", coll: "announcements" },
-            { key: "flats", coll: "flats" },
-            { key: "rentRecords", coll: "rentRecords" },
-            { key: "favorites", coll: "favorites" },
-            { key: "helpers", coll: "helpers" },
-            { key: "attendance", coll: "attendance" }
-          ];
-
-          if (isSec) {
-            collectionsToListen.push({ key: "expenses", coll: "expenses" });
-          }
-
-          if ((globalThis as any).__homeverse_unsubscribers) {
-            (globalThis as any).__homeverse_unsubscribers.forEach((unsub: any) => unsub());
-          }
-
-          (globalThis as any).__homeverse_unsubscribers = collectionsToListen.map(({ key, coll }) => {
-            return onSnapshot(collection(db, coll), (snapshot) => {
-              const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-              set({ [key]: list } as any);
-            });
-          });
-        }).catch((err) => {
-          console.error("Error setting up Firestore snapshot listeners:", err);
-          (globalThis as any).__homeverse_listeners_active = false;
+        const promises = endpoints.map(async ({ key, path }) => {
+          try {
+            const res = await fetch(path);
+            if (res.ok) {
+              const data = await res.json();
+              set({ [key]: data } as any);
+            }
+          } catch (e) {}
         });
+
+        await Promise.all(promises);
+      } catch (err) {}
+    };
+
+    fetchInitialState();
+
+    // 2. Establish Real-Time WebSocket Connection
+    const socket = io("http://localhost:5000", {
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
+      autoConnect: true
+    });
+
+    (globalThis as any).__homeverse_socket = socket;
+
+    socket.on("connect", () => {
+      console.log("⚡ Connected to HomeVerse Socket.IO Server!");
+    });
+
+    socket.on("complaint:update", (updated: any) => {
+      const current = get().complaints || [];
+      const index = current.findIndex(c => c.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ complaints: next });
       } else {
-        if ((globalThis as any).__homeverse_unsubscribers) {
-          (globalThis as any).__homeverse_unsubscribers.forEach((unsub: any) => unsub());
-          delete (globalThis as any).__homeverse_unsubscribers;
-        }
-        (globalThis as any).__homeverse_listeners_active = false;
+        set({ complaints: [updated, ...current] });
+      }
+    });
+
+    socket.on("visitor:update", (updated: any) => {
+      const current = get().visitors || [];
+      const index = current.findIndex(v => v.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ visitors: next });
+      } else {
+        set({ visitors: [updated, ...current] });
+      }
+    });
+
+    socket.on("helper:update", (updated: any) => {
+      const current = get().helpers || [];
+      const index = current.findIndex(h => h.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ helpers: next });
+      } else {
+        set({ helpers: [updated, ...current] });
+      }
+    });
+
+    socket.on("helper:delete", ({ id }: any) => {
+      const current = get().helpers || [];
+      set({ helpers: current.filter(h => h.id !== id) });
+    });
+
+    socket.on("attendance:update", (updated: any) => {
+      const current = get().attendance || [];
+      const index = current.findIndex(a => a.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ attendance: next });
+      } else {
+        set({ attendance: [updated, ...current] });
+      }
+    });
+
+    socket.on("favorite:update", (updated: any) => {
+      const current = get().favorites || [];
+      const index = current.findIndex(f => f.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ favorites: next });
+      } else {
+        set({ favorites: [updated, ...current] });
+      }
+    });
+
+    socket.on("favorite:delete", ({ id }: any) => {
+      const current = get().favorites || [];
+      set({ favorites: current.filter(f => f.id !== id) });
+    });
+
+    socket.on("announcement:update", (updated: any) => {
+      const current = get().announcements || [];
+      const index = current.findIndex(a => a.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ announcements: next });
+      } else {
+        set({ announcements: [updated, ...current] });
+      }
+    });
+
+    socket.on("leave:update", (updated: any) => {
+      const current = get().leaveRequests || [];
+      const index = current.findIndex(l => l.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ leaveRequests: next });
+      } else {
+        set({ leaveRequests: [updated, ...current] });
+      }
+    });
+
+    socket.on("laundry:update", (updated: any) => {
+      const current = get().laundrySlots || [];
+      const index = current.findIndex(l => l.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ laundrySlots: next });
+      } else {
+        set({ laundrySlots: [updated, ...current] });
+      }
+    });
+
+    socket.on("laundry:delete", ({ id }: any) => {
+      const current = get().laundrySlots || [];
+      set({ laundrySlots: current.filter(l => l.id !== id) });
+    });
+
+    socket.on("parcel:update", (updated: any) => {
+      const current = get().parcels || [];
+      const index = current.findIndex(p => p.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ parcels: next });
+      } else {
+        set({ parcels: [updated, ...current] });
+      }
+    });
+
+    socket.on("roomchange:update", (updated: any) => {
+      const current = get().roomChangeRequests || [];
+      const index = current.findIndex(r => r.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ roomChangeRequests: next });
+      } else {
+        set({ roomChangeRequests: [updated, ...current] });
+      }
+    });
+
+    socket.on("maintenance:update", (updated: any) => {
+      const current = get().maintenanceBills || [];
+      const index = current.findIndex(m => m.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ maintenanceBills: next });
+      } else {
+        set({ maintenanceBills: [updated, ...current] });
+      }
+    });
+
+    socket.on("rent:update", (updated: any) => {
+      const current = get().rentRecords || [];
+      const index = current.findIndex(r => r.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ rentRecords: next });
+      } else {
+        set({ rentRecords: [updated, ...current] });
+      }
+    });
+
+    socket.on("event:update", (updated: any) => {
+      const current = get().communityEvents || [];
+      const index = current.findIndex(e => e.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ communityEvents: next });
+      } else {
+        set({ communityEvents: [updated, ...current] });
+      }
+    });
+
+    socket.on("notification:update", (updated: any) => {
+      const current = get().notifications || [];
+      const index = current.findIndex(n => n.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ notifications: next });
+      } else {
+        set({ notifications: [updated, ...current] });
+      }
+    });
+
+    socket.on("emergency:update", (updated: any) => {
+      const current = get().emergencies || [];
+      const index = current.findIndex(e => e.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ emergencies: next });
+      } else {
+        set({ emergencies: [updated, ...current] });
+      }
+    });
+
+    socket.on("gatepass:update", (updated: any) => {
+      const current = get().gatePasses || [];
+      const index = current.findIndex(g => g.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ gatePasses: next });
+      } else {
+        set({ gatePasses: [updated, ...current] });
+      }
+    });
+
+    socket.on("vehiclelog:update", (updated: any) => {
+      const current = get().vehicleLogs || [];
+      const index = current.findIndex(v => v.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ vehicleLogs: next });
+      } else {
+        set({ vehicleLogs: [updated, ...current] });
+      }
+    });
+
+    socket.on("incident:update", (updated: any) => {
+      const current = get().incidents || [];
+      const index = current.findIndex(i => i.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ incidents: next });
+      } else {
+        set({ incidents: [updated, ...current] });
+      }
+    });
+
+    socket.on("marketplace:update", (updated: any) => {
+      const current = get().marketplaceItems || [];
+      const index = current.findIndex(m => m.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ marketplaceItems: next });
+      } else {
+        set({ marketplaceItems: [updated, ...current] });
+      }
+    });
+
+    socket.on("lostfound:update", (updated: any) => {
+      const current = get().lostFoundItems || [];
+      const index = current.findIndex(l => l.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ lostFoundItems: next });
+      } else {
+        set({ lostFoundItems: [updated, ...current] });
+      }
+    });
+
+    socket.on("flat:update", (updated: any) => {
+      const current = get().flats || [];
+      const index = current.findIndex(f => f.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ flats: next });
+      } else {
+        set({ flats: [updated, ...current] });
+      }
+    });
+
+    socket.on("expense:update", (updated: any) => {
+      const current = get().expenses || [];
+      const index = current.findIndex(e => e.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ expenses: next });
+      } else {
+        set({ expenses: [updated, ...current] });
+      }
+    });
+
+    socket.on("user:update", (updated: any) => {
+      const current = get().users || [];
+      const index = current.findIndex(u => u.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ users: next });
+      } else {
+        set({ users: [updated, ...current] });
       }
     });
   },
 
-  // No-op since we write straight to Firestore
   saveDb: () => {},
 
   addRegisteredUser: async (u) => {
-    await setDoc(doc(db, "users", u.id), u);
+    await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(u)
+    });
   },
 
-  // ==========================================
-  // COMPLAINT TRANSACTIONS
-  // ==========================================
   addComplaint: async (c) => {
-    const year = new Date().getFullYear();
-    const rand = Math.floor(1000 + Math.random() * 9000);
-    const id = `COMP-${year}-${rand}`;
-    
-    // AI Analysis Simulation
-    const titleAndDesc = `${c.title} ${c.description}`.toLowerCase();
-    
-    // Predict priority
-    let predictedPriority: ComplaintPriority = c.priority || 'medium';
-    if (c.emergency || (titleAndDesc.includes("leak") && (titleAndDesc.includes("gas") || titleAndDesc.includes("water enter"))) || titleAndDesc.includes("trapped")) {
-      predictedPriority = 'emergency';
-    } else if (titleAndDesc.includes("spark") || titleAndDesc.includes("fire") || titleAndDesc.includes("theft") || titleAndDesc.includes("short circuit")) {
-      predictedPriority = 'critical';
-    } else if (titleAndDesc.includes("broken") || titleAndDesc.includes("not working") || titleAndDesc.includes("stolen")) {
-      predictedPriority = 'high';
-    }
-
-    // Predict category if not supplied or for suggestion
-    let suggestedCategory = c.category || 'others';
-    if (titleAndDesc.includes("leak") || titleAndDesc.includes("pipe") || titleAndDesc.includes("tap") || titleAndDesc.includes("dripping")) {
-      suggestedCategory = 'water-leakage';
-    } else if (titleAndDesc.includes("wire") || titleAndDesc.includes("spark") || titleAndDesc.includes("mcb") || titleAndDesc.includes("fan") || titleAndDesc.includes("light") || titleAndDesc.includes("short")) {
-      suggestedCategory = 'electrical';
-    } else if (titleAndDesc.includes("lift") || titleAndDesc.includes("elevator") || titleAndDesc.includes("stuck") || titleAndDesc.includes("trapped")) {
-      suggestedCategory = 'lift';
-    } else if (titleAndDesc.includes("park") || titleAndDesc.includes("car") || titleAndDesc.includes("vehicle") || titleAndDesc.includes("double park")) {
-      suggestedCategory = 'parking';
-    } else if (titleAndDesc.includes("cleaning") || titleAndDesc.includes("dirt") || titleAndDesc.includes("dust") || titleAndDesc.includes("sweep")) {
-      suggestedCategory = 'cleaning';
-    } else if (titleAndDesc.includes("guard") || titleAndDesc.includes("gate") || titleAndDesc.includes("suspicious") || titleAndDesc.includes("theft")) {
-      suggestedCategory = 'security';
-    }
-    
-    // Predict required materials & cost
-    let requiredMaterials: string[] = ["Standard inspection kit"];
-    let expectedCost = "₹200 - ₹500";
-    if (suggestedCategory === 'plumbing' || suggestedCategory === 'water-leakage') {
-      requiredMaterials = ["PVC replacement pipe", "Teflon sealing tape", "Silicone thread sealant", "Pipe wrench", "Coupling joints"];
-      expectedCost = "₹450 - ₹1,200";
-    } else if (suggestedCategory === 'electrical') {
-      requiredMaterials = ["Insulated screwdriver set", "Replacement 16A MCB", "Wire strippers", "Electrical insulation tape", "Digital multimeter"];
-      expectedCost = "₹350 - ₹950";
-    } else if (suggestedCategory === 'lift') {
-      requiredMaterials = ["Elevator guide rail lubrication", "Safety brake cleaner", "Control panel spare fuses", "Intercom contact kit"];
-      expectedCost = "₹2,500 - ₹6,500";
-    } else if (suggestedCategory === 'cleaning' || suggestedCategory === 'housekeeping') {
-      requiredMaterials = ["Premium floor disinfectant", "Microfiber cleaning cloths", "High-reach duster", "Heavy-duty broom & mop set"];
-      expectedCost = "₹150 - ₹300";
-    } else if (suggestedCategory === 'pest-control') {
-      requiredMaterials = ["Organic gel pesticides", "Handheld sprayer", "Aerosol sprayers", "Rodent snap traps", "Protective safety gear"];
-      expectedCost = "₹800 - ₹1,800";
-    }
-
-    // Predict estimated completion
-    let estimatedCompletion = "24 Hours";
-    if (predictedPriority === 'emergency') {
-      estimatedCompletion = "2 Hours";
-    } else if (predictedPriority === 'critical') {
-      estimatedCompletion = "4 Hours";
-    } else if (predictedPriority === 'high') {
-      estimatedCompletion = "12 Hours";
-    }
-
-    // Duplicate detection
-    const existingComplaints = get().complaints || [];
-    const duplicateMatch = existingComplaints.find(comp => 
-      comp.status !== 'closed' &&
-      comp.category === c.category &&
-      comp.building === c.building &&
-      (comp.wing === c.wing || !c.wing || !comp.wing) &&
-      (comp.title.toLowerCase().includes(c.title.toLowerCase()) || 
-       c.title.toLowerCase().includes(comp.title.toLowerCase()) ||
-       comp.description.toLowerCase().includes(c.description.toLowerCase()))
-    );
-
-    const aiAnalysis: AiAnalysis = {
-      predictedPriority,
-      suggestedCategory,
-      estimatedCompletion,
-      requiredMaterials,
-      expectedCost,
-      possibleDuplicateOf: duplicateMatch ? duplicateMatch.id : undefined,
-      isDuplicate: duplicateMatch ? true : false
-    };
-
-    const newComplaint: Complaint = {
-      ...c,
-      id,
-      priority: predictedPriority,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      timeline: [
-        { status: "submitted", timestamp: new Date().toISOString(), note: "Complaint registered successfully and AI diagnostics compiled." }
-      ],
-      chat: [],
-      aiAnalysis
-    };
-
-    await setDoc(doc(db, "complaints", id), newComplaint);
-
-    // If duplicate was found, automatically append to the parent's group
-    if (duplicateMatch) {
-      const parentDoc = await getDoc(doc(db, "complaints", duplicateMatch.id));
-      if (parentDoc.exists()) {
-        const parentData = parentDoc.data() as Complaint;
-        const currentGroup = parentData.duplicateGroup || [];
-        if (!currentGroup.includes(id)) {
-          await updateDoc(doc(db, "complaints", duplicateMatch.id), {
-            duplicateGroup: [...currentGroup, id]
-          });
-        }
-      }
-    }
-
-    const title = `New Ticket Raised 📋`;
-    const message = `Unit ${c.unit} raised ticket: "${c.title}"`;
-    await get().sendNotification("all_residents", title, message, "info");
+    await fetch("/api/complaints", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(c)
+    });
   },
 
   updateComplaintStatus: async (id, status, details) => {
-    const compDoc = await getDoc(doc(db, "complaints", id));
-    if (!compDoc.exists()) return;
-    const comp = compDoc.data() as Complaint;
-    const newTimeline = [...(comp.timeline || [])];
-    
-    const timestamp = new Date().toISOString();
-    newTimeline.push({
-      status,
-      timestamp,
-      note: details?.note || `Status updated to ${status}.`,
-      by: details?.by,
-      afterPhoto: details?.afterPhoto
+    await fetch(`/api/complaints/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, note: details?.note, by: details?.by })
     });
-    
-    const updates: Partial<Complaint> = {
-      status,
-      updatedAt: timestamp,
-      timeline: newTimeline
-    };
-    if (details?.afterPhoto) {
-      updates.afterPhoto = details.afterPhoto;
-      updates.completionPhotos = [...(comp.completionPhotos || []), details.afterPhoto];
-    }
-    
-    await updateDoc(doc(db, "complaints", id), updates);
-
-    // Notifications
-    let residentMsg = "";
-    let secretaryMsg = "";
-    let workerMsg = "";
-
-    if (status === "under-review") {
-      residentMsg = `Your ticket "${comp.title}" is now Under Review.`;
-      secretaryMsg = `Ticket ${id} is under review.`;
-    } else if (status === "accepted") {
-      residentMsg = `Worker ${comp.assignedTo || "assigned"} has accepted your ticket: "${comp.title}".`;
-      secretaryMsg = `Worker accepted ticket ${id}.`;
-    } else if (status === "in-progress") {
-      residentMsg = `Work has started on your ticket: "${comp.title}".`;
-      secretaryMsg = `Worker started work on ticket ${id}.`;
-    } else if (status === "completed") {
-      residentMsg = `Worker marked your ticket "${comp.title}" as completed. Please verify!`;
-      secretaryMsg = `Worker completed ticket ${id}, pending resident verification.`;
-    } else if (status === "resolved") {
-      residentMsg = `Ticket "${comp.title}" has been resolved.`;
-      secretaryMsg = `Ticket ${id} has been resolved.`;
-    } else if (status === "resident-verification") {
-      residentMsg = `Please verify resolution of ticket: "${comp.title}".`;
-      secretaryMsg = `Resident verification pending for ${id}.`;
-    } else if (status === "closed") {
-      residentMsg = `Your ticket "${comp.title}" is now Closed. Thank you!`;
-      secretaryMsg = `Ticket ${id} is closed.`;
-      if (comp.assignedToId) {
-        workerMsg = `Ticket ${id} has been closed by resident.`;
-      }
-    }
-
-    if (residentMsg) {
-      await get().sendNotification(comp.raisedBy, `Ticket Update ⚙️`, residentMsg, "info");
-    }
-    if (secretaryMsg) {
-      const secretaryUser = get().users.find(u => u.role === "secretary");
-      const targetSecId = secretaryUser?.id || "user-secretary-1";
-      await get().sendNotification(targetSecId, `Ticket Status Alert 📋`, secretaryMsg, "info");
-    }
-    if (workerMsg && comp.assignedToId) {
-      await get().sendNotification(comp.assignedToId, `Job Closed 🛠️`, workerMsg, "success");
-    }
   },
 
   assignComplaintWorker: async (id, workerName, workerId, eta) => {
-    const updates = {
-      assignedTo: `${workerName} (ETA: ${eta})`,
-      assignedToId: workerId,
-      estimatedArrival: eta,
-      status: "assigned" as const,
-      updatedAt: new Date().toISOString()
-    };
-    await updateDoc(doc(db, "complaints", id), updates);
-    
-    // Notify worker
-    await get().sendNotification(
-      workerId,
-      `New Job Assigned 🛠️`,
-      `You have been assigned: "${id}". Please review ETA.`,
-      "info"
-    );
-
-    // Notify resident
-    const compDoc = await getDoc(doc(db, "complaints", id));
-    if (compDoc.exists()) {
-      const comp = compDoc.data() as Complaint;
-      await get().sendNotification(
-        comp.raisedBy,
-        `Contractor Assigned 🛠️`,
-        `${workerName} has been assigned to ticket "${comp.title}". ETA: ${eta}`,
-        "info"
-      );
-    }
+    await fetch(`/api/complaints/${id}/assign`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assignedTo: workerName, assignedToId: workerId, note: `Assigned ETA: ${eta}` })
+    });
   },
 
   rateComplaint: async (id, rating, review) => {
-    const compDoc = await getDoc(doc(db, "complaints", id));
-    if (!compDoc.exists()) return;
-    const comp = compDoc.data() as Complaint;
-    
-    const timestamp = new Date().toISOString();
-    const newTimeline = [...(comp.timeline || [])];
-    newTimeline.push({
-      status: "closed",
-      timestamp,
-      note: `Resident closed the ticket and rated it ${rating} stars. Review: ${review || "No review left."}`,
-      by: comp.raisedByName
+    await fetch(`/api/complaints/${id}/rate`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rating, review })
     });
-
-    await updateDoc(doc(db, "complaints", id), {
-      rating,
-      ratingReview: review || "",
-      status: "closed",
-      updatedAt: timestamp,
-      timeline: newTimeline
-    });
-
-    // Update worker rating if worker is assigned
-    if (comp.assignedToId) {
-      const workerId = comp.assignedToId;
-      const allComplaints = get().complaints || [];
-      const ratedComplaints = allComplaints.filter(c => 
-        c.assignedToId === workerId && 
-        c.id !== id && 
-        typeof c.rating === "number"
-      );
-      
-      const ratings = ratedComplaints.map(c => c.rating as number);
-      ratings.push(rating);
-      
-      const averageRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
-      
-      await updateDoc(doc(db, "users", workerId), {
-        rating: Number(averageRating.toFixed(2))
-      });
-    }
-
-    const secretaryUser = get().users.find(u => u.role === "secretary");
-    const targetSecId = secretaryUser?.id || "user-secretary-1";
-    await get().sendNotification(
-      targetSecId, 
-      `Ticket Closed & Rated ⭐`, 
-      `Ticket ${id} closed. Rated ${rating} stars by ${comp.raisedByName}.`, 
-      "success"
-    );
-
-    if (comp.assignedToId) {
-      await get().sendNotification(
-        comp.assignedToId,
-        `Job Rated ⭐`,
-        `Your job ${id} was rated ${rating} stars.`,
-        "success"
-      );
-    }
   },
 
   addComplaintChatMessage: async (id, msg) => {
-    const compDoc = await getDoc(doc(db, "complaints", id));
-    if (!compDoc.exists()) return;
-    const comp = compDoc.data() as Complaint;
-    const chat = comp.chat || [];
-    
-    const newMsg: ComplaintChatMessage = {
-      ...msg,
-      id: `MSG-${Math.floor(1000 + Math.random() * 9000)}`,
-      timestamp: new Date().toISOString()
-    };
-
-    const senderLabel = msg.senderRole === "resident" ? "Resident" : msg.senderRole === "worker" ? "Worker" : "Secretary";
-    const timelineEntry = {
-      status: comp.status,
-      timestamp: new Date().toISOString(),
-      note: `${senderLabel} Sent Message: "${msg.message.substring(0, 40)}${msg.message.length > 40 ? '...' : ''}"`,
-      by: msg.senderName
-    };
-    const newTimeline = [...(comp.timeline || []), timelineEntry];
-    
-    await updateDoc(doc(db, "complaints", id), {
-      chat: [...chat, newMsg],
-      timeline: newTimeline,
-      updatedAt: new Date().toISOString()
+    await fetch(`/api/complaints/${id}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: msg.message })
     });
   },
 
   mergeComplaints: async (parentTicketId, duplicateTicketIds) => {
-    const parentDoc = await getDoc(doc(db, "complaints", parentTicketId));
-    if (!parentDoc.exists()) return;
-    const parentData = parentDoc.data() as Complaint;
-    const currentGroup = parentData.duplicateGroup || [];
-    
-    const newGroup = Array.from(new Set([...currentGroup, ...duplicateTicketIds]));
-    await updateDoc(doc(db, "complaints", parentTicketId), {
-      duplicateGroup: newGroup,
-      updatedAt: new Date().toISOString()
+    await fetch("/api/complaints/merge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parentTicketId, duplicateTicketIds })
     });
-
-    for (const childId of duplicateTicketIds) {
-      const childDoc = await getDoc(doc(db, "complaints", childId));
-      if (childDoc.exists()) {
-        const childData = childDoc.data() as Complaint;
-        const newTimeline = [...(childData.timeline || [])];
-        newTimeline.push({
-          status: "closed",
-          timestamp: new Date().toISOString(),
-          note: `Ticket merged into parent ticket ${parentTicketId} as duplicate.`,
-          by: "Secretary"
-        });
-        await updateDoc(doc(db, "complaints", childId), {
-          parentTicketId,
-          status: "closed",
-          timeline: newTimeline,
-          updatedAt: new Date().toISOString()
-        });
-      }
-    }
   },
 
   subscribeToComplaint: async (id, userId, userName, unit) => {
-    const compDoc = await getDoc(doc(db, "complaints", id));
-    if (!compDoc.exists()) return;
-    const comp = compDoc.data() as Complaint;
-    const currentSubs = comp.subscribers || [];
-    if (currentSubs.find(s => s.userId === userId)) return; // already subscribed
-
-    const updatedSubs = [...currentSubs, { userId, name: userName, unit }];
-    const newTimeline = [...(comp.timeline || [])];
-    newTimeline.push({
-      status: comp.status,
-      timestamp: new Date().toISOString(),
-      note: `Resident ${userName} (Flat ${unit}) joined this common issue.`,
-      by: userName
-    });
-
-    await updateDoc(doc(db, "complaints", id), {
-      subscribers: updatedSubs,
-      timeline: newTimeline,
-      updatedAt: new Date().toISOString()
+    await fetch(`/api/complaints/${id}/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, userName, unit })
     });
   },
 
   updateComplaintEta: async (id, eta) => {
-    const compDoc = await getDoc(doc(db, "complaints", id));
-    if (!compDoc.exists()) return;
-    const comp = compDoc.data() as Complaint;
-    
-    const newTimeline = [...(comp.timeline || [])];
-    newTimeline.push({
-      status: comp.status,
-      timestamp: new Date().toISOString(),
-      note: `Worker updated Estimated Arrival Time (ETA) to: ${eta}`,
-      by: comp.assignedTo || "Worker"
+    await fetch(`/api/complaints/${id}/eta`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eta })
     });
-
-    await updateDoc(doc(db, "complaints", id), {
-      estimatedArrival: eta,
-      timeline: newTimeline,
-      updatedAt: new Date().toISOString()
-    });
-
-    // Notify resident
-    await get().sendNotification(
-      comp.raisedBy,
-      `ETA Update ⚙️`,
-      `Worker has updated the ETA for your ticket "${comp.title}" to: ${eta}`,
-      "info"
-    );
   },
 
-  // ==========================================
-  // LEAVES TRANSACTIONS
-  // ==========================================
   submitLeaveRequest: async (req) => {
-    const id = `LEV-${Math.floor(100 + Math.random() * 900)}`;
-    const newReq: LeaveRequest = {
-      ...req,
-      id,
-      status: "pending",
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, "leaveRequests", id), newReq);
-
-    await get().sendNotification(
-      "user-warden-1",
-      "New Outstation Request ✈️",
-      `${req.studentName} has requested outstation leave.`,
-      "warning"
-    );
+    await fetch("/api/leaveRequests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req)
+    });
   },
 
   approveRejectLeave: async (id, status) => {
-    await updateDoc(doc(db, "leaveRequests", id), { status });
-    const leaveDoc = await getDoc(doc(db, "leaveRequests", id));
-    if (leaveDoc.exists()) {
-      const leaveData = leaveDoc.data() as LeaveRequest;
-      await get().sendNotification(
-        leaveData.studentId,
-        `Leave Request ${status.toUpperCase()} ✈️`,
-        `Your leave request from ${leaveData.fromDate} has been ${status}.`,
-        status === "approved" ? "success" : "error"
-      );
-    }
+    await fetch(`/api/leaveRequests/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status })
+    });
   },
 
-  // ==========================================
-  // VISITORS TRANSACTIONS
-  // ==========================================
   submitVisitorRequest: async (v) => {
-    const id = `VIS-${Math.floor(100 + Math.random() * 900)}`;
-    const qrCode = `QR-HOMEVERSE-${id}`;
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    
-    let initialStatus: VisitorStatus = 'approved';
-    if (v.portal === 'hostel') {
-      initialStatus = 'expected';
-    } else if (v.status) {
-      initialStatus = v.status as VisitorStatus;
-    }
-
-    const timestamp = new Date().toISOString();
-    const visitorType = v.visitorType || "Guests";
-    const visitType = v.visitType || "one-time";
-    
-    const timelineEntry = {
-      status: initialStatus,
-      timestamp,
-      note: `Visit created: ${visitType} pass for ${v.name} (${visitorType})`,
-      by: v.visitingResident || "Resident"
-    };
-
-    const newVisitor: Visitor = {
-      ...v,
-      id,
-      status: initialStatus,
-      qrCode,
-      otp,
-      visitorType,
-      visitType,
-      timeline: [timelineEntry]
-    };
-    
-    await setDoc(doc(db, "visitors", id), cleanObject(newVisitor));
-
-    await get().sendNotification(
-      "user-security-1",
-      "Visitor Pass Scheduled 🚪",
-      `${visitorType} - ${v.name} scheduled for Unit ${v.visitingUnit}. Code: ${otp}`,
-      "info"
-    );
-
-    const secretaryUser = get().users.find(u => u.role === "secretary");
-    if (secretaryUser) {
-      await get().sendNotification(
-        secretaryUser.id,
-        "New Visitor Pass Created 📋",
-        `Unit ${v.visitingUnit} created ${visitType} pass for ${v.name} (${visitorType}).`,
-        "info"
-      );
-    }
+    await fetch("/api/visitors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(v)
+    });
   },
 
   checkInVisitor: async (id, remarks) => {
-    const timestamp = new Date().toISOString();
-    const visDoc = await getDoc(doc(db, "visitors", id));
-    if (!visDoc.exists()) return;
-    const vis = visDoc.data() as Visitor;
-    
-    const timelineEntry = {
-      status: "checked-in" as VisitorStatus,
-      timestamp,
-      note: `Checked In by Security Gate. ${remarks ? `Remarks: ${remarks}` : ""}`,
-      by: "Security"
-    };
-    const newTimeline = [...(vis.timeline || []), timelineEntry];
-
-    await updateDoc(doc(db, "visitors", id), {
-      status: "checked-in",
-      checkInTime: timestamp,
-      timeline: newTimeline,
-      ...(remarks ? { remarks } : {})
+    await fetch(`/api/visitors/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "checked-in", checkInTime: new Date().toISOString(), approvedBy: remarks })
     });
-    
-    const resident = get().users.find(u => u.role === "resident" && u.unit === vis.visitingUnit);
-    if (resident) {
-      await get().sendNotification(
-        resident.id,
-        "Visitor Checked In 🔔",
-        `Your visitor ${vis.name} (${vis.visitorType || "Guest"}) has checked in at the gate.`,
-        "success"
-      );
-    }
   },
 
   checkOutVisitor: async (id) => {
-    const timestamp = new Date().toISOString();
-    const visDoc = await getDoc(doc(db, "visitors", id));
-    if (!visDoc.exists()) return;
-    const vis = visDoc.data() as Visitor;
-
-    const timelineEntry = {
-      status: "checked-out" as VisitorStatus,
-      timestamp,
-      note: `Checked Out. Left society premises.`,
-      by: "Security"
-    };
-    const newTimeline = [...(vis.timeline || []), timelineEntry];
-
-    await updateDoc(doc(db, "visitors", id), {
-      status: "checked-out",
-      checkOutTime: timestamp,
-      timeline: newTimeline
+    await fetch(`/api/visitors/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "checked-out", checkOutTime: new Date().toISOString() })
     });
-
-    const resident = get().users.find(u => u.role === "resident" && u.unit === vis.visitingUnit);
-    if (resident) {
-      await get().sendNotification(
-        resident.id,
-        "Visitor Checked Out 🚪",
-        `Your visitor ${vis.name} has checked out and left the society.`,
-        "info"
-      );
-    }
   },
 
   denyVisitorEntry: async (id, reason, remarks) => {
-    const timestamp = new Date().toISOString();
-    const visDoc = await getDoc(doc(db, "visitors", id));
-    if (!visDoc.exists()) return;
-    const vis = visDoc.data() as Visitor;
-
-    const timelineEntry = {
-      status: "denied" as VisitorStatus,
-      timestamp,
-      note: `Entry Denied. Reason: ${reason}. ${remarks ? `Remarks: ${remarks}` : ""}`,
-      by: "Security"
-    };
-    const newTimeline = [...(vis.timeline || []), timelineEntry];
-
-    await updateDoc(doc(db, "visitors", id), {
-      status: "denied",
-      denialReason: reason,
-      timeline: newTimeline,
-      ...(remarks ? { remarks } : {})
+    await fetch(`/api/visitors/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "denied", approvedBy: `${reason}: ${remarks}` })
     });
-
-    await get().addIncidentReport({
-      date: timestamp.split("T")[0],
-      time: timestamp.split("T")[1].substring(0, 5),
-      location: "Main Gate",
-      description: `Visitor entry denied for ${vis.name} (Unit ${vis.visitingUnit}). Reason: ${reason}. Remarks: ${remarks || "None"}`,
-      type: "Visitor Dispute",
-      status: "logged",
-      reporter: "Security Guard"
-    });
-
-    const resident = get().users.find(u => u.role === "resident" && u.unit === vis.visitingUnit);
-    if (resident) {
-      await get().sendNotification(
-        resident.id,
-        "Visitor Access Denied 🚫",
-        `Entry denied for your visitor ${vis.name}. Reason: ${reason}`,
-        "error"
-      );
-    }
-
-    const secretaryUser = get().users.find(u => u.role === "secretary");
-    if (secretaryUser) {
-      await get().sendNotification(
-        secretaryUser.id,
-        "Security Alert: Entry Denied ⚠️",
-        `Visitor ${vis.name} denied entry for Unit ${vis.visitingUnit}. Reason: ${reason}`,
-        "warning"
-      );
-    }
   },
 
   cancelVisitorRequest: async (id) => {
-    const timestamp = new Date().toISOString();
-    const visDoc = await getDoc(doc(db, "visitors", id));
-    if (!visDoc.exists()) return;
-    const vis = visDoc.data() as Visitor;
-
-    const timelineEntry = {
-      status: "cancelled" as VisitorStatus,
-      timestamp,
-      note: `Visit cancelled by resident.`,
-      by: vis.visitingResident
-    };
-    const newTimeline = [...(vis.timeline || []), timelineEntry];
-
-    await updateDoc(doc(db, "visitors", id), {
-      status: "cancelled",
-      timeline: newTimeline
+    await fetch(`/api/visitors/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "cancelled" })
     });
-
-    await get().sendNotification(
-      "user-security-1",
-      "Visitor Pass Cancelled ❌",
-      `Expected pass for ${vis.name} (Unit ${vis.visitingUnit}) was cancelled by resident.`,
-      "info"
-    );
   },
 
   approveVisitorRequest: async (id) => {
-    const timestamp = new Date().toISOString();
-    const visDoc = await getDoc(doc(db, "visitors", id));
-    if (!visDoc.exists()) return;
-    const vis = visDoc.data() as Visitor;
-
-    const timelineEntry = {
-      status: "approved" as VisitorStatus,
-      timestamp,
-      note: `Visit approved by resident.`,
-      by: vis.visitingResident
-    };
-    const newTimeline = [...(vis.timeline || []), timelineEntry];
-
-    await updateDoc(doc(db, "visitors", id), {
-      status: "approved",
-      timeline: newTimeline
+    await fetch(`/api/visitors/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "approved" })
     });
-
-    await get().sendNotification(
-      "user-security-1",
-      "Visitor Request Approved ✅",
-      `Resident approved entry for ${vis.name} visiting flat ${vis.visitingUnit}.`,
-      "success"
-    );
   },
 
-  addFavoriteVisitor: async (visitor) => {
-    const id = `FAV-${Math.floor(100 + Math.random() * 900)}`;
-    const favItem = {
-      ...visitor,
-      id,
-      isFavorite: true,
-      status: "approved" as VisitorStatus,
-      date: new Date().toISOString().split("T")[0]
-    };
-    await setDoc(doc(db, "favorites", id), favItem);
+  addFavoriteVisitor: async (f) => {
+    await fetch("/api/visitors/favorites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(f)
+    });
   },
 
   removeFavoriteVisitor: async (id) => {
-    await deleteDoc(doc(db, "favorites", id));
+    await fetch(`/api/visitors/favorites/${id}`, {
+      method: "DELETE"
+    });
   },
 
   logEmergencyVisitor: async (agency, reason, vehicleNumber) => {
-    const id = `VIS-EMG-${Math.floor(100 + Math.random() * 900)}`;
-    const timestamp = new Date().toISOString();
-    
-    const timelineEntry = {
-      status: "checked-in" as VisitorStatus,
-      timestamp,
-      note: `Emergency responder entered: ${agency} for ${reason}`,
-      by: "Security Gate"
-    };
-
-    const newVisitor: Visitor = {
-      id,
-      name: `${agency} Emergency`,
-      phone: "108",
-      purpose: `Emergency - ${reason}`,
-      visitingUnit: "All / Common",
-      visitingResident: "Society Committee",
-      status: "checked-in",
-      checkInTime: timestamp,
-      vehicleNumber: vehicleNumber || "Emergency",
-      date: timestamp.split("T")[0],
-      portal: "society",
-      visitorType: "Emergency",
-      visitType: "one-time",
-      timeline: [timelineEntry]
-    };
-
-    await setDoc(doc(db, "visitors", id), newVisitor);
-
-    await get().sendNotification(
-      "all_residents",
-      "🚨 EMERGENCY ACCESS GRANTED 🚨",
-      `${agency} (${reason}) has entered the society premises. Please clear internal driveways.`,
-      "alert"
-    );
+    await fetch("/api/visitors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: agency, purpose: `EMERGENCY: ${reason}`, vehicleNumber, status: "checked-in" })
+    });
   },
 
-  // ==========================================
-  // LAUNDRY TRANSACTIONS
-  // ==========================================
+  registerHelper: async (h) => {
+    await fetch("/api/visitors/helpers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(h)
+    });
+  },
+
+  deleteHelper: async (id) => {
+    await fetch(`/api/visitors/helpers/${id}`, {
+      method: "DELETE"
+    });
+  },
+
+  checkInHelper: async (helperId, helperName, category, gate, assignedFlats) => {
+    await fetch("/api/visitors/helpers/checkin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ helperId, helperName, category, gate, assignedFlats })
+    });
+  },
+
+  checkOutHelper: async (attendanceId, gate) => {
+    await fetch("/api/visitors/helpers/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attendanceId, gate })
+    });
+  },
+
   bookLaundrySlot: async (machineId, slot, date, studentId, studentName) => {
-    const slotId = `${machineId}-${date}-${slot.replace(/\s+/g, "")}`;
-    const newSlot: LaundrySlot = {
-      id: slotId,
-      machineId,
-      machineName: machineId === "M1" || machineId === "M3" ? "Front Load LG" : "Top Load Samsung",
-      slot,
-      date,
-      bookedBy: studentId,
-      bookedByName: studentName,
-      status: "booked"
-    };
-    await setDoc(doc(db, "laundrySlots", slotId), newSlot);
-    return true;
+    const res = await fetch("/api/laundry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ machineId, machineName: slot, date, timeSlot: slot })
+    });
+    return res.ok;
   },
 
   cancelLaundrySlot: async (machineId, slot, date) => {
-    const slotId = `${machineId}-${date}-${slot.replace(/\s+/g, "")}`;
-    await deleteDoc(doc(db, "laundrySlots", slotId));
+    const matched = get().laundrySlots.find(l => l.machineId === machineId && l.slot === slot && l.date === date);
+    if (matched) {
+      await fetch(`/api/laundry/${matched.id}`, {
+        method: "DELETE"
+      });
+    }
   },
 
-  // ==========================================
-  // PARCELS TRANSACTIONS
-  // ==========================================
   addParcel: async (p) => {
-    const id = `PRC-${Math.floor(100 + Math.random() * 900)}`;
-    const newParcel: Parcel = {
-      ...p,
-      id,
-      status: "received",
-      receivedAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, "parcels", id), newParcel);
-
-    await get().sendNotification(
-      p.recipientId,
-      "New Parcel at Desk 📦",
-      `A parcel from ${p.courier} has been logged. OTP: ${p.otp}`,
-      "warning"
-    );
+    await fetch("/api/parcels", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(p)
+    });
   },
 
   pickupParcelWithOTP: async (id, otp) => {
-    const docRef = doc(db, "parcels", id);
-    const parcelDoc = await getDoc(docRef);
-    if (parcelDoc.exists()) {
-      const parcel = parcelDoc.data() as Parcel;
-      if (parcel.otp === otp) {
-        await updateDoc(docRef, {
-          status: "picked-up",
-          pickedUpAt: new Date().toISOString()
-        });
-        return true;
-      }
-    }
-    return false;
+    const res = await fetch(`/api/parcels/${id}/release`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ otp })
+    });
+    return res.ok;
   },
 
-  // ==========================================
-  // ROOM ALLOCATION TRANSACTIONS
-  // ==========================================
   reallocateRoom: async (studentId, newRoom, newBlock, newFloor) => {
-    await updateDoc(doc(db, "users", studentId), {
-      unit: newRoom,
-      building: newBlock,
-      floor: newFloor
+    await fetch(`/api/users/${studentId}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ unit: newRoom, building: newBlock })
     });
-    await get().sendNotification(
-      studentId,
-      "Room Reallocation 🛌",
-      `Your room allocation has been updated: ${newBlock} - Room ${newRoom}`,
-      "info"
-    );
   },
 
   vacateRoom: async (studentId) => {
-    await updateDoc(doc(db, "users", studentId), {
-      unit: "",
-      building: ""
+    await fetch(`/api/users/${studentId}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ unit: null, building: null })
     });
   },
 
   requestRoomChange: async (req) => {
-    const id = `RCH-${Math.floor(100 + Math.random() * 900)}`;
-    const newReq: RoomChangeRequest = {
-      ...req,
-      id,
-      status: "pending",
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, "roomChangeRequests", id), newReq);
-
-    await get().sendNotification(
-      "user-warden-1",
-      "Room Change Request 🔄",
-      `${req.studentName} requested room change to ${req.requestedRoom}`,
-      "warning"
-    );
+    await fetch("/api/roomchange", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req)
+    });
   },
 
   approveRoomChange: async (id) => {
-    const reqDoc = await getDoc(doc(db, "roomChangeRequests", id));
-    if (reqDoc.exists()) {
-      const req = reqDoc.data() as RoomChangeRequest;
-      await updateDoc(doc(db, "roomChangeRequests", id), { status: "approved" });
-      await updateDoc(doc(db, "users", req.studentId), {
-        unit: req.requestedRoom,
-        building: req.requestedBlock
-      });
-      await get().sendNotification(
-        req.studentId,
-        "Room Change Approved 🔄",
-        `Your room change request to ${req.requestedRoom} has been approved.`,
-        "success"
-      );
-    }
+    await fetch(`/api/roomchange/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "approved" })
+    });
   },
 
-  // ==========================================
-  // ROOMMATE PREFERENCE TRANSACTIONS
-  // ==========================================
   submitRoommatePreference: async (pref) => {
-    await setDoc(doc(db, "roommatePreferences", pref.userId), pref);
+    await fetch("/api/roommates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pref)
+    });
   },
 
-  // ==========================================
-  // FACILITY BOOKINGS
-  // ==========================================
   bookFacility: async (booking) => {
-    const id = `FAC-${Math.floor(100 + Math.random() * 900)}`;
-    const newBooking: FacilityBooking = {
-      ...booking,
-      id,
-      status: "booked"
-    };
-    await setDoc(doc(db, "facilityBookings", id), newBooking);
-    return true;
+    const res = await fetch("/api/facility-bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(booking)
+    });
+    return res.ok;
   },
 
   cancelFacilityBooking: async (id) => {
-    await updateDoc(doc(db, "facilityBookings", id), { status: "cancelled" });
+    await fetch(`/api/facility-bookings/${id}`, {
+      method: "DELETE"
+    });
   },
 
-  // ==========================================
-  // MARKETPLACE TRANSACTIONS
-  // ==========================================
   listMarketplaceItem: async (item) => {
-    const id = `ITEM-${Math.floor(100 + Math.random() * 900)}`;
-    const newItem: MarketplaceItem = {
-      ...item,
-      id,
-      status: "available",
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, "marketplaceItems", id), newItem);
+    await fetch("/api/marketplace", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(item)
+    });
   },
 
   sellMarketplaceItem: async (id) => {
-    await updateDoc(doc(db, "marketplaceItems", id), { status: "sold" });
+    await fetch(`/api/marketplace/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "sold" })
+    });
   },
 
   deleteMarketplaceItem: async (itemId) => {
-    await deleteDoc(doc(db, "marketplaceItems", itemId));
+    await fetch(`/api/marketplace/${itemId}`, {
+      method: "DELETE"
+    });
   },
 
-  // ==========================================
-  // LOST & FOUND TRANSACTIONS
-  // ==========================================
   reportLostFoundItem: async (item) => {
-    const id = `LF-${Math.floor(100 + Math.random() * 900)}`;
-    const newItem: LostFoundItem = {
-      ...item,
-      id,
-      status: "reported",
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, "lostFoundItems", id), newItem);
+    await fetch("/api/lostfound", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(item)
+    });
   },
 
   claimLostFoundItem: async (id, claimantId, claimantName) => {
-    await updateDoc(doc(db, "lostFoundItems", id), {
-      status: "claimed",
-      claimantId,
-      claimantName
+    await fetch(`/api/lostfound/${id}/claim`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ claimantId, claimantName })
     });
   },
 
   resolveLostFoundItem: async (id) => {
-    await updateDoc(doc(db, "lostFoundItems", id), { status: "claimed" });
-  },
-
-  // ==========================================
-  // BILLING & FINANCE
-  // ==========================================
-  payMaintenanceBill: async (id) => {
-    await updateDoc(doc(db, "maintenanceBills", id), {
-      status: "paid",
-      paidOn: new Date().toISOString().split("T")[0]
+    await fetch(`/api/lostfound/${id}/claim`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "claimed" })
     });
   },
 
-  // ==========================================
-  // EVENTS
-  // ==========================================
+  payMaintenanceBill: async (id) => {
+    await fetch(`/api/maintenance/${id}/pay`, {
+      method: "PUT"
+    });
+  },
+
   createEvent: async (ev) => {
-    const id = `EVT-${Math.floor(100 + Math.random() * 900)}`;
-    const newEvent: CommunityEvent = {
-      ...ev,
-      id,
-      rsvps: []
-    };
-    await setDoc(doc(db, "communityEvents", id), newEvent);
+    await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ev)
+    });
   },
 
   rsvpEvent: async (id, userId) => {
-    const docRef = doc(db, "communityEvents", id);
-    const evDoc = await getDoc(docRef);
-    if (evDoc.exists()) {
-      const ev = evDoc.data() as CommunityEvent;
-      const currentRsvps = ev.rsvps || [];
-      const newRsvps = currentRsvps.includes(userId)
-        ? currentRsvps.filter((u) => u !== userId)
-        : [...currentRsvps, userId];
-      await updateDoc(docRef, { rsvps: newRsvps });
-    }
+    await fetch(`/api/events/${id}/rsvp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, status: "Going" })
+    });
   },
 
-  // ==========================================
-  // NOTIFICATIONS
-  // ==========================================
   sendNotification: async (userId, title, message, type) => {
-    const id = `NTF-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newNtf: Notification = {
-      id,
-      userId,
-      title,
-      message,
-      type,
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, "notifications", id), newNtf);
+    await fetch("/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, title, message, type })
+    });
   },
 
   markNotificationsRead: async (userId) => {
-    const userNtfs = get().notifications.filter((n) => n.userId === userId && !n.read);
-    for (const ntf of userNtfs) {
-      await updateDoc(doc(db, "notifications", ntf.id), { read: true });
-    }
+    await fetch("/api/notifications/read", {
+      method: "PUT"
+    });
   },
 
-  // ==========================================
-  // SECURITY OPERATIONS
-  // ==========================================
   raiseEmergencyAlert: async (alert) => {
-    const id = `EMG-${Math.floor(100 + Math.random() * 900)}`;
-    const newAlert: EmergencyAlert = {
-      ...alert,
-      id,
-      status: "pending",
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, "emergencies", id), newAlert);
-
-    await get().sendNotification(
-      "user-security-1",
-      "🚨 EMERGENCY SIREN ALARM 🚨",
-      `Medical/Security panic button pressed at unit ${alert.unit}. Resident: ${alert.residentName}.`,
-      "alert"
-    );
+    await fetch("/api/emergencies", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(alert)
+    });
   },
 
   updateEmergencyStatus: async (id, status, notes) => {
-    await updateDoc(doc(db, "emergencies", id), {
-      status,
-      notes: notes || ""
+    await fetch(`/api/emergencies/${id}/resolve`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, notes })
     });
   },
 
   issueGatePass: async (pass) => {
-    const id = `PASS-${Math.floor(100 + Math.random() * 900)}`;
-    const newPass: GatePass = {
-      ...pass,
-      id,
-      status: "active",
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, "gatePasses", id), newPass);
+    await fetch("/api/gatepasses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pass)
+    });
   },
 
   logVehicleEntry: async (vehicle) => {
-    const id = `VEH-${Math.floor(100 + Math.random() * 900)}`;
-    const newVehicle: VehicleLog = {
-      ...vehicle,
-      id,
-      entryTime: new Date().toISOString(),
-      status: "inside"
-    };
-    await setDoc(doc(db, "vehicleLogs", id), newVehicle);
+    await fetch("/api/vehiclelogs/entry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(vehicle)
+    });
   },
 
   logVehicleExit: async (id) => {
-    await updateDoc(doc(db, "vehicleLogs", id), {
-      exitTime: new Date().toISOString(),
-      status: "exited"
+    await fetch(`/api/vehiclelogs/${id}/exit`, {
+      method: "PUT"
     });
   },
 
   addAnnouncement: async (ann) => {
-    const id = `ANN-${Math.floor(100 + Math.random() * 900)}`;
-    const newAnn: Announcement = {
-      ...ann,
-      id,
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, "announcements", id), newAnn);
+    await fetch("/api/announcements", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ann)
+    });
   },
 
   addIncidentReport: async (incident) => {
-    const id = `INC-${Math.floor(100 + Math.random() * 900)}`;
-    const newIncident: IncidentReport = {
-      ...incident,
-      id,
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, "incidents", id), newIncident);
+    await fetch("/api/incidents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(incident)
+    });
   },
 
   approveUser: async (userId) => {
-    await updateDoc(doc(db, "users", userId), { status: "approved" });
+    await fetch(`/api/users/${userId}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "approved" })
+    });
   },
 
   rejectUser: async (userId) => {
-    await updateDoc(doc(db, "users", userId), { status: "rejected" });
+    await fetch(`/api/users/${userId}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "rejected" })
+    });
   },
 
   activateDeactivateUser: async (userId, status) => {
-    await updateDoc(doc(db, "users", userId), { status });
+    await fetch(`/api/users/${userId}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status })
+    });
   },
 
   addFlat: async (flat) => {
-    const id = `FL-${flat.building.replace(/\s+/g, "")}-${flat.flatNumber}`;
-    await setDoc(doc(db, "flats", id), { id, ...flat });
+    await fetch("/api/flats", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(flat)
+    });
   },
 
   addExpense: async (expense) => {
-    const id = `EXP-${Math.floor(100 + Math.random() * 900)}`;
-    const newExpense: SocietyExpense = { id, ...expense };
-    await setDoc(doc(db, "expenses", id), newExpense);
+    await fetch("/api/expenses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(expense)
+    });
   },
 
   addRentRecord: async (rent) => {
-    const id = `RNT-${Math.floor(100 + Math.random() * 900)}`;
-    const newRent: RentRecord = { id, ...rent };
-    await setDoc(doc(db, "rentRecords", id), newRent);
+    await fetch("/api/rent/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(rent)
+    });
   },
 
   payRentRecord: async (id) => {
-    await updateDoc(doc(db, "rentRecords", id), {
-      status: "paid",
-      paidOn: new Date().toISOString().split("T")[0]
+    await fetch(`/api/rent/${id}/pay`, {
+      method: "PUT"
     });
   },
 
   generateBulkMaintenanceBills: async (billDetails) => {
-    const approvedResidents = get().users.filter(
-      (u) => u.role === "resident" && u.status === "approved"
-    );
-    for (const res of approvedResidents) {
-      const id = `BILL-${Math.floor(1000 + Math.random() * 9000)}`;
-      const bill = {
-        id,
-        residentId: res.id,
-        residentName: res.name,
-        unit: res.unit || "N/A",
-        month: billDetails.month,
-        amount: billDetails.amount,
-        dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 10).toISOString().split("T")[0],
-        status: "pending",
-        breakdown: billDetails.breakdown
-      };
-      await setDoc(doc(db, "maintenanceBills", id), bill);
-
-      await get().sendNotification(
-        res.id,
-        "Maintenance Bill Generated 🧾",
-        `Maintenance bill of ₹${billDetails.amount} for ${billDetails.month} has been generated. Due date: ${new Date(Date.now() + 1000 * 60 * 60 * 24 * 10).toISOString().split("T")[0]}`,
-        "warning"
-      );
-    }
+    await fetch("/api/maintenance/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(billDetails)
+    });
   },
 
   updateWorkerServices: async (workerId, details) => {
-    await updateDoc(doc(db, "users", workerId), details);
-  },
-
-  // Daily Helpers Actions
-  registerHelper: async (h) => {
-    const id = `HLP-${Math.floor(100 + Math.random() * 900)}`;
-    const joinedAt = new Date().toISOString();
-    const newHelper: Helper = { id, joinedAt, ...h, portal: "society" };
-    await setDoc(doc(db, "helpers", id), cleanObject(newHelper));
-  },
-
-  deleteHelper: async (id) => {
-    await deleteDoc(doc(db, "helpers", id));
-  },
-
-  checkInHelper: async (workerId, workerName, category, gate, assignedFlats) => {
-    const id = `ATT-${Math.floor(100 + Math.random() * 900)}`;
-    const date = new Date().toISOString().split("T")[0];
-    const checkInTime = new Date().toISOString();
-
-    let status: 'present' | 'late' | 'checked-in' | 'checked-out' = 'checked-in';
-    const helper = get().helpers.find(h => h.id === workerId || h.name === workerName);
-    let isLate = false;
-    let minutesLate = 0;
-
-    if (helper && helper.expectedArrival) {
-      try {
-        const [time, modifier] = helper.expectedArrival.split(" ");
-        let [expHours, expMins] = time.split(":").map(Number);
-        if (modifier === "PM" && expHours < 12) expHours += 12;
-        if (modifier === "AM" && expHours === 12) expHours = 0;
-
-        const checkInDate = new Date(checkInTime);
-        const expDate = new Date(checkInTime);
-        expDate.setHours(expHours, expMins, 0, 0);
-
-        const diffMs = checkInDate.getTime() - expDate.getTime();
-        if (diffMs > 5 * 60 * 1000) { // 5 minutes grace
-          isLate = true;
-          status = 'late';
-          minutesLate = Math.round(diffMs / (60 * 1000));
-        }
-      } catch (err) {
-        console.error("Error parsing expectedArrival:", err);
-      }
-    }
-
-    const newAttendance: HelperAttendance = {
-      id,
-      workerId,
-      workerName,
-      workerCategory: category,
-      date,
-      checkInTime,
-      entryGate: gate,
-      status,
-      assignedFlats
-    };
-
-    await setDoc(doc(db, "attendance", id), newAttendance);
-
-    // Notify residents
-    const residents = get().users.filter(u => u.role === "resident" && u.unit && assignedFlats.includes(u.unit));
-    for (const r of residents) {
-      await get().sendNotification(
-        r.id,
-        "Helper Checked In 🏢",
-        isLate
-          ? `${workerName} checked in through ${gate} Gate, running ${minutesLate} minutes late.`
-          : `${workerName} checked in through ${gate} Gate.`,
-        isLate ? "warning" : "success"
-      );
-    }
-  },
-
-  checkOutHelper: async (attendanceId, gate) => {
-    const checkOutTime = new Date().toISOString();
-    const attDocRef = doc(db, "attendance", attendanceId);
-    const attDoc = get().attendance.find(a => a.id === attendanceId);
-    if (!attDoc) return;
-
-    let duration = 0;
-    if (attDoc.checkInTime) {
-      const checkIn = new Date(attDoc.checkInTime).getTime();
-      const checkOut = new Date(checkOutTime).getTime();
-      duration = Math.round((checkOut - checkIn) / (60 * 1000));
-    }
-
-    await updateDoc(attDocRef, {
-      checkOutTime,
-      exitGate: gate,
-      status: 'checked-out',
-      duration
+    await fetch("/api/users/services", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(details)
     });
-
-    // Notify residents
-    const residents = get().users.filter(u => u.role === "resident" && u.unit && attDoc.assignedFlats.includes(u.unit));
-    for (const r of residents) {
-      await get().sendNotification(
-        r.id,
-        "Helper Checked Out 🚪",
-        `${attDoc.workerName} checked out from ${gate} Gate. Duration: ${duration} mins.`,
-        "info"
-      );
-    }
   }
 }));

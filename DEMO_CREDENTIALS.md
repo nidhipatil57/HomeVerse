@@ -39,10 +39,10 @@ Use this document to quickly access credentials for complete application testing
 | **Worker** | Vijay Dev | `vijay@sunshinecomplex.com` | `Vijay@123` | Painter | General (9 AM - 5 PM) | |
 | **Worker** | Pooja Sharma | `pooja@sunshinecomplex.com` | `Pooja@123` | Housekeeping | Morning (8 AM - 4 PM) | |
 | **Worker** | Ram Lal | `ramlal@sunshinecomplex.com` | `Ramlal@123` | Gardener | Morning (8 AM - 4 PM) | |
-| **Worker** | Maya Devi | `maya@sunshinecomplex.com` | `Maya@123` | Maid | Morning (7 AM - 1 PM) | Specialization: Cleaning, Utensils |
-| **Worker** | Sunita Bai | `sunita.b@sunshinecomplex.com` | `Sunita@123` | Maid | Morning (6 AM - 12 PM) | Specialization: Cooking, Cleaning |
-| **Worker** | Geeta Shinde | `geeta@sunshinecomplex.com` | `Geeta@123` | Maid | Afternoon (1 PM - 6 PM) | Specialization: Laundry, Ironing |
-| **Worker** | Pinky Shaw | `pinky@sunshinecomplex.com` | `Pinky@123` | Maid | Morning (8 AM - 2 PM) | Specialization: Cooking, Baby Care |
+| **Worker** | Meena Sharma | `meena@sunshinecomplex.com` | `Meena@123` | Maid | Morning (7 AM - 1 PM) | Specialization: Cleaning, Utensils |
+| **Worker** | Sunita Patil | `sunita.patil@sunshinecomplex.com` | `Sunita@123` | Maid | Morning (6 AM - 12 PM) | Specialization: Cooking, Cleaning |
+| **Worker** | Rani Sharma | `rani@sunshinecomplex.com` | `Rani@123` | Maid | Afternoon (1 PM - 6 PM) | Specialization: Laundry, Cleaning |
+| **Worker** | Kavita Joshi | `kavita@sunshinecomplex.com` | `Kavita@123` | Maid | Morning (8 AM - 2 PM) | Specialization: Cooking, Baby Care |
 
 ---
 

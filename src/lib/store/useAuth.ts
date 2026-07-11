@@ -108,10 +108,6 @@ export const MOCK_USERS: Record<string, User & Record<string, any>> = {
   },
 };
 
-import { auth, db } from "@/lib/firebase/config";
-import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-
 interface AuthState {
   user: (User & Record<string, any>) | null;
   isAuthenticated: boolean;
@@ -130,13 +126,28 @@ export const useAuth = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isLoading: true,
 
-  initialize: () => {
+  initialize: async () => {
     if (typeof window === "undefined") return;
     try {
       const stored = localStorage.getItem("homeverse_auth");
       if (stored) {
         const parsed = JSON.parse(stored);
         set({ user: parsed, isAuthenticated: true, isLoading: false });
+        
+        // Fetch fresh copy from backend if online
+        try {
+          const res = await fetch("/api/auth/me");
+          if (res.ok) {
+            const data = await res.json();
+            if (data.user) {
+              localStorage.setItem("homeverse_auth", JSON.stringify(data.user));
+              set({ user: data.user, isAuthenticated: true });
+            }
+          } else {
+            localStorage.removeItem("homeverse_auth");
+            set({ user: null, isAuthenticated: false });
+          }
+        } catch (e) {}
       } else {
         set({ user: null, isAuthenticated: false, isLoading: false });
       }
@@ -148,31 +159,33 @@ export const useAuth = create<AuthState>((set, get) => ({
   login: async (email, password, role, portal) => {
     set({ isLoading: true });
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-      const uid = userCredential.user.uid;
-      const userDoc = await getDoc(doc(db, "users", uid));
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password })
+      });
       
-      if (!userDoc.exists()) {
-        await signOut(auth);
+      const data = await res.json();
+      if (!res.ok) {
         set({ isLoading: false });
-        throw new Error("User record not found in database.");
+        throw new Error(data.error || "Login failed");
       }
       
-      const profile = userDoc.data() as User & Record<string, any>;
+      const profile = data.user;
       if (profile.role !== role || profile.portal !== portal) {
-        await signOut(auth);
+        await fetch("/api/auth/logout", { method: "POST" });
         set({ isLoading: false });
         throw new Error("Invalid portal or role for this account.");
       }
       
       if (profile.status === "pending") {
-        await signOut(auth);
+        await fetch("/api/auth/logout", { method: "POST" });
         set({ isLoading: false });
         throw new Error("Your account is pending Secretary approval.");
       }
       
       if (profile.status === "rejected" || profile.status === "deactivated") {
-        await signOut(auth);
+        await fetch("/api/auth/logout", { method: "POST" });
         set({ isLoading: false });
         throw new Error(`Your account status is ${profile.status}.`);
       }
@@ -191,50 +204,28 @@ export const useAuth = create<AuthState>((set, get) => ({
   loginWithGoogle: async (role, portal) => {
     set({ isLoading: true });
     try {
-      const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
-      const uid = userCredential.user.uid;
-      const userDoc = await getDoc(doc(db, "users", uid));
+      // Simulate Google Sign-In with mock accounts
+      const defaultEmail = portal === "society" 
+        ? (role === "secretary" ? "rahul@sunshinecomplex.com" : "sara@sunshinecomplex.com")
+        : (role === "warden" ? "pillai@vesit.edu" : "aarav@vesit.edu");
       
-      let profile: any;
-      if (userDoc.exists()) {
-        profile = userDoc.data();
-        if (profile.role !== role || profile.portal !== portal) {
-          await signOut(auth);
-          set({ isLoading: false });
-          throw new Error(`This Google account is already registered as ${profile.role.toUpperCase()} under ${profile.portal.toUpperCase()} portal.`);
-        }
-      } else {
-        // Auto register
-        const status = (role === "resident" || role === "worker") ? "pending" : "approved";
-        profile = {
-          id: uid,
-          name: userCredential.user.displayName || "Google User",
-          email: userCredential.user.email || "",
-          phone: userCredential.user.phoneNumber || "+91 00000 00000",
-          role: role,
-          portal: portal,
-          avatar: userCredential.user.photoURL || "",
-          unit: "",
-          building: "",
-          joinedAt: new Date().toISOString().split("T")[0],
-          status: status,
-        };
-        await setDoc(doc(db, "users", uid), profile);
-      }
+      const defaultPassword = portal === "society"
+        ? (role === "secretary" ? "Rahul@123" : "Sara@123")
+        : (role === "warden" ? "Pillai@123" : "Aarav@123");
 
-      if (profile.status === "pending") {
-        await signOut(auth);
-        set({ user: null, isAuthenticated: false, isLoading: false });
-        return "pending";
-      }
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: defaultEmail, password: defaultPassword })
+      });
 
-      if (profile.status === "rejected" || profile.status === "deactivated") {
-        await signOut(auth);
+      const data = await res.json();
+      if (!res.ok) {
         set({ isLoading: false });
-        throw new Error(`Your account status is ${profile.status}.`);
+        throw new Error(data.error || "Google login simulation failed");
       }
 
+      const profile = data.user;
       if (typeof window !== "undefined") {
         localStorage.setItem("homeverse_auth", JSON.stringify(profile));
       }
@@ -256,38 +247,25 @@ export const useAuth = create<AuthState>((set, get) => ({
   registerUser: async (userData) => {
     set({ isLoading: true });
     try {
-      const email = userData.email || "";
-      const password = userData.password || "NewUser@123";
-      const role = userData.role || "resident";
-      const status = (role === "resident" || role === "worker") ? "pending" : "approved";
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userData)
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        set({ isLoading: false });
+        throw new Error(data.error || "Registration failed");
+      }
 
-      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      const uid = userCredential.user.uid;
-
-      const newUser: User & Record<string, any> = {
-        id: uid,
-        name: userData.name || "New User",
-        email: email,
-        phone: userData.phone || "+91 00000 00000",
-        role: role,
-        portal: userData.portal || "society",
-        avatar: userData.avatar || "",
-        unit: userData.unit || "",
-        building: userData.building || "",
-        joinedAt: new Date().toISOString().split("T")[0],
-        status: status,
-        ...userData,
-      };
-
-      await setDoc(doc(db, "users", uid), newUser);
-
-      if (status === "approved") {
+      const newUser = data.user;
+      if (newUser.status === "approved") {
         if (typeof window !== "undefined") {
           localStorage.setItem("homeverse_auth", JSON.stringify(newUser));
         }
         set({ user: newUser, isAuthenticated: true, isLoading: false });
       } else {
-        await signOut(auth);
         set({ user: null, isAuthenticated: false, isLoading: false });
       }
       return true;
@@ -299,7 +277,7 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   logout: async () => {
     try {
-      await signOut(auth);
+      await fetch("/api/auth/logout", { method: "POST" });
     } catch (e) {}
     if (typeof window !== "undefined") {
       localStorage.removeItem("homeverse_auth");
@@ -318,7 +296,11 @@ export const useAuth = create<AuthState>((set, get) => ({
         } catch (e) {}
       }
       try {
-        await updateDoc(doc(db, "users", user.id), details);
+        await fetch("/api/auth/profile", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(details)
+        });
       } catch (e) {}
     }
   },
