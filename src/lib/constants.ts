@@ -19,29 +19,47 @@ export const COMPLAINT_CATEGORIES = [
   { value: 'electrical', label: 'Electrical', icon: 'Zap', color: '#f59e0b' },
   { value: 'plumbing', label: 'Plumbing', icon: 'Droplets', color: '#3b82f6' },
   { value: 'lift', label: 'Lift / Elevator', icon: 'ArrowUpDown', color: '#8b5cf6' },
+  { value: 'water-leakage', label: 'Water Leakage', icon: 'AlertTriangle', color: '#ef4444' },
+  { value: 'water-supply', label: 'Water Supply', icon: 'Waves', color: '#06b6d4' },
   { value: 'parking', label: 'Parking', icon: 'Car', color: '#6366f1' },
-  { value: 'security', label: 'Security', icon: 'Shield', color: '#ef4444' },
-  { value: 'water', label: 'Water Supply', icon: 'Waves', color: '#06b6d4' },
-  { value: 'gardening', label: 'Gardening', icon: 'TreePine', color: '#22c55e' },
+  { value: 'cleaning', label: 'Cleaning', icon: 'Sparkles', color: '#22c55e' },
   { value: 'housekeeping', label: 'Housekeeping', icon: 'Sparkles', color: '#ec4899' },
-  { value: 'internet', label: 'Internet / WiFi', icon: 'Wifi', color: '#14b8a6' },
-  { value: 'furniture', label: 'Furniture', icon: 'Armchair', color: '#a855f7' },
-  { value: 'room-cleaning', label: 'Room Cleaning', icon: 'SprayCan', color: '#f97316' },
-  { value: 'mess', label: 'Mess / Canteen', icon: 'UtensilsCrossed', color: '#eab308' },
-  { value: 'bathroom', label: 'Bathroom', icon: 'Bath', color: '#0ea5e9' },
+  { value: 'gardening', label: 'Gardening', icon: 'TreePine', color: '#10b981' },
+  { value: 'security', label: 'Security', icon: 'Shield', color: '#dc2626' },
+  { value: 'noise', label: 'Noise / Nuisance', icon: 'Volume2', color: '#f43f5e' },
+  { value: 'internet', label: 'Internet', icon: 'Wifi', color: '#14b8a6' },
+  { value: 'pest-control', label: 'Pest Control', icon: 'Bug', color: '#78350f' },
+  { value: 'common-area', label: 'Common Area', icon: 'Building2', color: '#6b7280' },
+  { value: 'clubhouse', label: 'Clubhouse', icon: 'Home', color: '#a855f7' },
+  { value: 'swimming-pool', label: 'Swimming Pool', icon: 'Waves', color: '#0ea5e9' },
+  { value: 'wifi', label: 'WiFi', icon: 'Wifi', color: '#14b8a6' }, // keep for compatibility
+  { value: 'furniture', label: 'Furniture', icon: 'Armchair', color: '#a855f7' }, // keep for compatibility
+  { value: 'room-cleaning', label: 'Room Cleaning', icon: 'SprayCan', color: '#f97316' }, // keep for compatibility
+  { value: 'mess', label: 'Mess / Canteen', icon: 'UtensilsCrossed', color: '#eab308' }, // keep for compatibility
+  { value: 'bathroom', label: 'Bathroom', icon: 'Bath', color: '#0ea5e9' }, // keep for compatibility
   { value: 'others', label: 'Others', icon: 'CircleDot', color: '#64748b' },
 ] as const;
 
 export const COMPLAINT_STATUSES = [
   { value: 'submitted', label: 'Submitted', color: '#3b82f6' },
+  { value: 'under-review', label: 'Under Review', color: '#8b5cf6' },
   { value: 'assigned', label: 'Assigned', color: '#f59e0b' },
+  { value: 'accepted', label: 'Accepted', color: '#10b981' },
+  { value: 'travelling', label: 'Travelling', color: '#3b82f6' },
+  { value: 'reached-society', label: 'Reached Society', color: '#06b6d4' },
+  { value: 'reached-building', label: 'Reached Building', color: '#6366f1' },
+  { value: 'reached-flat', label: 'Reached Flat', color: '#a855f7' },
+  { value: 'work-started', label: 'Work Started', color: '#f97316' },
   { value: 'in-progress', label: 'In Progress', color: '#f97316' },
+  { value: 'completed', label: 'Completed', color: '#10b981' },
   { value: 'resolved', label: 'Resolved', color: '#22c55e' },
+  { value: 'resident-verification', label: 'Resident Verification', color: '#6366f1' },
   { value: 'closed', label: 'Closed', color: '#64748b' },
 ] as const;
 
 export const PRIORITY_CONFIG = {
   critical: { label: 'Critical', color: '#ef4444', bg: '#fef2f2' },
+  emergency: { label: 'Emergency', color: '#dc2626', bg: '#fef2f2' },
   high: { label: 'High', color: '#f97316', bg: '#fff7ed' },
   medium: { label: 'Medium', color: '#f59e0b', bg: '#fffbeb' },
   low: { label: 'Low', color: '#22c55e', bg: '#f0fdf4' },

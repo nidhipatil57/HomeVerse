@@ -40,12 +40,30 @@ export interface User {
 }
 
 // --- Complaints ---
-export type ComplaintStatus = 'submitted' | 'assigned' | 'in-progress' | 'resolved' | 'closed';
-export type ComplaintPriority = 'critical' | 'high' | 'medium' | 'low';
+export type ComplaintStatus =
+  | 'submitted'
+  | 'under-review'
+  | 'assigned'
+  | 'accepted'
+  | 'travelling'
+  | 'reached-society'
+  | 'reached-building'
+  | 'reached-flat'
+  | 'work-started'
+  | 'in-progress'
+  | 'completed'
+  | 'resolved'
+  | 'resident-verification'
+  | 'closed';
+
+export type ComplaintPriority = 'critical' | 'high' | 'medium' | 'low' | 'emergency';
+
 export type ComplaintCategory =
   | 'electrical'
   | 'plumbing'
   | 'lift'
+  | 'water-leakage'
+  | 'water-supply'
   | 'parking'
   | 'security'
   | 'water'
@@ -57,7 +75,33 @@ export type ComplaintCategory =
   | 'room-cleaning'
   | 'mess'
   | 'bathroom'
+  | 'cleaning'
+  | 'noise'
+  | 'pest-control'
+  | 'common-area'
+  | 'clubhouse'
+  | 'swimming-pool'
   | 'others';
+
+export interface ComplaintChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: UserRole;
+  message: string;
+  timestamp: string;
+  attachments?: string[];
+}
+
+export interface AiAnalysis {
+  predictedPriority: ComplaintPriority;
+  suggestedCategory: string;
+  estimatedCompletion: string;
+  requiredMaterials: string[];
+  expectedCost: string;
+  possibleDuplicateOf?: string;
+  isDuplicate?: boolean;
+}
 
 export interface Complaint {
   id: string;
@@ -70,20 +114,34 @@ export interface Complaint {
   raisedByName: string;
   unit: string;
   building: string;
+  wing?: string;
+  emergency?: boolean;
   images?: string[];
+  videos?: string[];
+  documents?: string[];
+  invoices?: string[];
+  completionPhotos?: string[];
   assignedTo?: string;
   assignedToId?: string;
   priorityScore?: number;
   estimatedResolution?: string;
+  estimatedArrival?: string;
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string;
   rating?: number;
+  ratingReview?: string;
   timeline: ComplaintTimelineEntry[];
   portal?: PortalType;
   beforePhoto?: string;
   afterPhoto?: string;
   comments?: string;
+  chat?: ComplaintChatMessage[];
+  aiAnalysis?: AiAnalysis;
+  duplicateGroup?: string[];
+  parentTicketId?: string;
+  secretaryNotes?: string;
+  subscribers?: { userId: string; unit: string; name: string }[];
 }
 
 export interface ComplaintTimelineEntry {
