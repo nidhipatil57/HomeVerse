@@ -1,0 +1,443 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String   @id
+  name             String
+  email            String   @unique
+  phone            String
+  role             String   // secretary, security, resident, worker, student, warden
+  portal           String   // society, hostel
+  unit             String?  // Flat or Room number
+  building         String?  // A Wing, Wing A, etc.
+  societyName      String?
+  hostelName       String?
+  collegeName      String?
+  communityCode    String?
+  ownerOrTenant    String?  // Owner, Tenant
+  joinedAt         String?
+  status           String   @default("approved") // approved, pending, rejected
+  password         String   // Hashed password
+  
+  // Secretary fields
+  designation      String?
+  committeeId      String?
+  
+  // Security fields
+  employeeId       String?
+  workingShift     String?
+  gate             String?
+  
+  // Student/Warden fields
+  gender           String?
+  course           String?
+  year             String?
+  branch           String?
+  assignedWing     String?
+
+  // Worker fields
+  workerCategory   String?
+  availability     String?  // Available, Busy
+  rating           Float?
+  experience       String?
+  specializations  String[]
+
+  // Relations
+  residentAssignments ResidentWorkerAssignment[] @relation("ResidentAssignments")
+  workerAssignments   ResidentWorkerAssignment[] @relation("WorkerAssignments")
+  complaintsRaised Complaint[]           @relation("ComplaintsRaised")
+  complaintsAssigned Complaint[]         @relation("ComplaintsAssigned")
+  subscribedComplaints ComplaintSubscriber[]
+  chatMessages     ComplaintChatMessage[]
+  notifications    Notification[]
+  roommatePreference RoommatePreference?
+  gatePasses       GatePass[]
+  facilityBookings FacilityBooking[]
+  rsvps            EventRsvp[]
+}
+
+model Complaint {
+  id                  String   @id
+  title               String
+  description         String
+  category            String
+  priority            String
+  raisedBy            String
+  raisedByName        String
+  unit                String
+  building            String
+  status              String
+  portal              String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  emergency           Boolean  @default(false)
+  images              String[]
+  videos              String[]
+  resolvedAt          DateTime?
+  assignedTo          String?
+  assignedToId        String?
+  duplicateGroup      String[]
+  isDuplicate         Boolean  @default(false)
+  possibleDuplicateOf String?
+
+  // Relations
+  raisedByUser        User     @relation("ComplaintsRaised", fields: [raisedBy], references: [id], onDelete: Cascade)
+  assignedToUser      User?    @relation("ComplaintsAssigned", fields: [assignedToId], references: [id], onDelete: SetNull)
+  subscribers         ComplaintSubscriber[]
+  chat                ComplaintChatMessage[]
+  timeline            ComplaintTimeline[]
+}
+
+model ComplaintSubscriber {
+  id          String    @id @default(uuid())
+  complaintId String
+  userId      String
+  userName    String
+  unit        String
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ComplaintChatMessage {
+  id          String    @id @default(uuid())
+  complaintId String
+  senderId    String
+  senderName  String
+  senderRole  String
+  message     String
+  timestamp   DateTime  @default(now())
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model ComplaintTimeline {
+  id          String    @id @default(uuid())
+  complaintId String
+  status      String
+  timestamp   DateTime  @default(now())
+  note        String
+  by          String?
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+}
+
+model LeaveRequest {
+  id            String   @id
+  studentId     String
+  studentName   String
+  room          String
+  parentContact String
+  reason        String
+  fromDate      String
+  toDate        String
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+}
+
+model Visitor {
+  id                 String   @id
+  name               String
+  phone              String
+  purpose            String
+  visitingUnit       String
+  visitingResident   String
+  visitingResidentId String?
+  status             String
+  expectedAt         String?
+  checkInTime        String?
+  checkOutTime       String?
+  date               String
+  portal             String
+  approvedBy         String?
+  vehicleNumber      String?
+}
+
+model LaundrySlot {
+  id            String  @id
+  machineId     String
+  machineName   String
+  date          String
+  timeSlot      String
+  bookedBy      String?
+  bookedById    String?
+  communityCode String  @default("VESIT26")
+}
+
+model Parcel {
+  id             String  @id
+  recipientName  String
+  recipientId    String?
+  unit           String
+  carrier        String
+  trackingNumber String?
+  status         String
+  otp            String?
+  dateReceived   String
+  timeReceived   String
+  dateReleased   String?
+  timeReleased   String?
+  portal         String
+  communityCode  String
+}
+
+model FacilityBooking {
+  id            String @id
+  facilityName  String
+  residentName  String
+  residentId    String
+  date          String
+  timeSlot      String
+  purpose       String
+  status        String
+  communityCode String
+  user          User   @relation(fields: [residentId], references: [id], onDelete: Cascade)
+}
+
+model MarketplaceItem {
+  id          String   @id
+  title       String
+  description String
+  price       String
+  sellerId    String
+  sellerName  String
+  category    String
+  status      String
+  portal      String
+  createdAt   DateTime @default(now())
+  images      String[]
+}
+
+model LostFoundItem {
+  id           String   @id
+  title        String
+  description  String
+  status       String
+  reporterId   String
+  reporterName String
+  claimantId   String?
+  claimantName String?
+  portal       String
+  createdAt    DateTime @default(now())
+}
+
+model RoomChangeRequest {
+  id            String   @id
+  studentId     String
+  studentName   String
+  currentRoom   String
+  preferredRoom String
+  reason        String
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+  communityCode String
+}
+
+model MaintenanceBill {
+  id           String  @id
+  residentId   String
+  residentName String
+  unit         String
+  month        String
+  amount       Float
+  dueDate      String
+  status       String
+  paidOn       String?
+}
+
+model CommunityEvent {
+  id            String   @id
+  title         String
+  description   String
+  date          String
+  time          String
+  location      String
+  organizer     String
+  priority      String
+  communityCode String
+  rsvps         EventRsvp[]
+}
+
+model EventRsvp {
+  id        String         @id @default(uuid())
+  eventId   String
+  userId    String
+  userName  String
+  status    String
+  event     CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id
+  userId    String
+  title     String
+  message   String
+  type      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RoommatePreference {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  userName       String
+  sleepingHabits String
+  studyHours     String
+  cleanliness    String
+  smoking        Boolean
+  foodPreference String
+  interests      String[]
+  roomPreference String
+  communityCode  String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmergencyAlert {
+  id            String    @id
+  type          String
+  reporterName  String
+  reporterId    String
+  unit          String
+  status        String
+  createdAt     DateTime  @default(now())
+  resolvedAt    DateTime?
+  resolvedBy    String?
+  communityCode String
+}
+
+model GatePass {
+  id            String @id
+  visitorName   String
+  purpose       String
+  validOn       String
+  qrCodeData    String
+  status        String
+  residentId    String
+  residentName  String
+  unit          String
+  communityCode String
+  user          User   @relation(fields: [residentId], references: [id], onDelete: Cascade)
+}
+
+model VehicleLog {
+  id            String    @id
+  vehicleNumber String
+  ownerName     String
+  ownerUnit     String?
+  type          String
+  entryTime     DateTime  @default(now())
+  exitTime      DateTime?
+  gate          String
+  loggedBy      String
+  communityCode String
+}
+
+model IncidentReport {
+  id          String   @id
+  title       String
+  time        String
+  location    String
+  description String
+  type        String
+  status      String
+  reporter    String
+  createdAt   DateTime @default(now())
+}
+
+model Announcement {
+  id         String   @id
+  title      String
+  content    String
+  author     String
+  authorRole String
+  priority   String
+  createdAt  DateTime @default(now())
+  tags       String[]
+}
+
+model FlatInfo {
+  id           String  @id
+  building     String
+  wing         String
+  floor        Int
+  flatNumber   String
+  status       String
+  residentId   String?
+  residentName String?
+}
+
+model RentRecord {
+  id         String  @id
+  unit       String
+  building   String
+  tenantName String
+  tenantId   String?
+  amount     Float
+  dueDate    String
+  status     String
+  paidOn     String?
+}
+
+model FavoriteVisitor {
+  id           String @id
+  name         String
+  phone        String
+  category     String
+  residentId   String
+  visitingUnit String
+}
+
+model Helper {
+  id                  String   @id
+  name                String
+  phone               String
+  category            String
+  expectedArrivalTime String
+  expectedExitTime    String
+  workingDays         String[]
+  assignedFlats       String[]
+  createdBy           String
+  code                String   @unique
+}
+
+model HelperAttendance {
+  id            String    @id
+  helperId      String
+  helperName    String
+  category      String
+  checkInTime   DateTime?
+  checkOutTime  DateTime?
+  date          String
+  assignedFlats String[]
+  entryGate     String?
+  exitGate      String?
+}
+
+model SocietyExpense {
+  id       String  @id
+  category String
+  vendor   String
+  amount   Float
+  date     String
+  notes    String?
+}
+
+model ResidentWorkerAssignment {
+  id            String   @id @default(uuid())
+  residentId    String
+  workerId      String
+  workingDays   String[]
+  arrivalTime   String
+  exitTime      String
+  services      String[]
+  createdAt     DateTime @default(now())
+
+  resident      User     @relation("ResidentAssignments", fields: [residentId], references: [id], onDelete: Cascade)
+  worker        User     @relation("WorkerAssignments", fields: [workerId], references: [id], onDelete: Cascade)
+}

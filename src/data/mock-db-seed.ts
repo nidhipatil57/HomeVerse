@@ -1001,8 +1001,8 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
   // --- MAIDS (4 different maids with different specializations) ---
   {
     id: "user-worker-3",
-    name: "Maya Devi",
-    email: "maya@sunshinecomplex.com",
+    name: "Meena Sharma",
+    email: "meena@sunshinecomplex.com",
     phone: "+91 87654 32111",
     role: "worker",
     portal: "society",
@@ -1018,12 +1018,12 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     availability: "Available",
     joinedAt: "2026-03-01",
     status: "approved",
-    password: "Maya@123"
+    password: "Meena@123"
   },
   {
     id: "user-worker-8",
-    name: "Sunita Bai",
-    email: "sunita.b@sunshinecomplex.com",
+    name: "Sunita Patil",
+    email: "sunita.patil@sunshinecomplex.com",
     phone: "+91 87654 32118",
     role: "worker",
     portal: "society",
@@ -1034,7 +1034,7 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     employeeId: "EMP-2947",
     workingShift: "Morning (6 AM - 12 PM)",
     specializations: ["Cooking", "Cleaning"],
-    rating: 4.9,
+    rating: 5.0,
     experience: "8 years",
     availability: "Available",
     joinedAt: "2026-03-05",
@@ -1043,8 +1043,8 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
   },
   {
     id: "user-worker-9",
-    name: "Geeta Shinde",
-    email: "geeta@sunshinecomplex.com",
+    name: "Rani Sharma",
+    email: "rani@sunshinecomplex.com",
     phone: "+91 87654 32119",
     role: "worker",
     portal: "society",
@@ -1054,18 +1054,18 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     workerCategory: "Maid",
     employeeId: "EMP-2948",
     workingShift: "Afternoon (1 PM - 6 PM)",
-    specializations: ["Laundry", "Ironing"],
-    rating: 4.7,
-    experience: "4 years",
+    specializations: ["Laundry", "Cleaning"],
+    rating: 4.5,
+    experience: "3 years",
     availability: "Available",
     joinedAt: "2026-03-08",
     status: "approved",
-    password: "Geeta@123"
+    password: "Rani@123"
   },
   {
     id: "user-worker-10",
-    name: "Pinky Shaw",
-    email: "pinky@sunshinecomplex.com",
+    name: "Kavita Joshi",
+    email: "kavita@sunshinecomplex.com",
     phone: "+91 87654 32120",
     role: "worker",
     portal: "society",
@@ -1076,12 +1076,12 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     employeeId: "EMP-2949",
     workingShift: "Morning (8 AM - 2 PM)",
     specializations: ["Cooking", "Baby Care"],
-    rating: 4.6,
-    experience: "5 years",
+    rating: 5.0,
+    experience: "8 years",
     availability: "Available",
     joinedAt: "2026-03-12",
     status: "approved",
-    password: "Pinky@123"
+    password: "Kavita@123"
   },
   // --- WARDEN ---
   {

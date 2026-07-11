@@ -541,11 +541,9 @@ export default function ComplaintsPage() {
     if (!selected || !overridePriority) return;
     await updateComplaintStatus(selected.id, selected.status, {
       by: user?.name || "Secretary",
-      note: `Priority changed manually from ${selected.priority.toUpperCase()} to ${overridePriority.toUpperCase()}.`
-    });
-    const { db } = await import("@/lib/firebase/config");
-    const { updateDoc, doc } = await import("firebase/firestore");
-    await updateDoc(doc(db, "complaints", selected.id), { priority: overridePriority });
+      note: `Priority changed manually from ${selected.priority.toUpperCase()} to ${overridePriority.toUpperCase()}.`,
+      priority: overridePriority
+    } as any);
     setOverridePriority("");
   };
 
@@ -1159,9 +1157,7 @@ export default function ComplaintsPage() {
                           size="sm"
                           onClick={async () => {
                             if (confirm("Are you sure you want to delete this complaint?")) {
-                              const { db } = await import("@/lib/firebase/config");
-                              const { deleteDoc, doc } = await import("firebase/firestore");
-                              await deleteDoc(doc(db, "complaints", selected.id));
+                              await fetch(`/api/complaints/${selected.id}`, { method: "DELETE" });
                               setSelectedComplaintId(null);
                               alert("Ticket deleted.");
                             }

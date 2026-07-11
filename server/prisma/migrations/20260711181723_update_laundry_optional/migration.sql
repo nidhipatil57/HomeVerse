@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "LaundrySlot" ALTER COLUMN "bookedBy" DROP NOT NULL,
+ALTER COLUMN "bookedById" DROP NOT NULL,
+ALTER COLUMN "communityCode" SET DEFAULT 'VESIT26';

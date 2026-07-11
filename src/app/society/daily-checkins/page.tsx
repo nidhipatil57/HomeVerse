@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Users, Clock, LogIn, LogOut, Check, Plus, Wrench, Shield, CheckCircle2,
-  AlertTriangle, Phone, Building, Calendar, ClipboardCheck, Trash2, ArrowRight, MapPin
+  AlertTriangle, Phone, Building, Calendar, ClipboardCheck, Trash2, ArrowRight, MapPin, Star
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,83 +41,78 @@ export default function DailyCheckInsPage() {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [expandedHelper, setExpandedHelper] = useState<string | null>(null);
 
-  // Form states
-  const [helperName, setHelperName] = useState("");
-  const [category, setCategory] = useState("Maid");
-  const [phone, setPhone] = useState("");
+  // Selector form states
+  const [availableHelpers, setAvailableHelpers] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterService, setFilterService] = useState<string>("All");
+  const [selectedWorker, setSelectedWorker] = useState<any | null>(null);
+  const [step, setStep] = useState<1 | 2>(1);
+
+  // Form scheduling states (Step 2)
   const [expectedArrival, setExpectedArrival] = useState("08:30 AM");
   const [expectedExit, setExpectedExit] = useState("11:30 AM");
-  const [workingDays, setWorkingDays] = useState<string[]>(["Monday", "Wednesday", "Friday"]);
+  const [workingDays, setWorkingDays] = useState<string[]>(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]);
+  const [servicesRequired, setServicesRequired] = useState<string[]>([]);
 
   useEffect(() => {
     initializeDb();
     setMounted(true);
   }, [initializeDb]);
 
-  // Prepopulate standard demo helper if database list is empty
+  // Fetch available maids when dialog opens
+  useEffect(() => {
+    if (registerOpen) {
+      fetch("/api/visitors/helpers?available=true")
+        .then(res => res.json())
+        .then(data => {
+          setAvailableHelpers(data || []);
+          setStep(1);
+          setSelectedWorker(null);
+          setSearchQuery("");
+          setFilterService("All");
+        })
+        .catch(err => console.error(err));
+    }
+  }, [registerOpen]);
+
+  // Derive assigned helpers
   const myHelpers = useMemo(() => {
     if (!user) return [];
-    
-    // Find registered helpers in store linked to user
-    const dbHelpers = helpers.filter(h => h.residentIds?.includes(user.id) || (user.unit && h.assignedFlats?.includes(user.unit)));
-    
-    // Fallback/prepopulated demo maid: "Sunita Patil" (user-worker-8 in seed)
-    const isDemoResident = ["user-resident-1", "user-resident-6", "user-resident-9"].includes(user.id) || 
-                           ["Sara Shah", "Rahul Mehta", "Priya Desai"].includes(user.name);
-    
-    const hasDemoMaid = dbHelpers.some(h => h.name.includes("Sunita"));
-    
-    if (isDemoResident && !hasDemoMaid) {
-      const demoMaid: Helper = {
-        id: "user-worker-8",
-        name: "Sunita Patil",
-        category: "Cooking + Cleaning",
-        phone: "+91 87654 32118",
-        workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        expectedArrival: "08:30 AM",
-        expectedExit: "11:30 AM",
-        assignedFlats: ["A-204", "A-302", "C-201"],
-        assignedResidents: ["Sara Shah", "Rahul Mehta", "Priya Desai"],
-        residentIds: ["user-resident-1", "user-resident-6", "user-resident-9"],
-        joinedAt: new Date().toISOString(),
-        portal: "society"
-      };
-      return [demoMaid, ...dbHelpers];
-    }
-    
-    return dbHelpers;
+    return helpers.filter(h => h.residentIds?.includes(user.id) || (user.unit && h.assignedFlats?.includes(user.unit)));
   }, [helpers, user]);
 
   if (!mounted || !user) return null;
 
-  // Handle register submission
-  const handleRegister = async (e: React.FormEvent) => {
+  // Handle assignment submission
+  const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!helperName.trim() || !phone.trim()) return;
+    if (!selectedWorker) return;
 
     await registerHelper({
-      name: helperName,
-      category,
-      phone,
+      workerId: selectedWorker.id,
+      expectedArrivalTime: expectedArrival,
+      expectedExitTime: expectedExit,
       workingDays,
-      expectedArrival,
-      expectedExit,
-      assignedFlats: [user.unit || ""],
-      assignedResidents: [user.name],
-      residentIds: [user.id],
-      portal: "society" as const
-    });
+      services: servicesRequired.length > 0 ? servicesRequired : selectedWorker.specializations,
+      category: selectedWorker.workerCategory || "Maid",
+      name: selectedWorker.name,
+      phone: selectedWorker.phone
+    } as any);
 
-    setHelperName("");
-    setPhone("");
-    setWorkingDays(["Monday", "Wednesday", "Friday"]);
     setRegisterOpen(false);
-    alert("Recurring domestic helper registered successfully.");
+    initializeDb();
+    alert(`${selectedWorker.name} has been assigned to your flat.`);
   };
 
   const toggleDay = (day: string) => {
     setWorkingDays(prev => 
       prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    );
+  };
+
+  const toggleService = (srv: string) => {
+    setServicesRequired(prev => 
+      prev.includes(srv) ? prev.filter(s => s !== srv) : [...prev, srv]
     );
   };
 
@@ -132,6 +127,13 @@ export default function DailyCheckInsPage() {
       return { hours: 8, mins: 30 };
     }
   };
+
+  // Filter available maids
+  const filteredMaids = availableHelpers.filter(m => {
+    const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesService = filterService === "All" || m.specializations?.some((s: string) => s.toLowerCase().includes(filterService.toLowerCase()));
+    return matchesSearch && matchesService;
+  });
 
   return (
     <div className="space-y-6">
@@ -150,68 +152,194 @@ export default function DailyCheckInsPage() {
           <DialogTrigger
             render={
               <Button className="gradient-primary text-white border-0 shadow-md h-10 px-4 text-xs font-semibold rounded-xl">
-                <Plus className="w-4 h-4 mr-1.5" /> Register Household Helper
+                <Plus className="w-4 h-4 mr-1.5" /> Add Domestic Helper
               </Button>
             }
           />
-          <DialogContent className="sm:max-w-md rounded-2xl">
-            <DialogHeader>
-              <DialogTitle className="font-[family-name:var(--font-heading)]">Register Recurring Helper</DialogTitle>
-              <DialogDescription>Add helpers like cooks or maids to get notified when they enter the gate.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleRegister} className="space-y-4 mt-2">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-muted-foreground block mb-1">Helper Name</label>
-                  <Input value={helperName} onChange={(e) => setHelperName(e.target.value)} className="h-10 text-xs rounded-xl" required />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-muted-foreground block mb-1">Phone Number</label>
-                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="h-10 text-xs rounded-xl" required />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-muted-foreground block mb-1">Category</label>
-                  <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full h-10 px-3 border rounded-xl text-xs bg-card">
-                    {helperCategories.map(cat => <option key={cat}>{cat}</option>)}
+          <DialogContent className="sm:max-w-lg rounded-2xl max-h-[85vh] overflow-y-auto">
+            {step === 1 ? (
+              <div className="space-y-4">
+                <DialogHeader>
+                  <DialogTitle className="font-[family-name:var(--font-heading)]">Add Domestic Helper</DialogTitle>
+                  <DialogDescription>Select from approved registered helpers in the society database.</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Search by name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-10 text-xs rounded-xl"
+                  />
+                  <select
+                    value={filterService}
+                    onChange={(e) => setFilterService(e.target.value)}
+                    className="h-10 px-3 border border-input rounded-xl text-xs bg-card shrink-0"
+                  >
+                    <option value="All">All Services</option>
+                    <option value="Cooking">Cooking</option>
+                    <option value="Cleaning">Cleaning</option>
+                    <option value="Laundry">Laundry</option>
+                    <option value="Baby Care">Baby Care</option>
+                    <option value="Utensils">Utensils</option>
+                    <option value="Electrician">Electrician</option>
+                    <option value="Plumber">Plumber</option>
+                    <option value="Carpenter">Carpenter</option>
+                    <option value="Painter">Painter</option>
+                    <option value="Gardener">Gardener</option>
+                    <option value="Housekeeping">Housekeeping</option>
                   </select>
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold text-muted-foreground block mb-1">Shift Start</label>
-                  <Input placeholder="e.g. 08:30 AM" value={expectedArrival} onChange={(e) => setExpectedArrival(e.target.value)} className="h-10 text-xs rounded-xl" required />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-muted-foreground block mb-1">Shift End</label>
-                  <Input placeholder="e.g. 11:30 AM" value={expectedExit} onChange={(e) => setExpectedExit(e.target.value)} className="h-10 text-xs rounded-xl" required />
+
+                <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+                  {filteredMaids.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-xs">
+                      No matching domestic helpers found.
+                    </div>
+                  ) : (
+                    filteredMaids.map((m) => (
+                      <div key={m.id} className="p-3 border border-border/80 bg-secondary/10 rounded-xl flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="w-10 h-10 border border-border">
+                            <AvatarFallback className="gradient-primary text-white font-bold text-xs">
+                              {m.name.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h4 className="font-bold text-foreground">{m.name}</h4>
+                            <div className="flex items-center gap-1.5 mt-0.5 text-muted-foreground">
+                              <span className="flex items-center gap-0.5 text-amber-500 font-semibold">
+                                <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" /> {m.rating?.toFixed(1) || "5.0"}
+                              </span>
+                              <span>•</span>
+                              <span>{m.experience || "5 years"} Exp</span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                              {m.specializations?.join(", ")}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            setSelectedWorker(m);
+                            setServicesRequired(m.specializations || []);
+                            setStep(2);
+                          }}
+                          className="h-8 px-3 rounded-lg text-[10px] font-bold gradient-primary text-white border-0 shadow-sm"
+                        >
+                          Add Helper
+                        </Button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-muted-foreground block mb-1">Working Days</label>
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {daysOfWeek.map(day => {
-                    const active = workingDays.includes(day);
-                    return (
-                      <button
-                        type="button"
-                        key={day}
-                        onClick={() => toggleDay(day)}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
-                          active 
-                            ? "bg-primary/10 border-primary/30 text-primary" 
-                            : "bg-secondary/10 border-border/40 text-muted-foreground hover:bg-secondary/25"
-                        }`}
-                      >
-                        {day.slice(0, 3)}
-                      </button>
-                    );
-                  })}
+            ) : (
+              <form onSubmit={handleAssignSubmit} className="space-y-4">
+                <DialogHeader>
+                  <DialogTitle className="font-[family-name:var(--font-heading)]">Configure Helper Schedule</DialogTitle>
+                  <DialogDescription>Assign working hours and days for {selectedWorker?.name}.</DialogDescription>
+                </DialogHeader>
+
+                <div className="p-3 border border-border/60 bg-secondary/5 rounded-xl flex items-center gap-3">
+                  <Avatar className="w-9 h-9 border">
+                    <AvatarFallback className="gradient-primary text-white font-bold text-xs">
+                      {selectedWorker?.name.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h4 className="font-bold text-xs">{selectedWorker?.name}</h4>
+                    <p className="text-[10px] text-muted-foreground">{selectedWorker?.specializations?.join(", ")}</p>
+                  </div>
                 </div>
-              </div>
-              <Button type="submit" className="w-full h-10 bg-primary text-white border-0 rounded-xl font-bold text-xs mt-2 shadow-md">
-                Register Helper Profile
-              </Button>
-            </form>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground block mb-1">Expected Arrival Time</label>
+                    <Input
+                      placeholder="e.g. 08:30 AM"
+                      value={expectedArrival}
+                      onChange={(e) => setExpectedArrival(e.target.value)}
+                      className="h-10 text-xs rounded-xl"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground block mb-1">Expected Exit Time</label>
+                    <Input
+                      placeholder="e.g. 11:30 AM"
+                      value={expectedExit}
+                      onChange={(e) => setExpectedExit(e.target.value)}
+                      className="h-10 text-xs rounded-xl"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground block mb-1">Working Days</label>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {daysOfWeek.map(day => {
+                      const active = workingDays.includes(day);
+                      return (
+                        <button
+                          type="button"
+                          key={day}
+                          onClick={() => toggleDay(day)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
+                            active 
+                              ? "bg-primary/10 border-primary/30 text-primary" 
+                              : "bg-secondary/10 border-border/40 text-muted-foreground hover:bg-secondary/25"
+                          }`}
+                        >
+                          {day.slice(0, 3)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground block mb-1">Required Services</label>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {selectedWorker?.specializations?.map((srv: string) => {
+                      const active = servicesRequired.includes(srv);
+                      return (
+                        <button
+                          type="button"
+                          key={srv}
+                          onClick={() => toggleService(srv)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
+                            active 
+                              ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-600" 
+                              : "bg-secondary/10 border-border/40 text-muted-foreground hover:bg-secondary/25"
+                          }`}
+                        >
+                          {srv}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep(1)}
+                    className="w-1/3 h-10 rounded-xl text-xs font-semibold"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="w-2/3 h-10 bg-primary text-white border-0 rounded-xl font-bold text-xs shadow-md"
+                  >
+                    Confirm & Assign
+                  </Button>
+                </div>
+              </form>
+            )}
           </DialogContent>
         </Dialog>
       </div>
