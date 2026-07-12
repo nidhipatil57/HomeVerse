@@ -173,6 +173,8 @@ interface CommunityState {
   helpers: Helper[];
   attendance: HelperAttendance[];
   flatAttendance: any[];
+  payments: any[];
+  collections: any[];
 
   initializeDb: () => void;
   saveDb: () => void;
@@ -277,6 +279,13 @@ interface CommunityState {
     phone: string;
     availability: string;
   }) => Promise<void>;
+
+  // Society Collections & Payments actions
+  createCollection: (details: any) => Promise<void>;
+  editCollection: (id: string, details: any) => Promise<void>;
+  cancelCollection: (id: string) => Promise<void>;
+  payPayment: (id: string, paymentMethod: string) => Promise<void>;
+  sendPaymentReminder: (id: string) => Promise<void>;
 }
 
 export const useCommunityStore = create<CommunityState>((set, get) => ({
@@ -306,6 +315,8 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   helpers: [],
   attendance: [],
   flatAttendance: [],
+  payments: [],
+  collections: [],
 
   initializeDb: () => {
     if (typeof window === "undefined") return;
@@ -338,7 +349,9 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           { key: "lostFoundItems", path: "/api/lostfound" },
           { key: "flats", path: "/api/flats" },
           { key: "expenses", path: "/api/expenses" },
-          { key: "users", path: "/api/users" }
+          { key: "users", path: "/api/users" },
+          { key: "payments", path: "/api/payments" },
+          { key: "collections", path: "/api/payments/collections" }
         ];
 
         const promises = endpoints.map(async ({ key, path }) => {
@@ -373,7 +386,9 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       const criticalEndpoints = [
         { key: "helpers", path: "/api/visitors/helpers" },
         { key: "attendance", path: "/api/visitors/attendance" },
-        { key: "flatAttendance", path: "/api/visitors/helpers/flat-attendance" }
+        { key: "flatAttendance", path: "/api/visitors/helpers/flat-attendance" },
+        { key: "payments", path: "/api/payments" },
+        { key: "collections", path: "/api/payments/collections" }
       ];
       criticalEndpoints.forEach(async ({ key, path }) => {
         try {
@@ -388,7 +403,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                 workerCategory: att.category || att.workerCategory
               }));
             }
-            const currentStr = JSON.stringify(get()[key]);
+            const currentStr = JSON.stringify((get() as any)[key]);
             const nextStr = JSON.stringify(data);
             if (currentStr !== nextStr) {
               set({ [key]: data } as any);
@@ -409,6 +424,30 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
     socket.on("connect", () => {
       console.log("⚡ Connected to HomeVerse Socket.IO Server!");
+    });
+
+    socket.on("payment:update", (updated: any) => {
+      const current = get().payments || [];
+      const index = current.findIndex(p => p.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ payments: next });
+      } else {
+        set({ payments: [updated, ...current] });
+      }
+    });
+
+    socket.on("collection:update", (updated: any) => {
+      const current = get().collections || [];
+      const index = current.findIndex(c => c.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ collections: next });
+      } else {
+        set({ collections: [updated, ...current] });
+      }
     });
 
     socket.on("complaint:update", (updated: any) => {
@@ -1275,6 +1314,42 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(details)
+    });
+  },
+
+  createCollection: async (details) => {
+    await fetch("/api/payments/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(details)
+    });
+  },
+
+  editCollection: async (id, details) => {
+    await fetch(`/api/payments/collections/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(details)
+    });
+  },
+
+  cancelCollection: async (id) => {
+    await fetch(`/api/payments/collections/${id}`, {
+      method: "DELETE"
+    });
+  },
+
+  payPayment: async (id, paymentMethod) => {
+    await fetch(`/api/payments/${id}/pay`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paymentMethod })
+    });
+  },
+
+  sendPaymentReminder: async (id) => {
+    await fetch(`/api/payments/${id}/remind`, {
+      method: "POST"
     });
   }
 }));

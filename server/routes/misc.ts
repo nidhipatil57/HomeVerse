@@ -307,13 +307,68 @@ router.get("/maintenance", authenticateToken, async (req: any, res) => {
 });
 
 router.post("/maintenance/generate", authenticateToken, async (req: any, res) => {
-  const { residentId, residentName, unit, month, amount, dueDate } = req.body;
-  if (!residentId || !residentName || !unit || !month || !amount || !dueDate) {
-    return res.status(400).json({ error: "All bill details (residentId, residentName, unit, month, amount, dueDate) are required" });
-  }
+  const { residentId, residentName, unit, month, amount, dueDate, breakdown } = req.body;
+
   try {
+    // If no residentId is provided, perform bulk generation for all approved residents
+    if (!residentId) {
+      const residents = await prisma.user.findMany({
+        where: { role: "resident", status: "approved" }
+      });
+
+      const generatedBills = [];
+      const billMonth = month || "July 2026";
+      const billAmount = parseFloat(amount) || 3500;
+      const billDueDate = dueDate || "15 August";
+
+      for (const r of residents) {
+        const id = `BILL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+        
+        // 1. Create MaintenanceBill
+        const bill = await prisma.maintenanceBill.create({
+          data: {
+            id,
+            residentId: r.id,
+            residentName: r.name,
+            unit: r.unit || "",
+            month: billMonth,
+            amount: billAmount,
+            dueDate: billDueDate,
+            status: "pending"
+          }
+        });
+
+        // 2. Also create a ResidentPayment record to track this transaction
+        const paymentId = `PAY-BILL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+        await prisma.residentPayment.create({
+          data: {
+            id: paymentId,
+            residentId: r.id,
+            residentName: r.name,
+            unit: r.unit || "",
+            building: r.building || "",
+            societyId: req.user.communityCode || "SUN123",
+            paymentType: "Maintenance",
+            amount: billAmount,
+            status: "pending",
+            dueDate: billDueDate,
+            referenceId: id
+          }
+        });
+
+        // 3. Send in-app notification: Maintenance bill generated.
+        await sendInAppNotification(r.id, "Maintenance Bill Generated", "Maintenance bill generated.", "info");
+
+        generatedBills.push(bill);
+        broadcastUpdate("maintenance:update", bill);
+      }
+
+      return res.status(201).json({ success: true, count: generatedBills.length });
+    }
+
+    // Otherwise, generate a single maintenance bill
     const id = `BILL-${Math.floor(100 + Math.random() * 900)}`;
-    const newItem = await prisma.maintenanceBill.create({
+    const bill = await prisma.maintenanceBill.create({
       data: {
         id,
         residentId,
@@ -325,10 +380,33 @@ router.post("/maintenance/generate", authenticateToken, async (req: any, res) =>
         status: "pending"
       }
     });
-    broadcastUpdate("maintenance:update", newItem);
-    res.status(201).json(newItem);
+
+    // Also create a ResidentPayment record for this single bill
+    const paymentId = `PAY-BILL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+    await prisma.residentPayment.create({
+      data: {
+        id: paymentId,
+        residentId,
+        residentName,
+        unit,
+        building: req.user.building || "",
+        societyId: req.user.communityCode || "SUN123",
+        paymentType: "Maintenance",
+        amount: parseFloat(amount),
+        status: "pending",
+        dueDate,
+        referenceId: id
+      }
+    });
+
+    // Send notification
+    await sendInAppNotification(residentId, "Maintenance Bill Generated", "Maintenance bill generated.", "info");
+
+    broadcastUpdate("maintenance:update", bill);
+    res.status(201).json(bill);
   } catch (error) {
-    res.status(500).json({ error: "Failed to generate bill" });
+    console.error("Failed to generate maintenance bills:", error);
+    res.status(500).json({ error: "Failed to generate bills" });
   }
 });
 
@@ -339,13 +417,326 @@ router.put("/maintenance/:id/pay", authenticateToken, async (req: any, res) => {
       where: { id },
       data: {
         status: "paid",
-        paidOn: new Date().toISOString().split("T")[0]
+        paidOn: new Date().toLocaleDateString('en-CA')
       }
     });
+
+    // Sync with corresponding ResidentPayment if exists
+    await prisma.residentPayment.updateMany({
+      where: { referenceId: id, paymentType: "Maintenance" },
+      data: {
+        status: "Paid",
+        paidDate: new Date().toLocaleDateString('en-CA'),
+        transactionId: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+        paymentMethod: "Card"
+      }
+    });
+
     broadcastUpdate("maintenance:update", updated);
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: "Failed to pay bill" });
+  }
+});
+
+// ==========================================
+// 💳 Resident Payments & Society Collections
+// ==========================================
+
+async function sendInAppNotification(userId: string, title: string, message: string, type: string) {
+  try {
+    const id = `NTF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+    const newNotif = await prisma.notification.create({
+      data: {
+        id,
+        userId,
+        title,
+        message,
+        type: type || "info",
+        read: false
+      }
+    });
+    broadcastUpdate("notification:update", newNotif);
+  } catch (e) {
+    console.error("Failed to send in-app notification:", e);
+  }
+}
+
+// 1. GET /payments - Fetch all payment transaction records
+router.get("/payments", authenticateToken, async (req: any, res) => {
+  try {
+    const { role, id: userId, unit } = req.user;
+    let list;
+    if (role === "secretary") {
+      list = await prisma.residentPayment.findMany({
+        orderBy: { createdAt: "desc" }
+      });
+    } else {
+      list = await prisma.residentPayment.findMany({
+        where: { residentId: userId },
+        orderBy: { createdAt: "desc" }
+      });
+    }
+    res.json(list);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch payments" });
+  }
+});
+
+// 2. GET /payments/collections - Fetch all society collections
+router.get("/payments/collections", authenticateToken, async (req: any, res) => {
+  try {
+    const { role, unit, building } = req.user;
+    let list;
+    if (role === "secretary") {
+      list = await prisma.societyCollection.findMany({
+        orderBy: { createdAt: "desc" }
+      });
+    } else {
+      const allCollections = await prisma.societyCollection.findMany({
+        where: { status: "active" },
+        orderBy: { createdAt: "desc" }
+      });
+      list = allCollections.filter(c => {
+        if (c.visibility === "Everyone") return true;
+        if (c.applicableBuildings.length > 0 && building && c.applicableBuildings.includes(building)) {
+          return true;
+        }
+        if (c.applicableFlats.length > 0 && unit && c.applicableFlats.includes(unit)) {
+          return true;
+        }
+        return false;
+      });
+    }
+    res.json(list);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch collections" });
+  }
+});
+
+// 3. POST /payments/collections - Create new special collection
+router.post("/payments/collections", authenticateToken, async (req: any, res) => {
+  const { title, description, amount, type, dueDate, applicableBuildings, applicableFlats, visibility } = req.body;
+  if (!title || !amount || !type || !dueDate) {
+    return res.status(400).json({ error: "Title, amount, type, and dueDate are required" });
+  }
+  try {
+    const id = `COLL-${Math.floor(100 + Math.random() * 900)}`;
+    const collection = await prisma.societyCollection.create({
+      data: {
+        id,
+        title,
+        description: description || "",
+        amount: parseFloat(amount),
+        type,
+        dueDate,
+        applicableBuildings: applicableBuildings || [],
+        applicableFlats: applicableFlats || [],
+        visibility: visibility || "Everyone",
+        communityCode: req.user.communityCode || "SUN123"
+      }
+    });
+
+    // Generate pending payments for applicable residents
+    const residents = await prisma.user.findMany({
+      where: { role: "resident", status: "approved" }
+    });
+
+    const applicableResidents = residents.filter(r => {
+      if (visibility === "Everyone") return true;
+      if (applicableBuildings && applicableBuildings.length > 0 && r.building && applicableBuildings.includes(r.building)) {
+        return true;
+      }
+      if (applicableFlats && applicableFlats.length > 0 && r.unit && applicableFlats.includes(r.unit)) {
+        return true;
+      }
+      return false;
+    });
+
+    for (const r of applicableResidents) {
+      const paymentId = `PAY-COLL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+      await prisma.residentPayment.create({
+        data: {
+          id: paymentId,
+          residentId: r.id,
+          residentName: r.name,
+          unit: r.unit || "",
+          building: r.building || "",
+          societyId: req.user.communityCode || "SUN123",
+          paymentType: title,
+          amount: parseFloat(amount),
+          status: "pending",
+          dueDate,
+          referenceId: id
+        }
+      });
+
+      // Send in-app notification: Ganesh Festival contribution announced.
+      await sendInAppNotification(r.id, "New Collection Announced", `${title} announced.`, "info");
+    }
+
+    broadcastUpdate("collection:update", collection);
+    res.status(201).json(collection);
+  } catch (error) {
+    console.error("Failed to create collection:", error);
+    res.status(500).json({ error: "Failed to create collection" });
+  }
+});
+
+// 4. PUT /payments/collections/:id - Edit special collection
+router.put("/payments/collections/:id", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const { title, description, amount, dueDate } = req.body;
+  try {
+    const updated = await prisma.societyCollection.update({
+      where: { id },
+      data: {
+        title,
+        description,
+        amount: amount ? parseFloat(amount) : undefined,
+        dueDate
+      }
+    });
+
+    // Update pending payments for this collection
+    await prisma.residentPayment.updateMany({
+      where: { referenceId: id, status: "pending" },
+      data: {
+        paymentType: title || undefined,
+        amount: amount ? parseFloat(amount) : undefined,
+        dueDate: dueDate || undefined
+      }
+    });
+
+    broadcastUpdate("collection:update", updated);
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update collection" });
+  }
+});
+
+// 5. DELETE /payments/collections/:id - Cancel special collection
+router.delete("/payments/collections/:id", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  try {
+    const cancelled = await prisma.societyCollection.update({
+      where: { id },
+      data: { status: "cancelled" }
+    });
+
+    // Delete or cancel pending payments for this collection
+    await prisma.residentPayment.updateMany({
+      where: { referenceId: id, status: "pending" },
+      data: { status: "cancelled" }
+    });
+
+    broadcastUpdate("collection:update", cancelled);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to cancel collection" });
+  }
+});
+
+// 6. PUT /payments/:id/pay - Process payment
+router.put("/payments/:id/pay", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const { paymentMethod } = req.body;
+  try {
+    const payment = await prisma.residentPayment.findUnique({
+      where: { id }
+    });
+    if (!payment) return res.status(404).json({ error: "Payment request not found" });
+
+    const txnId = `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
+    const nowStr = new Date().toLocaleDateString('en-CA');
+
+    const updatedPayment = await prisma.residentPayment.update({
+      where: { id },
+      data: {
+        status: "Paid",
+        paidDate: nowStr,
+        transactionId: txnId,
+        paymentMethod: paymentMethod || "Card",
+        receiptPath: `/receipts/${id}.pdf`
+      }
+    });
+
+    // If it is linked to a MaintenanceBill, mark it paid too
+    if (payment.paymentType === "Maintenance" && payment.referenceId) {
+      await prisma.maintenanceBill.update({
+        where: { id: payment.referenceId },
+        data: {
+          status: "paid",
+          paidOn: nowStr
+        }
+      });
+    }
+
+    // Send notifications
+    await sendInAppNotification(payment.residentId, "Payment Successful", "Payment successful.", "success");
+    await sendInAppNotification(payment.residentId, "Receipt Ready", "Receipt ready to download.", "success");
+
+    const secretaryUsers = await prisma.user.findMany({ where: { role: "secretary" } });
+    for (const sec of secretaryUsers) {
+      await sendInAppNotification(sec.id, "Resident Payment Received", "Resident completed payment.", "success");
+    }
+
+    // Check if collection target reached
+    if (payment.referenceId && payment.paymentType !== "Maintenance") {
+      const collection = await prisma.societyCollection.findUnique({
+        where: { id: payment.referenceId }
+      });
+      if (collection) {
+        const allPayments = await prisma.residentPayment.findMany({
+          where: { referenceId: collection.id }
+        });
+        const totalCollected = allPayments
+          .filter(p => p.status === "Paid")
+          .reduce((sum, p) => sum + p.amount, 0);
+
+        const expectedAmount = collection.amount * allPayments.length;
+        if (totalCollected >= expectedAmount && expectedAmount > 0) {
+          for (const sec of secretaryUsers) {
+            await sendInAppNotification(sec.id, "Target Reached", "Collection target reached.", "success");
+          }
+        }
+      }
+    }
+
+    broadcastUpdate("payment:update", updatedPayment);
+    res.json(updatedPayment);
+  } catch (error) {
+    console.error("Payment error:", error);
+    res.status(500).json({ error: "Failed to process payment" });
+  }
+});
+
+// 7. POST /payments/:id/remind - Send payment reminder
+router.post("/payments/:id/remind", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  try {
+    const payment = await prisma.residentPayment.findUnique({
+      where: { id }
+    });
+    if (!payment) return res.status(404).json({ error: "Payment request not found" });
+
+    // Send reminder notification
+    // Example: "Ganesh Festival contribution closes tomorrow." or "Maintenance payment due in 3 days."
+    let msg = `${payment.paymentType} payment due in 3 days.`;
+    if (payment.paymentType !== "Maintenance") {
+      msg = `${payment.paymentType} contribution closes tomorrow.`;
+    }
+
+    await sendInAppNotification(payment.residentId, "Payment Reminder", msg, "warning");
+
+    const secretaryUsers = await prisma.user.findMany({ where: { role: "secretary" } });
+    for (const sec of secretaryUsers) {
+      await sendInAppNotification(sec.id, "Reminder Sent", "Payment overdue reminder sent.", "info");
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to send reminder" });
   }
 });
 

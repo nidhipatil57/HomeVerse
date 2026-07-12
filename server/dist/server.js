@@ -7,7 +7,6 @@ const express_1 = __importDefault(require("express"));
 const http_1 = __importDefault(require("http"));
 const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
-const child_process_1 = require("child_process");
 const db_js_1 = __importDefault(require("./config/db.js"));
 const index_js_1 = require("./socket/index.js");
 const auth_js_1 = __importDefault(require("./routes/auth.js"));
@@ -44,26 +43,17 @@ async function verifyAndSetupDatabase() {
         // 1. Verify database connection
         await db_js_1.default.$connect();
         console.log("🟢 Database connection successful.");
-        // 2. Check if tables exist
-        try {
-            await db_js_1.default.user.count();
-            console.log("🟢 Required database tables exist.");
-        }
-        catch (e) {
-            console.warn("⚠️ Database tables are missing. Automatically deploying schema...");
-            (0, child_process_1.execSync)("npx prisma db push --accept-data-loss", { stdio: "inherit" });
-            console.log("🟢 Database schema synchronized.");
-        }
-        // 3. Check if seed data exists
+        // 2. Check table record counts to verify tables exist
         const userCount = await db_js_1.default.user.count();
-        if (userCount === 0) {
-            console.warn("⚠️ Demo seed data is missing. Automatically seeding the database...");
-            (0, child_process_1.execSync)("npx tsx seed.ts", { stdio: "inherit" });
-            console.log("🟢 Demo seed data successfully populated.");
-        }
-        else {
-            console.log("🟢 Demo seed data exists.");
-        }
+        const complaintCount = await db_js_1.default.complaint.count();
+        const visitorCount = await db_js_1.default.visitor.count();
+        const attendanceCount = await db_js_1.default.helperAttendance.count();
+        console.log("🟢 Required database tables exist.");
+        console.log("📊 Database Record Counts:");
+        console.log(`   - Users: ${userCount}`);
+        console.log(`   - Complaints: ${complaintCount}`);
+        console.log(`   - Visitors: ${visitorCount}`);
+        console.log(`   - Helper Attendance: ${attendanceCount}`);
     }
     catch (error) {
         console.error("❌ Startup Database Verification failed:", error.message);
