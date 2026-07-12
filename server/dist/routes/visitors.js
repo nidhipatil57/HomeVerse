@@ -135,9 +135,9 @@ router.get("/helpers", auth_js_1.authenticateToken, async (req, res) => {
                 expectedArrival: first.arrivalTime,
                 expectedExit: first.exitTime,
                 workingDays: first.workingDays,
-                assignedFlats: assignments.map(a => a.resident.unit || "A-204"),
-                assignedResidents: assignments.map(a => a.resident.name),
-                residentIds: assignments.map(a => a.resident.id),
+                assignedFlats: assignments.map((a) => a.resident.unit || "A-204"),
+                assignedResidents: assignments.map((a) => a.resident.name),
+                residentIds: assignments.map((a) => a.resident.id),
                 portal: "society"
             };
             return res.json([helper]);
@@ -147,7 +147,7 @@ router.get("/helpers", auth_js_1.authenticateToken, async (req, res) => {
                 where: { residentId: userId },
                 include: { worker: true, resident: true }
             });
-            const formatted = assignments.map(a => ({
+            const formatted = assignments.map((a) => ({
                 id: a.worker.id,
                 name: a.worker.name,
                 phone: a.worker.phone,
@@ -163,25 +163,52 @@ router.get("/helpers", auth_js_1.authenticateToken, async (req, res) => {
             }));
             return res.json(formatted);
         }
-        // For secretary/security/others, return all helper assignments
+        // For secretary/security/others, return all helper assignments expected today
         const allAssignments = await db_js_1.default.residentWorkerAssignment.findMany({
             include: { worker: true, resident: true }
         });
-        const formattedAll = allAssignments.map(a => ({
-            id: a.worker.id,
-            name: a.worker.name,
-            phone: a.worker.phone,
-            category: a.services.join(" + ") || a.worker.workerCategory || "Maid",
-            expectedArrival: a.arrivalTime,
-            expectedExit: a.exitTime,
-            workingDays: a.workingDays,
-            assignedFlats: [a.resident.unit || "A-204"],
-            assignedResidents: [a.resident.name],
-            residentIds: [a.resident.id],
-            joinedAt: a.createdAt.toISOString(),
-            portal: "society"
-        }));
-        res.json(formattedAll);
+        const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+        const grouped = {};
+        for (const a of allAssignments) {
+            if (!a.worker)
+                continue;
+            // Filter by today's day of week for security/secretary
+            if (role === "security" || role === "secretary") {
+                if (!a.workingDays.includes(todayStr)) {
+                    continue;
+                }
+            }
+            const wId = a.worker.id;
+            if (!grouped[wId]) {
+                grouped[wId] = {
+                    id: wId,
+                    name: a.worker.name,
+                    phone: a.worker.phone,
+                    category: a.services.join(" + ") || a.worker.workerCategory || "Maid",
+                    expectedArrival: a.arrivalTime,
+                    expectedExit: a.exitTime,
+                    workingDays: a.workingDays,
+                    assignedFlats: [a.resident.unit || "A-204"],
+                    assignedResidents: [a.resident.name],
+                    residentIds: [a.resident.id],
+                    joinedAt: a.createdAt.toISOString(),
+                    portal: "society"
+                };
+            }
+            else {
+                const flat = a.resident.unit || "A-204";
+                if (!grouped[wId].assignedFlats.includes(flat)) {
+                    grouped[wId].assignedFlats.push(flat);
+                }
+                if (!grouped[wId].assignedResidents.includes(a.resident.name)) {
+                    grouped[wId].assignedResidents.push(a.resident.name);
+                }
+                if (!grouped[wId].residentIds.includes(a.resident.id)) {
+                    grouped[wId].residentIds.push(a.resident.id);
+                }
+            }
+        }
+        res.json(Object.values(grouped));
     }
     catch (error) {
         console.error("Error fetching helpers:", error);
@@ -228,22 +255,27 @@ router.post("/helpers", auth_js_1.authenticateToken, async (req, res) => {
                 }
             });
         }
-        const formattedHelper = {
-            id: workerRecord.id,
-            name: workerRecord.name,
-            phone: workerRecord.phone,
-            category: services?.join(" + ") || category || workerRecord.workerCategory || "Maid",
-            expectedArrival: expectedArrivalTime || "08:30 AM",
-            expectedExit: expectedExitTime || "11:30 AM",
-            workingDays: workingDays || ["Monday", "Wednesday", "Friday"],
-            assignedFlats: [residentRecord.unit || "A-204"],
-            assignedResidents: [residentRecord.name],
-            residentIds: [residentRecord.id],
+        const allAssignmentsForWorker = await db_js_1.default.residentWorkerAssignment.findMany({
+            where: { workerId: targetWorkerId },
+            include: { worker: true, resident: true }
+        });
+        const first = allAssignmentsForWorker[0];
+        const groupedHelper = {
+            id: targetWorkerId,
+            name: first.worker.name,
+            phone: first.worker.phone,
+            category: first.services.join(" + ") || first.worker.workerCategory || "Maid",
+            expectedArrival: first.arrivalTime,
+            expectedExit: first.exitTime,
+            workingDays: first.workingDays,
+            assignedFlats: allAssignmentsForWorker.map((a) => a.resident.unit || "A-204"),
+            assignedResidents: allAssignmentsForWorker.map((a) => a.resident.name),
+            residentIds: allAssignmentsForWorker.map((a) => a.resident.id),
             joinedAt: assignment.createdAt.toISOString(),
             portal: "society"
         };
-        (0, index_js_1.broadcastUpdate)("helper:update", formattedHelper);
-        res.status(201).json(formattedHelper);
+        (0, index_js_1.broadcastUpdate)("helper:update", groupedHelper);
+        res.status(201).json(groupedHelper);
     }
     catch (error) {
         console.error("Failed to assign helper:", error);
@@ -290,86 +322,149 @@ router.post("/helpers/checkin", auth_js_1.authenticateToken, async (req, res) =>
         return res.status(400).json({ error: "Helper ID, helper name, and category are required" });
     }
     try {
-        const attendanceId = `ATT-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
-        const dateStr = new Date().toISOString().split("T")[0];
-        const checkIn = await db_js_1.default.helperAttendance.create({
-            data: {
-                id: attendanceId,
-                helperId,
-                helperName,
-                category,
-                checkInTime: new Date(),
-                date: dateStr,
-                assignedFlats: assignedFlats || [],
-                entryGate: gate || "Main Gate",
-                status: "checked-in"
-            }
+        const dateStr = new Date().toLocaleDateString('en-CA');
+        // 1. Validate worker exists
+        const worker = await db_js_1.default.user.findFirst({
+            where: { id: helperId, role: "worker" }
         });
-        (0, index_js_1.broadcastUpdate)("attendance:update", checkIn);
-        // Send notifications
-        const assignments = await db_js_1.default.residentWorkerAssignment.findMany({
-            where: { workerId: helperId }
-        });
-        for (const a of assignments) {
-            await sendInAppNotification(a.residentId, "Helper Entered Society", `✅ ${helperName} has entered the society.`, "success");
+        if (!worker) {
+            return res.status(400).json({ error: "Worker not found in system roster" });
         }
-        await sendInAppNotification(helperId, "Society Check-In Successful", "✅ Society check-in successful.", "success");
+        // 2. Validate worker assigned to at least one resident
+        const assignments = await db_js_1.default.residentWorkerAssignment.findMany({
+            where: { workerId: helperId },
+            include: { resident: true }
+        });
+        if (assignments.length === 0) {
+            return res.status(400).json({ error: "Worker is not assigned to any resident flat" });
+        }
+        const flats = assignments.map((a) => a.resident.unit || "A-204");
+        // 3. Check today's attendance record (ensure single record per date)
+        let attendanceRecord = await db_js_1.default.helperAttendance.findFirst({
+            where: { helperId, date: dateStr }
+        });
+        if (attendanceRecord) {
+            attendanceRecord = await db_js_1.default.helperAttendance.update({
+                where: { id: attendanceRecord.id },
+                data: {
+                    checkInTime: new Date(),
+                    entryGate: gate || "Society Gate",
+                    status: "Inside Society",
+                    assignedFlats: flats
+                }
+            });
+        }
+        else {
+            const attendanceId = `ATT-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+            attendanceRecord = await db_js_1.default.helperAttendance.create({
+                data: {
+                    id: attendanceId,
+                    helperId,
+                    helperName,
+                    category,
+                    checkInTime: new Date(),
+                    date: dateStr,
+                    assignedFlats: flats,
+                    entryGate: gate || "Society Gate",
+                    status: "Inside Society"
+                }
+            });
+        }
+        const mapped = {
+            ...attendanceRecord,
+            workerId: attendanceRecord.helperId,
+            workerName: attendanceRecord.helperName,
+            workerCategory: attendanceRecord.category
+        };
+        (0, index_js_1.broadcastUpdate)("attendance:update", mapped);
+        // Send notifications
+        for (const a of assignments) {
+            await sendInAppNotification(a.residentId, "Helper Entered Society", `${helperName} entered society.`, "success");
+        }
+        await sendInAppNotification(helperId, "Society Check-In Successful", "Security logged your entry.", "success");
+        await sendInAppNotification(helperId, "Today's Work Unlocked", "Today's work unlocked.", "info");
         const securityUsers = await db_js_1.default.user.findMany({ where: { role: "security" } });
         for (const sec of securityUsers) {
-            await sendInAppNotification(sec.id, "Worker Entered", `Worker ${helperName} entered society.`, "info");
+            await sendInAppNotification(sec.id, "Entry Recorded", "Entry recorded successfully.", "success");
         }
         const secretaryUsers = await db_js_1.default.user.findMany({ where: { role: "secretary" } });
         for (const sec of secretaryUsers) {
-            await sendInAppNotification(sec.id, "Daily Attendance Updated", "Daily attendance updated.", "info");
+            await sendInAppNotification(sec.id, "Daily Attendance Updated", "Worker attendance updated.", "info");
         }
-        res.status(201).json(checkIn);
+        res.status(201).json(mapped);
     }
     catch (error) {
         res.status(500).json({ error: "Failed helper checkin" });
     }
 });
 router.post("/helpers/checkout", auth_js_1.authenticateToken, async (req, res) => {
-    const { attendanceId, gate } = req.body;
-    if (!attendanceId) {
-        return res.status(400).json({ error: "Attendance ID is required" });
+    const { attendanceId, helperId, gate } = req.body;
+    if (!attendanceId && !helperId) {
+        return res.status(400).json({ error: "Attendance ID or Helper ID is required" });
     }
     try {
-        const record = await db_js_1.default.helperAttendance.findUnique({
-            where: { id: attendanceId }
-        });
+        const dateStr = new Date().toLocaleDateString('en-CA');
+        let record = null;
+        if (attendanceId) {
+            record = await db_js_1.default.helperAttendance.findUnique({
+                where: { id: attendanceId }
+            });
+        }
+        else {
+            record = await db_js_1.default.helperAttendance.findFirst({
+                where: { helperId, date: dateStr }
+            });
+        }
         if (!record) {
             return res.status(404).json({ error: "Attendance record not found" });
+        }
+        // 1. Validate worker exists
+        const worker = await db_js_1.default.user.findFirst({
+            where: { id: record.helperId, role: "worker" }
+        });
+        if (!worker) {
+            return res.status(400).json({ error: "Worker not found in system roster" });
+        }
+        // 2. Validate worker assigned to at least one resident
+        const assignments = await db_js_1.default.residentWorkerAssignment.findMany({
+            where: { workerId: record.helperId }
+        });
+        if (assignments.length === 0) {
+            return res.status(400).json({ error: "Worker is not assigned to any resident flat" });
         }
         const now = new Date();
         const checkInTime = record.checkInTime ? new Date(record.checkInTime) : now;
         const duration = Math.max(1, Math.round((now.getTime() - checkInTime.getTime()) / (60 * 1000)));
         const checkOut = await db_js_1.default.helperAttendance.update({
-            where: { id: attendanceId },
+            where: { id: record.id },
             data: {
                 checkOutTime: now,
-                exitGate: gate || "Main Gate",
-                status: "checked-out",
+                exitGate: gate || "Society Gate",
+                status: "Checked Out",
                 duration
             }
         });
-        (0, index_js_1.broadcastUpdate)("attendance:update", checkOut);
+        const mapped = {
+            ...checkOut,
+            workerId: checkOut.helperId,
+            workerName: checkOut.helperName,
+            workerCategory: checkOut.category
+        };
+        (0, index_js_1.broadcastUpdate)("attendance:update", mapped);
         // Send notifications
-        const assignments = await db_js_1.default.residentWorkerAssignment.findMany({
-            where: { workerId: record.helperId }
-        });
         for (const a of assignments) {
-            await sendInAppNotification(a.residentId, "Helper Exited Society", `🚪 ${record.helperName} has exited the society.`, "info");
+            await sendInAppNotification(a.residentId, "Helper Exited Society", `${record.helperName} exited society.`, "info");
         }
-        await sendInAppNotification(record.helperId, "Society Check-Out Successful", "🚪 Society check-out successful.", "success");
+        await sendInAppNotification(record.helperId, "Society Check-Out Successful", "Security logged your exit.", "success");
         const securityUsers = await db_js_1.default.user.findMany({ where: { role: "security" } });
         for (const sec of securityUsers) {
-            await sendInAppNotification(sec.id, "Worker Exited", `Worker ${record.helperName} exited society.`, "info");
+            await sendInAppNotification(sec.id, "Exit Recorded", "Exit recorded successfully.", "success");
         }
         const secretaryUsers = await db_js_1.default.user.findMany({ where: { role: "secretary" } });
         for (const sec of secretaryUsers) {
-            await sendInAppNotification(sec.id, "Worker Attendance Completed", "Worker attendance completed.", "info");
+            await sendInAppNotification(sec.id, "Worker Attendance Completed", "Worker attendance updated.", "info");
         }
-        res.json(checkOut);
+        res.json(mapped);
     }
     catch (error) {
         res.status(500).json({ error: "Failed helper checkout" });
@@ -389,7 +484,7 @@ router.post("/helpers/flat-checkin", auth_js_1.authenticateToken, async (req, re
             data: {
                 helperId,
                 helperName: worker?.name || "Helper",
-                date: new Date().toISOString().split("T")[0],
+                date: new Date().toLocaleDateString('en-CA'),
                 residentId,
                 residentName,
                 flatNumber,
@@ -447,9 +542,14 @@ router.post("/helpers/flat-complete", auth_js_1.authenticateToken, async (req, r
         return res.status(400).json({ error: "Helper ID, flat number, resident ID, and resident name are required" });
     }
     try {
-        const dateStr = new Date().toISOString().split("T")[0];
+        const dateStr = new Date().toLocaleDateString('en-CA');
         const helperProfile = await db_js_1.default.user.findUnique({ where: { id: helperId } });
         const helperName = helperProfile?.name || "Helper";
+        const todayLog = await db_js_1.default.helperAttendance.findFirst({
+            where: { helperId, date: dateStr }
+        });
+        const checkInTime = todayLog?.checkInTime ? new Date(todayLog.checkInTime) : new Date();
+        const duration = Math.max(1, Math.round((new Date().getTime() - checkInTime.getTime()) / (60 * 1000)));
         const flatAtt = await db_js_1.default.flatAttendance.create({
             data: {
                 helperId,
@@ -458,9 +558,9 @@ router.post("/helpers/flat-complete", auth_js_1.authenticateToken, async (req, r
                 residentId,
                 residentName,
                 flatNumber,
-                checkInTime: new Date(),
+                checkInTime,
                 checkOutTime: new Date(),
-                duration: 0,
+                duration,
                 servicePerformed: servicePerformed || "Service",
                 status: "completed",
                 notes: notes || null,
@@ -469,11 +569,11 @@ router.post("/helpers/flat-complete", auth_js_1.authenticateToken, async (req, r
         });
         (0, index_js_1.broadcastUpdate)("flat-attendance:update", flatAtt);
         // Send notifications
-        await sendInAppNotification(residentId, "Work Completed", `✔ ${helperName} completed today's work.`, "success");
-        await sendInAppNotification(helperId, "Flat Work Completed", "✔ Flat work completed.", "success");
+        await sendInAppNotification(residentId, "Work Completed", `${helperName} completed today's work.`, "success");
+        await sendInAppNotification(helperId, "Flat Work Completed", "Work completion saved.", "success");
         const secretaryUsers = await db_js_1.default.user.findMany({ where: { role: "secretary" } });
         for (const sec of secretaryUsers) {
-            await sendInAppNotification(sec.id, "Worker Assignment Completed", `Worker ${helperName} completed work in Flat ${flatNumber}.`, "info");
+            await sendInAppNotification(sec.id, "Worker Assignment Completed", "Worker completed assigned jobs.", "info");
         }
         res.status(201).json(flatAtt);
     }
@@ -495,17 +595,28 @@ router.get("/helpers/flat-attendance", auth_js_1.authenticateToken, async (req, 
 });
 router.get("/attendance", auth_js_1.authenticateToken, async (req, res) => {
     try {
-        const { role, unit } = req.user;
+        const { role, unit, id: userId } = req.user;
         let attendance;
         if (role === "secretary" || role === "security") {
             attendance = await db_js_1.default.helperAttendance.findMany();
         }
-        else {
+        else if (role === "worker") {
             attendance = await db_js_1.default.helperAttendance.findMany({
-                where: { assignedFlats: { has: unit } }
+                where: { helperId: userId }
             });
         }
-        res.json(attendance);
+        else {
+            attendance = await db_js_1.default.helperAttendance.findMany({
+                where: { assignedFlats: { has: unit || "" } }
+            });
+        }
+        const normalized = attendance.map((att) => ({
+            ...att,
+            workerId: att.helperId,
+            workerName: att.helperName,
+            workerCategory: att.category
+        }));
+        res.json(normalized);
     }
     catch (error) {
         res.status(500).json({ error: "Failed to fetch helper attendance" });
