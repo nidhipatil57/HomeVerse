@@ -378,7 +378,7 @@ router.put("/:id/rate", authenticateToken, async (req: any, res) => {
       const allComplaints = await prisma.complaint.findMany({
         where: { assignedToId: comp.assignedToId }
       });
-      const rated = allComplaints.filter(c => typeof c.resolvedAt !== "undefined" && c.id !== id);
+      const rated = allComplaints.filter(c => c.resolvedAt !== null && c.id !== id);
       const totalRatings = rated.length + 1;
       const sumRatings = rated.reduce((sum, r) => sum + 5, 0) + rating;
       const averageRating = sumRatings / totalRatings;

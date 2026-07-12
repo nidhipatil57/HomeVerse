@@ -38,6 +38,7 @@ async function main() {
   await prisma.favoriteVisitor.deleteMany();
   await prisma.helper.deleteMany();
   await prisma.helperAttendance.deleteMany();
+  await prisma.flatAttendance.deleteMany();
   await prisma.societyExpense.deleteMany();
 
   console.log("🌱 Fetching mock database seed records...");
@@ -490,6 +491,46 @@ async function main() {
   for (const a of mockAssignments) {
     await prisma.residentWorkerAssignment.create({
       data: a
+    });
+  }
+
+  console.log("🤝 Seeding Mock Helper Attendance...");
+  for (const att of db.attendance) {
+    await prisma.helperAttendance.create({
+      data: {
+        id: att.id,
+        helperId: att.helperId,
+        helperName: att.helperName,
+        category: att.category,
+        checkInTime: att.checkInTime ? new Date(att.checkInTime) : null,
+        checkOutTime: att.checkOutTime ? new Date(att.checkOutTime) : null,
+        date: att.date,
+        assignedFlats: att.assignedFlats,
+        entryGate: att.entryGate,
+        exitGate: att.exitGate,
+        status: att.checkOutTime ? "checked-out" : "checked-in",
+        duration: att.duration || null
+      }
+    });
+  }
+
+  console.log("🏠 Seeding Mock Flat Attendance...");
+  for (const flatAtt of db.flatAttendance) {
+    await prisma.flatAttendance.create({
+      data: {
+        id: flatAtt.id,
+        helperId: flatAtt.helperId,
+        helperName: flatAtt.helperName,
+        date: flatAtt.date,
+        residentId: flatAtt.residentId,
+        residentName: flatAtt.residentName,
+        flatNumber: flatAtt.flatNumber,
+        checkInTime: new Date(flatAtt.checkInTime),
+        checkOutTime: flatAtt.checkOutTime ? new Date(flatAtt.checkOutTime) : null,
+        duration: flatAtt.duration || null,
+        servicePerformed: flatAtt.servicePerformed,
+        status: flatAtt.status
+      }
     });
   }
 

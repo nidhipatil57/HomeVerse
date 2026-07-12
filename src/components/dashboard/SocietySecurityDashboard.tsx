@@ -23,7 +23,8 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
     vehicleLogs, logVehicleEntry, logVehicleExit,
     incidents, addIncidentReport,
     announcements, addAnnouncement,
-    users, complaints, updateComplaintStatus
+    users, complaints, updateComplaintStatus,
+    helpers, attendance, checkInHelper, checkOutHelper
   } = useCommunityStore(
     useShallow((state) => ({
       visitors: state.visitors,
@@ -49,7 +50,11 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
       addAnnouncement: state.addAnnouncement,
       users: state.users,
       complaints: state.complaints,
-      updateComplaintStatus: state.updateComplaintStatus
+      updateComplaintStatus: state.updateComplaintStatus,
+      helpers: state.helpers || [],
+      attendance: state.attendance || [],
+      checkInHelper: state.checkInHelper,
+      checkOutHelper: state.checkOutHelper
     }))
   );
 
@@ -776,8 +781,12 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
                 <CardDescription>Record entry/exit attendance logs for verified flats maids & cooks</CardDescription>
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto p-4 space-y-3">
-                {domesticWorkers.map(w => {
-                  const isInside = activeWorkers[w.id];
+                {helpers.map(w => {
+                  const todayStr = new Date().toISOString().split("T")[0];
+                  const todayLog = attendance.find(a => a.workerId === w.id && a.date === todayStr);
+                  const isInside = todayLog && !todayLog.checkOutTime;
+                  const isCheckedOut = todayLog && todayLog.checkOutTime;
+
                   return (
                     <div key={w.id} className="p-4 rounded-xl border border-border/60 bg-card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                       <div>
@@ -786,23 +795,40 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
                           <Badge variant="outline" className="text-[9px] uppercase px-1.5">{w.category}</Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Assigned Units: <span className="font-medium text-foreground">{w.assignedUnits.join(", ")}</span>
+                          Assigned Units: <span className="font-medium text-foreground">{w.assignedFlats?.join(", ") || "None"}</span>
                         </p>
-                        {isInside && (
+                        {isInside && todayLog?.checkInTime && (
                           <span className="text-[10px] text-green-500 font-semibold block mt-1 flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> Inside since {isInside}
+                            <Clock className="w-3 h-3" /> Inside since {new Date(todayLog.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({todayLog.entryGate})
+                          </span>
+                        )}
+                        {isCheckedOut && todayLog?.checkOutTime && (
+                          <span className="text-[10px] text-amber-500 font-semibold block mt-1 flex items-center gap-1">
+                            <LogOut className="w-3 h-3" /> Exited at {new Date(todayLog.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({todayLog.exitGate})
                           </span>
                         )}
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleWorkerGateAction(w.id, w.name, w.assignedUnits)}
-                        className={`rounded-xl px-3 py-1.5 h-9 font-semibold text-xs border-0 shrink-0 ${
-                          isInside ? "bg-red-600 hover:bg-red-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"
-                        }`}
-                      >
-                        {isInside ? "Mark Checkout" : "Mark Check-In"}
-                      </Button>
+                      {!isCheckedOut ? (
+                        <Button
+                          size="sm"
+                          onClick={async () => {
+                            if (isInside) {
+                              await checkOutHelper(todayLog.id, "Main Gate");
+                              alert(`Checked out ${w.name} from Main Gate.`);
+                            } else {
+                              await checkInHelper(w.id, w.name, w.category, "Main Gate", w.assignedFlats);
+                              alert(`Checked in ${w.name} through Main Gate.`);
+                            }
+                          }}
+                          className={`rounded-xl px-3 py-1.5 h-9 font-semibold text-xs border-0 shrink-0 ${
+                            isInside ? "bg-red-600 hover:bg-red-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"
+                          }`}
+                        >
+                          {isInside ? "Mark Checkout" : "Mark Check-In"}
+                        </Button>
+                      ) : (
+                        <Badge className="bg-gray-500/10 text-gray-500 border-gray-500/20 text-[9px] font-bold">Shift Finished</Badge>
+                      )}
                     </div>
                   );
                 })}

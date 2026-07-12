@@ -62,6 +62,7 @@ export default function VisitorsPage() {
     removeFavoriteVisitor,
     helpers,
     attendance,
+    flatAttendance,
     initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
@@ -78,6 +79,7 @@ export default function VisitorsPage() {
       removeFavoriteVisitor: state.removeFavoriteVisitor,
       helpers: state.helpers || [],
       attendance: state.attendance || [],
+      flatAttendance: state.flatAttendance || [],
       initializeDb: state.initializeDb,
     }))
   );
@@ -252,16 +254,35 @@ export default function VisitorsPage() {
         })()
       : "--";
 
+    // Two-level Attendance additions
+    const insideSocietyCount = todayAttendance.filter(a => !a.checkOutTime).length;
+    const currentlyWorkingCount = allH.filter(h => {
+      const hasCheckedIn = todayAttendance.some(a => a.workerId === h.id && !a.checkOutTime);
+      if (!hasCheckedIn) return false;
+      const completedFlatsToday = flatAttendance.filter(fa => fa.helperId === h.id && fa.date === todayStr && fa.status === "completed").length;
+      return completedFlatsToday < h.assignedFlats.length;
+    }).length;
+    const completedFlatVisits = flatAttendance.filter(fa => fa.date === todayStr && fa.status === "completed");
+    const avgFlatMins = completedFlatVisits.length > 0 
+      ? Math.round(completedFlatVisits.reduce((acc, curr) => acc + (curr.duration || 0), 0) / completedFlatVisits.length)
+      : 0;
+    const averageWorkingHours = avgFlatMins > 0 ? `${avgFlatMins} mins` : "--";
+    const attendancePercentage = allH.length > 0 ? Math.round((present / allH.length) * 100) : 0;
+
     return {
       presentCount: present,
       absentCount: allH.length - present,
       lateCount,
       avgArrivalTime: avgTimeStr,
+      insideSocietyCount,
+      currentlyWorkingCount,
+      averageWorkingHours,
+      attendancePercentage,
       lateList,
       pendingList,
       allReport
     };
-  }, [helpers, attendance]);
+  }, [helpers, attendance, flatAttendance]);
 
   // Filter visitors dynamically based on role
   const myVisitors = visitors.filter((v) => {
@@ -868,10 +889,10 @@ export default function VisitorsPage() {
               {/* Worker Stats Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Workers Checked In", value: workerStats.presentCount, icon: LogIn, color: "#10b981" },
-                  { label: "Absent / Not Arrived", value: workerStats.absentCount, icon: UserX, color: "#6b7280" },
-                  { label: "Late Arrivals Today", value: workerStats.lateCount, icon: AlertTriangle, color: "#f59e0b" },
-                  { label: "Average Arrival Time", value: workerStats.avgArrivalTime, icon: Clock, color: "#6366f1" },
+                  { label: "Today's Attendance", value: `${workerStats.presentCount} (${workerStats.attendancePercentage}%)`, icon: LogIn, color: "#10b981" },
+                  { label: "Workers Inside Society", value: workerStats.insideSocietyCount, icon: Users, color: "#6366f1" },
+                  { label: "Workers Currently Working", value: workerStats.currentlyWorkingCount, icon: Activity, color: "#f59e0b" },
+                  { label: "Average Working Time", value: workerStats.averageWorkingHours, icon: Clock, color: "#a855f7" },
                 ].map((s) => (
                   <Card key={s.label} className="border-border/50 bg-card">
                     <CardContent className="p-4 flex items-center gap-3">

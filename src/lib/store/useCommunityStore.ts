@@ -172,6 +172,7 @@ interface CommunityState {
   favorites: Visitor[];
   helpers: Helper[];
   attendance: HelperAttendance[];
+  flatAttendance: any[];
 
   initializeDb: () => void;
   saveDb: () => void;
@@ -207,6 +208,9 @@ interface CommunityState {
   deleteHelper: (id: string) => Promise<void>;
   checkInHelper: (workerId: string, workerName: string, category: string, gate: string, assignedFlats: string[]) => Promise<void>;
   checkOutHelper: (attendanceId: string, gate: string) => Promise<void>;
+  checkInFlatHelper: (helperId: string, flatNumber: string, residentId: string, residentName: string, servicePerformed: string) => Promise<void>;
+  checkOutFlatHelper: (flatAttendanceId: string) => Promise<void>;
+  completeFlatWork: (helperId: string, flatNumber: string, residentId: string, residentName: string, servicePerformed: string, notes?: string, photoUrl?: string) => Promise<void>;
 
   // Laundry Transactions
   bookLaundrySlot: (machineId: string, slot: string, date: string, studentId: string, studentName: string) => Promise<boolean>;
@@ -301,6 +305,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   favorites: [],
   helpers: [],
   attendance: [],
+  flatAttendance: [],
 
   initializeDb: () => {
     if (typeof window === "undefined") return;
@@ -315,6 +320,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           { key: "visitors", path: "/api/visitors" },
           { key: "helpers", path: "/api/visitors/helpers" },
           { key: "attendance", path: "/api/visitors/attendance" },
+          { key: "flatAttendance", path: "/api/visitors/helpers/flat-attendance" },
           { key: "favorites", path: "/api/visitors/favorites" },
           { key: "announcements", path: "/api/announcements" },
           { key: "leaveRequests", path: "/api/leaveRequests" },
@@ -341,7 +347,15 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           try {
             const res = await fetch(path);
             if (res.ok) {
-              const data = await res.json();
+              let data = await res.json();
+              if (key === "attendance" && Array.isArray(data)) {
+                data = data.map((att: any) => ({
+                  ...att,
+                  workerId: att.helperId || att.workerId,
+                  workerName: att.helperName || att.workerName,
+                  workerCategory: att.category || att.workerCategory
+                }));
+              }
               set({ [key]: data } as any);
             }
           } catch (e) {}
@@ -408,14 +422,32 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
 
     socket.on("attendance:update", (updated: any) => {
+      const normalized = {
+        ...updated,
+        workerId: updated.helperId || updated.workerId,
+        workerName: updated.helperName || updated.workerName,
+        workerCategory: updated.category || updated.workerCategory
+      };
       const current = get().attendance || [];
+      const index = current.findIndex(a => a.id === normalized.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = normalized;
+        set({ attendance: next });
+      } else {
+        set({ attendance: [normalized, ...current] });
+      }
+    });
+
+    socket.on("flat-attendance:update", (updated: any) => {
+      const current = get().flatAttendance || [];
       const index = current.findIndex(a => a.id === updated.id);
       if (index > -1) {
         const next = [...current];
         next[index] = updated;
-        set({ attendance: next });
+        set({ flatAttendance: next });
       } else {
-        set({ attendance: [updated, ...current] });
+        set({ flatAttendance: [updated, ...current] });
       }
     });
 
@@ -833,19 +865,90 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   checkInHelper: async (helperId, helperName, category, gate, assignedFlats) => {
-    await fetch("/api/visitors/helpers/checkin", {
+    const res = await fetch("/api/visitors/helpers/checkin", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ helperId, helperName, category, gate, assignedFlats })
     });
+    if (res.ok) {
+      const raw = await res.json();
+      const data = {
+        ...raw,
+        workerId: raw.helperId || raw.workerId,
+        workerName: raw.helperName || raw.workerName,
+        workerCategory: raw.category || raw.workerCategory
+      };
+      set(state => {
+        const filtered = state.attendance.filter(a => a.id !== data.id);
+        return { attendance: [...filtered, data] };
+      });
+    }
   },
 
   checkOutHelper: async (attendanceId, gate) => {
-    await fetch("/api/visitors/helpers/checkout", {
+    const res = await fetch("/api/visitors/helpers/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ attendanceId, gate })
     });
+    if (res.ok) {
+      const raw = await res.json();
+      const data = {
+        ...raw,
+        workerId: raw.helperId || raw.workerId,
+        workerName: raw.helperName || raw.workerName,
+        workerCategory: raw.category || raw.workerCategory
+      };
+      set(state => {
+        const filtered = state.attendance.filter(a => a.id !== data.id);
+        return { attendance: [...filtered, data] };
+      });
+    }
+  },
+
+  checkInFlatHelper: async (helperId, flatNumber, residentId, residentName, servicePerformed) => {
+    const res = await fetch("/api/visitors/helpers/flat-checkin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ helperId, flatNumber, residentId, residentName, servicePerformed })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      set(state => {
+        const filtered = state.flatAttendance.filter(fa => fa.id !== data.id);
+        return { flatAttendance: [...filtered, data] };
+      });
+    }
+  },
+
+  checkOutFlatHelper: async (flatAttendanceId) => {
+    const res = await fetch("/api/visitors/helpers/flat-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ flatAttendanceId })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      set(state => {
+        const filtered = state.flatAttendance.filter(fa => fa.id !== data.id);
+        return { flatAttendance: [...filtered, data] };
+      });
+    }
+  },
+
+  completeFlatWork: async (helperId, flatNumber, residentId, residentName, servicePerformed, notes, photoUrl) => {
+    const res = await fetch("/api/visitors/helpers/flat-complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ helperId, flatNumber, residentId, residentName, servicePerformed, notes, photoUrl })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      set(state => {
+        const filtered = state.flatAttendance.filter(fa => fa.id !== data.id);
+        return { flatAttendance: [...filtered, data] };
+      });
+    }
   },
 
   bookLaundrySlot: async (machineId, slot, date, studentId, studentName) => {

@@ -10,14 +10,23 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { useShallow } from "zustand/react/shallow";
 import type { Helper, HelperAttendance } from "@/types";
 
 export function SocietyWorkerDashboard({ worker }: { worker: any }) {
   const {
-    complaints, updateComplaintStatus, assignComplaintWorker,
-    helpers, attendance, checkInHelper, checkOutHelper, initializeDb
+    complaints,
+    updateComplaintStatus,
+    assignComplaintWorker,
+    helpers,
+    attendance,
+    flatAttendance,
+    checkInHelper,
+    checkOutHelper,
+    completeFlatWork,
+    initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
       complaints: state.complaints,
@@ -25,8 +34,10 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
       assignComplaintWorker: state.assignComplaintWorker,
       helpers: state.helpers || [],
       attendance: state.attendance || [],
+      flatAttendance: state.flatAttendance || [],
       checkInHelper: state.checkInHelper,
       checkOutHelper: state.checkOutHelper,
+      completeFlatWork: state.completeFlatWork,
       initializeDb: state.initializeDb,
     }))
   );
@@ -38,8 +49,10 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
 
   // Daily helper states
-  const [showGateModal, setShowGateModal] = useState(false);
-  const [gateAction, setGateAction] = useState<"check-in" | "check-out">("check-in");
+  const [flatWorkModalOpen, setFlatWorkModalOpen] = useState(false);
+  const [selectedWorkFlat, setSelectedWorkFlat] = useState<any | null>(null);
+  const [flatWorkNotes, setFlatWorkNotes] = useState("");
+  const [flatWorkPhoto, setFlatWorkPhoto] = useState("");
 
   useEffect(() => {
     initializeDb();
@@ -79,6 +92,13 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
     return attendance.find((a) => a.workerId === helperProfile.id && a.date === todayStr);
   }, [attendance, helperProfile]);
 
+  // Today's flat logs
+  const todayFlatLogs = useMemo(() => {
+    if (!helperProfile) return [];
+    const todayStr = new Date().toISOString().split("T")[0];
+    return flatAttendance.filter((fa: any) => fa.helperId === helperProfile.id && fa.date === todayStr);
+  }, [flatAttendance, helperProfile]);
+
   // Work Schedule time slots
   const workSchedule = useMemo(() => {
     if (!helperProfile) return [];
@@ -87,6 +107,7 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
     return helperProfile.assignedFlats.map((flat, index) => ({
       flat,
       resident: helperProfile.assignedResidents[index] || "Resident",
+      residentId: helperProfile.residentIds[index] || "user-resident-1",
       time: timeSlots[index % timeSlots.length],
       activity: activities[index % activities.length]
     }));
@@ -97,6 +118,53 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
     if (!helperProfile) return [];
     return attendance.filter((a) => a.workerId === helperProfile.id && a.id !== todayLog?.id).slice(-5);
   }, [attendance, helperProfile, todayLog]);
+
+  // Check if all assigned flats are completed today
+  const allFlatsCompleted = useMemo(() => {
+    if (workSchedule.length === 0) return false;
+    return workSchedule.every(task => {
+      const log = todayFlatLogs.find((fa: any) => fa.flatNumber === task.flat);
+      return log && log.status === "completed";
+    });
+  }, [workSchedule, todayFlatLogs]);
+
+  // Computed Status Text
+  const currentStatusText = useMemo(() => {
+    if (!todayLog) return "Not Checked Into Society";
+    if (todayLog.checkOutTime) return "Checked Out Of Society";
+    
+    const activeFlat = todayFlatLogs.find((fa: any) => fa.status === "working");
+    if (activeFlat) return `Working at Flat ${activeFlat.flatNumber}`;
+    
+    if (allFlatsCompleted) return "Completed Today's Work";
+    
+    const completedCount = todayFlatLogs.filter((fa: any) => fa.status === "completed").length;
+    if (completedCount > 0) return "Travelling to Next Flat";
+    
+    return "Inside Society";
+  }, [todayLog, todayFlatLogs, allFlatsCompleted]);
+
+  const handleCompleteFlatWork = async () => {
+    if (!helperProfile || !selectedWorkFlat) return;
+    try {
+      await completeFlatWork(
+        helperProfile.id,
+        selectedWorkFlat.flat,
+        selectedWorkFlat.residentId,
+        selectedWorkFlat.resident,
+        selectedWorkFlat.activity,
+        flatWorkNotes,
+        flatWorkPhoto || undefined
+      );
+      setFlatWorkModalOpen(false);
+      setSelectedWorkFlat(null);
+      setFlatWorkNotes("");
+      setFlatWorkPhoto("");
+      alert(`Work completion successfully logged for Flat ${selectedWorkFlat.flat}.`);
+    } catch (e) {
+      console.error("Flat completion failed:", e);
+    }
+  };
 
   // Filter specialized jobs for worker
   const mySpecializedJobs = complaints.filter(
@@ -193,39 +261,41 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
           </Badge>
           <Badge className="bg-green-500/15 text-green-500 border border-green-500/20 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            On Duty
+            Status: {currentStatusText}
           </Badge>
         </div>
       </motion.div>
 
-      {/* GATE SELECTION DIALOG */}
-      <Dialog open={showGateModal} onOpenChange={setShowGateModal}>
+      {/* FLAT WORK COMPLETION DIALOG */}
+      <Dialog open={flatWorkModalOpen} onOpenChange={setFlatWorkModalOpen}>
         <DialogContent className="sm:max-w-xs rounded-2xl p-5">
           <DialogHeader>
-            <DialogTitle className="font-[family-name:var(--font-heading)] text-sm">Select Verification Gate</DialogTitle>
+            <DialogTitle className="font-[family-name:var(--font-heading)] text-sm">Mark Work Completed</DialogTitle>
+            <CardDescription className="text-[10px] mt-1">Add optional notes and completion photo for Flat {selectedWorkFlat?.flat}</CardDescription>
           </DialogHeader>
-          <div className="grid gap-2 mt-3">
-            {["Main Gate", "Tower A Gate", "Tower B Gate", "North Gate", "South Gate"].map((gate) => (
-              <Button
-                key={gate}
-                onClick={async () => {
-                  if (gateAction === "check-in") {
-                    if (helperProfile) {
-                      await checkInHelper(helperProfile.id, helperProfile.name, helperProfile.category, gate, helperProfile.assignedFlats);
-                    }
-                  } else {
-                    if (todayLog) {
-                      await checkOutHelper(todayLog.id, gate);
-                    }
-                  }
-                  setShowGateModal(false);
-                  alert(`${gateAction === "check-in" ? "Check In" : "Check Out"} logged at ${gate}.`);
-                }}
-                className="h-10 text-xs bg-secondary/20 hover:bg-secondary/40 text-foreground border border-border/40 rounded-xl"
-              >
-                {gate}
-              </Button>
-            ))}
+          <div className="space-y-3 mt-3">
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground block mb-1">Completion Notes</label>
+              <textarea
+                value={flatWorkNotes}
+                onChange={(e: any) => setFlatWorkNotes(e.target.value)}
+                placeholder="Optional notes e.g., watered plants, key under mat"
+                className="w-full h-20 p-2.5 border rounded-xl text-xs bg-card resize-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground block mb-1">Completion Photo URL</label>
+              <Input
+                value={flatWorkPhoto}
+                onChange={(e: any) => setFlatWorkPhoto(e.target.value)}
+                placeholder="Optional photo URL"
+                className="h-9 text-xs rounded-xl"
+              />
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="ghost" onClick={() => setFlatWorkModalOpen(false)} className="rounded-xl text-xs h-9 font-bold">Cancel</Button>
+              <Button onClick={handleCompleteFlatWork} className="bg-green-600 hover:bg-green-700 text-white border-0 rounded-xl text-xs h-9 font-bold">Submit Completion</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -249,48 +319,28 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
                   <Badge className="bg-primary/10 text-primary border-primary/20 font-bold">{helperProfile.assignedFlats.length} Flats</Badge>
                 </div>
 
-                {!todayLog ? (
-                  <div className="space-y-3">
-                    <p className="text-muted-foreground text-[11px] font-medium leading-relaxed">
-                      You have not checked in yet today. Tap below to log entry through your entry gate.
-                    </p>
-                    <Button
-                      onClick={() => {
-                        setGateAction("check-in");
-                        setShowGateModal(true);
-                      }}
-                      className="w-full h-11 bg-green-600 hover:bg-green-700 text-white border-0 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-1.5"
-                    >
-                      <LogIn className="w-4 h-4" /> Tap to Check In Entry
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-xl text-green-700 font-semibold space-y-1">
-                      <p className="flex items-center gap-1"><Check className="w-4 h-4" /> Duty Checked In</p>
-                      <p className="text-[10px] text-foreground/80 font-medium">Arrived at: {new Date(todayLog.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Gate: {todayLog.entryGate}</p>
-                      {todayLog.status === "late" && <p className="text-[10px] text-amber-600 font-bold">⚠️ Late Arrival Logged</p>}
+                <div className="space-y-4">
+                  <h4 className="font-bold text-foreground text-[10px] uppercase tracking-wider text-muted-foreground">Today&apos;s Attendance</h4>
+                  {!todayLog ? (
+                    <div className="p-3 bg-secondary/20 border border-border/60 rounded-xl text-muted-foreground font-semibold space-y-1">
+                      <p className="flex items-center gap-1"><Clock className="w-4 h-4 text-gray-400" /> Expected shift has not started yet.</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">Status: Not arrived at gate.</p>
                     </div>
-
-                    {!todayLog.checkOutTime ? (
-                      <Button
-                        onClick={() => {
-                          setGateAction("check-out");
-                          setShowGateModal(true);
-                        }}
-                        className="w-full h-11 bg-amber-600 hover:bg-amber-700 text-white border-0 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-1.5"
-                      >
-                        <LogOut className="w-4 h-4" /> Tap to Check Out Exit
-                      </Button>
-                    ) : (
-                      <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-700 font-semibold space-y-1">
-                        <p className="flex items-center gap-1"><Check className="w-4 h-4" /> Duty Checked Out</p>
-                        <p className="text-[10px] text-foreground/80 font-medium">Exited at: {new Date(todayLog.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Gate: {todayLog.exitGate}</p>
-                        <p className="text-[10px] text-muted-foreground font-medium">Duration: {todayLog.duration} mins inside complex</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  ) : todayLog.checkOutTime ? (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-700 font-semibold space-y-1">
+                      <p className="flex items-center gap-1"><Check className="w-4 h-4" /> Checked Out of Society</p>
+                      <p className="text-[10px] text-foreground/80 font-medium">Exited at: {new Date(todayLog.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Gate: {todayLog.exitGate}</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">Recorded by Security</p>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-xl text-green-700 font-semibold space-y-1">
+                      <p className="flex items-center gap-1"><Check className="w-4 h-4" /> Checked Into Society</p>
+                      <p className="text-[10px] text-foreground/80 font-medium">Arrived at: {new Date(todayLog.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Gate: {todayLog.entryGate}</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">Recorded by Security</p>
+                      <p className="text-[10px] text-green-600 font-bold mt-1">Status: Inside Society</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -303,18 +353,60 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
                 <CardDescription className="text-[10px]">Your routing checklist for household services</CardDescription>
               </CardHeader>
               <CardContent className="p-4 flex-1 overflow-y-auto space-y-3">
-                {workSchedule.map((task, i) => (
-                  <div key={i} className="p-3 border border-border bg-secondary/5 rounded-2xl flex items-center justify-between text-xs transition-all hover:bg-secondary/15">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-extrabold text-foreground text-sm">Flat {task.flat}</span>
-                        <Badge className="bg-primary/10 text-primary border-primary/20 text-[9px] font-bold">{task.activity}</Badge>
+                {workSchedule.map((task, idx) => {
+                  const flatLog = todayFlatLogs.find((fa: any) => fa.flatNumber === task.flat && fa.status === "completed");
+                  const isSocietyInside = todayLog && !todayLog.checkOutTime;
+                  const isEnabled = isSocietyInside && !flatLog;
+
+                  return (
+                    <div key={idx} className="p-3.5 border border-border bg-secondary/5 rounded-2xl flex flex-col gap-2.5 text-xs transition-all hover:bg-secondary/15">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-extrabold text-foreground text-sm">Flat {task.flat}</span>
+                            <Badge className="bg-primary/10 text-primary border-primary/20 text-[9px] font-bold">{task.activity}</Badge>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-medium">Resident: {task.resident}</p>
+                        </div>
+                        <span className="font-bold text-foreground bg-secondary/20 px-2.5 py-1 rounded-lg text-[10px]">{task.time}</span>
                       </div>
-                      <p className="text-[10px] text-muted-foreground font-medium">Resident: {task.resident}</p>
+
+                      {!flatLog ? (
+                        <div className="flex items-center justify-between mt-1">
+                          <span className={`text-[10px] font-bold ${isSocietyInside ? "text-green-600" : "text-muted-foreground"}`}>
+                            {isSocietyInside ? "📋 Work Pending" : "🔒 Checked out or not arrived"}
+                          </span>
+                          <Button
+                            onClick={() => {
+                              setSelectedWorkFlat(task);
+                              setFlatWorkNotes("");
+                              setFlatWorkPhoto("");
+                              setFlatWorkModalOpen(true);
+                            }}
+                            disabled={!isEnabled}
+                            className={`h-8 text-[10px] font-bold px-4 rounded-lg flex items-center gap-1 border-0 ${
+                              isEnabled ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer" : "bg-gray-400 text-white cursor-not-allowed"
+                            }`}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Mark Completed
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 bg-green-500/10 border border-green-500/20 rounded-xl text-green-700 text-[10px] space-y-1">
+                          <p className="font-bold flex items-center gap-1">✔ Work Completed</p>
+                          {flatLog.checkOutTime && (
+                            <p className="text-foreground/80 font-medium">
+                              Completed at: {new Date(flatLog.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          )}
+                          {flatLog.notes && (
+                            <p className="text-[9px] text-muted-foreground italic font-semibold">Notes: &quot;{flatLog.notes}&quot;</p>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <span className="font-bold text-foreground bg-secondary/20 px-2.5 py-1 rounded-lg text-[10px]">{task.time}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </CardContent>
             </Card>
           </div>
@@ -330,21 +422,43 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
                 {historyLogs.length === 0 ? (
                   <p className="text-[10px] text-muted-foreground italic py-8 text-center">No past attendance logged.</p>
                 ) : (
-                  historyLogs.map((log) => (
-                    <div key={log.id} className="p-2.5 border border-border/40 bg-secondary/5 rounded-xl flex justify-between items-center text-[10px] font-semibold">
-                      <div>
-                        <span className="font-bold text-foreground">{log.date}</span>
-                        <span className={`ml-2 text-[9px] px-1.5 py-0.5 rounded border ${
-                          log.status === "late" 
-                            ? "bg-amber-500/10 text-amber-600 border-amber-500/20" 
-                            : "bg-green-500/10 text-green-600 border-green-500/20"
-                        }`}>{log.status === "late" ? "Late" : "Present"}</span>
+                  historyLogs.map((log) => {
+                    const dayFlatLogs = flatAttendance.filter((fa: any) => fa.helperId === helperProfile.id && fa.date === log.date);
+                    return (
+                      <div key={log.id} className="p-3 border border-border/40 bg-secondary/5 rounded-2xl space-y-2 text-[10px] font-semibold">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="font-bold text-foreground">{log.date}</span>
+                            <span className={`ml-2 text-[9px] px-1.5 py-0.5 rounded border ${
+                              log.status === "late" 
+                                ? "bg-amber-500/10 text-amber-600 border-amber-500/20" 
+                                : "bg-green-500/10 text-green-600 border-green-500/20"
+                            }`}>{log.status === "late" ? "Late" : "Present"}</span>
+                          </div>
+                          <div className="text-muted-foreground">
+                            Society In: {log.checkInTime ? new Date(log.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                          </div>
+                        </div>
+                        {dayFlatLogs.length > 0 && (
+                          <div className="pl-2.5 border-l border-border space-y-1 text-[9px] text-muted-foreground font-medium">
+                            {dayFlatLogs.map((fl: any, flIdx: number) => (
+                              <div key={flIdx} className="flex justify-between">
+                                <span>Flat {fl.flatNumber} ({fl.servicePerformed})</span>
+                                <span>
+                                  {fl.checkInTime ? new Date(fl.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"} 
+                                  ➔ 
+                                  {fl.checkOutTime ? new Date(fl.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="text-right text-[9px] text-muted-foreground/80 font-medium">
+                          Society Out: {log.checkOutTime ? new Date(log.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Inside"}
+                        </div>
                       </div>
-                      <div className="text-muted-foreground">
-                        In: {new Date(log.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({log.entryGate})
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </CardContent>
             </Card>
