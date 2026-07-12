@@ -28,78 +28,18 @@ export default function SecurityHelpersEntryPage() {
 
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedGate, setSelectedGate] = useState("Main Gate");
-
-  // Gate actions state
-  const [showGateModal, setShowGateModal] = useState(false);
-  const [gateAction, setGateAction] = useState<"check-in" | "check-out">("check-in");
-  const [selectedHelper, setSelectedHelper] = useState<Helper | null>(null);
-  const [selectedAttendanceId, setSelectedAttendanceId] = useState<string>("");
 
   useEffect(() => {
     initializeDb();
     setMounted(true);
   }, [initializeDb]);
 
-  // Merge default helpers with Firestore data so it's always populated for testing
+  // Read from helpers store data directly
   const allHelpers = useMemo(() => {
-    // Standard seeded helpers
-    const defaultMaids: Helper[] = [
-      {
-        id: "user-worker-8",
-        name: "Sunita Patil",
-        category: "Cooking + Cleaning",
-        phone: "+91 87654 32118",
-        workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        expectedArrival: "08:30 AM",
-        expectedExit: "11:30 AM",
-        assignedFlats: ["A-204", "A-302", "C-201"],
-        assignedResidents: ["Sara Shah", "Rahul Mehta", "Priya Desai"],
-        residentIds: ["user-resident-1", "user-resident-6", "user-resident-9"],
-        joinedAt: new Date().toISOString(),
-        portal: "society"
-      },
-      {
-        id: "dw-1",
-        name: "Kamla Bai",
-        category: "Maid",
-        phone: "+91 91000 20001",
-        workingDays: ["Monday", "Wednesday", "Friday"],
-        expectedArrival: "09:00 AM",
-        expectedExit: "12:00 PM",
-        assignedFlats: ["A-301", "B-102"],
-        assignedResidents: ["Nidhi Rao", "Karan Johar"],
-        residentIds: ["user-resident-3", "user-resident-2"],
-        joinedAt: new Date().toISOString(),
-        portal: "society"
-      },
-      {
-        id: "dw-2",
-        name: "Shankar Kumar",
-        category: "Cook",
-        phone: "+91 91000 20002",
-        workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        expectedArrival: "07:30 AM",
-        expectedExit: "10:30 AM",
-        assignedFlats: ["A-301", "C-504"],
-        assignedResidents: ["Nidhi Rao", "Vikram Sen"],
-        residentIds: ["user-resident-3", "user-resident-10"],
-        joinedAt: new Date().toISOString(),
-        portal: "society"
-      }
-    ];
-
-    const merged = [...helpers];
-    defaultMaids.forEach(dm => {
-      if (!merged.some(h => h.id === dm.id)) {
-        merged.push(dm);
-      }
-    });
-
-    return merged;
+    return helpers;
   }, [helpers]);
 
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayStr = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
 
   // Filter lists based on search
   const filteredHelpers = useMemo(() => {
@@ -117,29 +57,14 @@ export default function SecurityHelpersEntryPage() {
 
   if (!mounted || !user) return null;
 
-  const triggerCheckIn = (helper: Helper) => {
-    setSelectedHelper(helper);
-    setGateAction("check-in");
-    setShowGateModal(true);
+  const triggerCheckIn = async (helper: Helper) => {
+    await checkInHelper(helper.id, helper.name, helper.category, "Society Gate", helper.assignedFlats);
+    alert(`${helper.name} entry registered successfully.`);
   };
 
-  const triggerCheckOut = (attId: string, helperName: string) => {
-    setSelectedAttendanceId(attId);
-    setSelectedHelper({ name: helperName } as any);
-    setGateAction("check-out");
-    setShowGateModal(true);
-  };
-
-  const executeGateAction = async (gate: string) => {
-    if (gateAction === "check-in") {
-      if (selectedHelper) {
-        await checkInHelper(selectedHelper.id, selectedHelper.name, selectedHelper.category, gate, selectedHelper.assignedFlats);
-      }
-    } else {
-      await checkOutHelper(selectedAttendanceId, gate);
-    }
-    setShowGateModal(false);
-    alert(`${gateAction === "check-in" ? "Entry" : "Exit"} registered at ${gate}.`);
+  const triggerCheckOut = async (attId: string, helperName: string) => {
+    await checkOutHelper(attId, "Society Gate");
+    alert(`${helperName} exit registered successfully.`);
   };
 
   return (
@@ -253,26 +178,7 @@ export default function SecurityHelpersEntryPage() {
         </div>
       </div>
 
-      {/* GATE VERIFICATION SELECTION DIALOG */}
-      <Dialog open={showGateModal} onOpenChange={setShowGateModal}>
-        <DialogContent className="sm:max-w-xs rounded-2xl p-5">
-          <DialogHeader>
-            <DialogTitle className="font-[family-name:var(--font-heading)] text-sm">Verify Gate Selection</DialogTitle>
-            <CardDescription className="text-[10px] mt-1">Select the gate where {selectedHelper?.name} is passing</CardDescription>
-          </DialogHeader>
-          <div className="grid gap-2 mt-3">
-            {["Main Gate", "Tower A Gate", "Tower B Gate", "North Gate", "South Gate"].map((gate) => (
-              <Button
-                key={gate}
-                onClick={() => executeGateAction(gate)}
-                className="h-10 text-xs bg-secondary/20 hover:bg-secondary/40 text-foreground border border-border/40 rounded-xl font-bold"
-              >
-                {gate}
-              </Button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }

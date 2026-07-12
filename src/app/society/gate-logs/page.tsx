@@ -67,8 +67,8 @@ export default function SecurityGateLogsPage() {
   };
 
   const filteredPasses = gatePasses.filter(p => 
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.assignedResident.toLowerCase().includes(search.toLowerCase())
+    (p.name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.assignedResident || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
