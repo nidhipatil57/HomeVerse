@@ -309,8 +309,6 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
   initializeDb: () => {
     if (typeof window === "undefined") return;
-    if ((globalThis as any).__homeverse_listeners_active) return;
-    (globalThis as any).__homeverse_listeners_active = true;
 
     // 1. Initial REST state fetch
     const fetchInitialState = async () => {
@@ -367,7 +365,10 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
     fetchInitialState();
 
-    // 2. Establish Real-Time WebSocket Connection
+    // 2. Establish Real-Time WebSocket Connection (Only once)
+    if ((globalThis as any).__homeverse_listeners_active) return;
+    (globalThis as any).__homeverse_listeners_active = true;
+
     const socket = io("http://localhost:5000", {
       path: "/socket.io",
       transports: ["websocket", "polling"],
