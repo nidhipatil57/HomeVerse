@@ -465,7 +465,7 @@ async function main() {
     {
       residentId: "user-resident-1",
       workerId: "user-worker-8",
-      workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+      workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
       arrivalTime: "08:30 AM",
       exitTime: "11:30 AM",
       services: ["Cooking", "Cleaning"]
@@ -473,7 +473,7 @@ async function main() {
     {
       residentId: "user-resident-6",
       workerId: "user-worker-8",
-      workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+      workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
       arrivalTime: "09:30 AM",
       exitTime: "10:30 AM",
       services: ["Cleaning"]
@@ -481,7 +481,7 @@ async function main() {
     {
       residentId: "user-resident-9",
       workerId: "user-worker-8",
-      workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+      workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
       arrivalTime: "10:30 AM",
       exitTime: "11:15 AM",
       services: ["Laundry"]

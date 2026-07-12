@@ -138,9 +138,9 @@ router.get("/helpers", authenticateToken, async (req: any, res) => {
         expectedArrival: first.arrivalTime,
         expectedExit: first.exitTime,
         workingDays: first.workingDays,
-        assignedFlats: assignments.map(a => a.resident.unit || "A-204"),
-        assignedResidents: assignments.map(a => a.resident.name),
-        residentIds: assignments.map(a => a.resident.id),
+        assignedFlats: assignments.map((a: any) => a.resident.unit || "A-204"),
+        assignedResidents: assignments.map((a: any) => a.resident.name),
+        residentIds: assignments.map((a: any) => a.resident.id),
         portal: "society"
       };
 
@@ -153,7 +153,7 @@ router.get("/helpers", authenticateToken, async (req: any, res) => {
         include: { worker: true, resident: true }
       });
 
-      const formatted = assignments.map(a => ({
+      const formatted = assignments.map((a: any) => ({
         id: a.worker.id,
         name: a.worker.name,
         phone: a.worker.phone,
@@ -171,27 +171,55 @@ router.get("/helpers", authenticateToken, async (req: any, res) => {
       return res.json(formatted);
     }
 
-    // For secretary/security/others, return all helper assignments
+    // For secretary/security/others, return all helper assignments expected today
     const allAssignments = await prisma.residentWorkerAssignment.findMany({
       include: { worker: true, resident: true }
     });
 
-    const formattedAll = allAssignments.map(a => ({
-      id: a.worker.id,
-      name: a.worker.name,
-      phone: a.worker.phone,
-      category: a.services.join(" + ") || a.worker.workerCategory || "Maid",
-      expectedArrival: a.arrivalTime,
-      expectedExit: a.exitTime,
-      workingDays: a.workingDays,
-      assignedFlats: [a.resident.unit || "A-204"],
-      assignedResidents: [a.resident.name],
-      residentIds: [a.resident.id],
-      joinedAt: a.createdAt.toISOString(),
-      portal: "society"
-    }));
+    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    const grouped: { [key: string]: any } = {};
 
-    res.json(formattedAll);
+    for (const a of allAssignments) {
+      if (!a.worker) continue;
+
+      // Filter by today's day of week for security/secretary
+      if (role === "security" || role === "secretary") {
+        if (!a.workingDays.includes(todayStr)) {
+          continue;
+        }
+      }
+
+      const wId = a.worker.id;
+      if (!grouped[wId]) {
+        grouped[wId] = {
+          id: wId,
+          name: a.worker.name,
+          phone: a.worker.phone,
+          category: a.services.join(" + ") || a.worker.workerCategory || "Maid",
+          expectedArrival: a.arrivalTime,
+          expectedExit: a.exitTime,
+          workingDays: a.workingDays,
+          assignedFlats: [a.resident.unit || "A-204"],
+          assignedResidents: [a.resident.name],
+          residentIds: [a.resident.id],
+          joinedAt: a.createdAt.toISOString(),
+          portal: "society"
+        };
+      } else {
+        const flat = a.resident.unit || "A-204";
+        if (!grouped[wId].assignedFlats.includes(flat)) {
+          grouped[wId].assignedFlats.push(flat);
+        }
+        if (!grouped[wId].assignedResidents.includes(a.resident.name)) {
+          grouped[wId].assignedResidents.push(a.resident.name);
+        }
+        if (!grouped[wId].residentIds.includes(a.resident.id)) {
+          grouped[wId].residentIds.push(a.resident.id);
+        }
+      }
+    }
+
+    res.json(Object.values(grouped));
   } catch (error) {
     console.error("Error fetching helpers:", error);
     res.status(500).json({ error: "Failed to fetch helpers" });
@@ -240,23 +268,29 @@ router.post("/helpers", authenticateToken, async (req: any, res) => {
       });
     }
 
-    const formattedHelper = {
-      id: workerRecord.id,
-      name: workerRecord.name,
-      phone: workerRecord.phone,
-      category: services?.join(" + ") || category || workerRecord.workerCategory || "Maid",
-      expectedArrival: expectedArrivalTime || "08:30 AM",
-      expectedExit: expectedExitTime || "11:30 AM",
-      workingDays: workingDays || ["Monday", "Wednesday", "Friday"],
-      assignedFlats: [residentRecord.unit || "A-204"],
-      assignedResidents: [residentRecord.name],
-      residentIds: [residentRecord.id],
+    const allAssignmentsForWorker = await prisma.residentWorkerAssignment.findMany({
+      where: { workerId: targetWorkerId },
+      include: { worker: true, resident: true }
+    });
+
+    const first = allAssignmentsForWorker[0];
+    const groupedHelper = {
+      id: targetWorkerId,
+      name: first.worker.name,
+      phone: first.worker.phone,
+      category: first.services.join(" + ") || first.worker.workerCategory || "Maid",
+      expectedArrival: first.arrivalTime,
+      expectedExit: first.exitTime,
+      workingDays: first.workingDays,
+      assignedFlats: allAssignmentsForWorker.map((a: any) => a.resident.unit || "A-204"),
+      assignedResidents: allAssignmentsForWorker.map((a: any) => a.resident.name),
+      residentIds: allAssignmentsForWorker.map((a: any) => a.resident.id),
       joinedAt: assignment.createdAt.toISOString(),
       portal: "society"
     };
 
-    broadcastUpdate("helper:update", formattedHelper);
-    res.status(201).json(formattedHelper);
+    broadcastUpdate("helper:update", groupedHelper);
+    res.status(201).json(groupedHelper);
   } catch (error) {
     console.error("Failed to assign helper:", error);
     res.status(500).json({ error: "Failed to assign helper" });
@@ -307,50 +341,83 @@ router.post("/helpers/checkin", authenticateToken, async (req: any, res) => {
   }
 
   try {
-    const attendanceId = `ATT-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
-    const dateStr = new Date().toISOString().split("T")[0];
+    const dateStr = new Date().toLocaleDateString('en-CA');
 
-    const checkIn = await prisma.helperAttendance.create({
-      data: {
-        id: attendanceId,
-        helperId,
-        helperName,
-        category,
-        checkInTime: new Date(),
-        date: dateStr,
-        assignedFlats: assignedFlats || [],
-        entryGate: gate || "Main Gate",
-        status: "checked-in"
-      }
+    // 1. Validate worker exists
+    const worker = await prisma.user.findFirst({
+      where: { id: helperId, role: "worker" }
+    });
+    if (!worker) {
+      return res.status(400).json({ error: "Worker not found in system roster" });
+    }
+
+    // 2. Validate worker assigned to at least one resident
+    const assignments = await prisma.residentWorkerAssignment.findMany({
+      where: { workerId: helperId },
+      include: { resident: true }
+    });
+    if (assignments.length === 0) {
+      return res.status(400).json({ error: "Worker is not assigned to any resident flat" });
+    }
+    const flats = assignments.map((a: any) => a.resident.unit || "A-204");
+
+    // 3. Check today's attendance record (ensure single record per date)
+    let attendanceRecord = await prisma.helperAttendance.findFirst({
+      where: { helperId, date: dateStr }
     });
 
+    if (attendanceRecord) {
+      attendanceRecord = await prisma.helperAttendance.update({
+        where: { id: attendanceRecord.id },
+        data: {
+          checkInTime: new Date(),
+          entryGate: gate || "Society Gate",
+          status: "Inside Society",
+          assignedFlats: flats
+        }
+      });
+    } else {
+      const attendanceId = `ATT-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+      attendanceRecord = await prisma.helperAttendance.create({
+        data: {
+          id: attendanceId,
+          helperId,
+          helperName,
+          category,
+          checkInTime: new Date(),
+          date: dateStr,
+          assignedFlats: flats,
+          entryGate: gate || "Society Gate",
+          status: "Inside Society"
+        }
+      });
+    }
+
     const mapped = {
-      ...checkIn,
-      workerId: checkIn.helperId,
-      workerName: checkIn.helperName,
-      workerCategory: checkIn.category
+      ...attendanceRecord,
+      workerId: attendanceRecord.helperId,
+      workerName: attendanceRecord.helperName,
+      workerCategory: attendanceRecord.category
     };
 
     broadcastUpdate("attendance:update", mapped);
 
     // Send notifications
-    const assignments = await prisma.residentWorkerAssignment.findMany({
-      where: { workerId: helperId }
-    });
     for (const a of assignments) {
-      await sendInAppNotification(a.residentId, "Helper Entered Society", `✅ ${helperName} has entered the society.`, "success");
+      await sendInAppNotification(a.residentId, "Helper Entered Society", `${helperName} entered society.`, "success");
     }
 
-    await sendInAppNotification(helperId, "Society Check-In Successful", "✅ Society check-in successful.", "success");
+    await sendInAppNotification(helperId, "Society Check-In Successful", "Security logged your entry.", "success");
+    await sendInAppNotification(helperId, "Today's Work Unlocked", "Today's work unlocked.", "info");
 
     const securityUsers = await prisma.user.findMany({ where: { role: "security" } });
     for (const sec of securityUsers) {
-      await sendInAppNotification(sec.id, "Worker Entered", `Worker ${helperName} entered society.`, "info");
+      await sendInAppNotification(sec.id, "Entry Recorded", "Entry recorded successfully.", "success");
     }
 
     const secretaryUsers = await prisma.user.findMany({ where: { role: "secretary" } });
     for (const sec of secretaryUsers) {
-      await sendInAppNotification(sec.id, "Daily Attendance Updated", "Daily attendance updated.", "info");
+      await sendInAppNotification(sec.id, "Daily Attendance Updated", "Worker attendance updated.", "info");
     }
 
     res.status(201).json(mapped);
@@ -360,19 +427,44 @@ router.post("/helpers/checkin", authenticateToken, async (req: any, res) => {
 });
 
 router.post("/helpers/checkout", authenticateToken, async (req: any, res) => {
-  const { attendanceId, gate } = req.body;
+  const { attendanceId, helperId, gate } = req.body;
 
-  if (!attendanceId) {
-    return res.status(400).json({ error: "Attendance ID is required" });
+  if (!attendanceId && !helperId) {
+    return res.status(400).json({ error: "Attendance ID or Helper ID is required" });
   }
 
   try {
-    const record = await prisma.helperAttendance.findUnique({
-      where: { id: attendanceId }
-    });
+    const dateStr = new Date().toLocaleDateString('en-CA');
+    let record = null;
+
+    if (attendanceId) {
+      record = await prisma.helperAttendance.findUnique({
+        where: { id: attendanceId }
+      });
+    } else {
+      record = await prisma.helperAttendance.findFirst({
+        where: { helperId, date: dateStr }
+      });
+    }
 
     if (!record) {
       return res.status(404).json({ error: "Attendance record not found" });
+    }
+
+    // 1. Validate worker exists
+    const worker = await prisma.user.findFirst({
+      where: { id: record.helperId, role: "worker" }
+    });
+    if (!worker) {
+      return res.status(400).json({ error: "Worker not found in system roster" });
+    }
+
+    // 2. Validate worker assigned to at least one resident
+    const assignments = await prisma.residentWorkerAssignment.findMany({
+      where: { workerId: record.helperId }
+    });
+    if (assignments.length === 0) {
+      return res.status(400).json({ error: "Worker is not assigned to any resident flat" });
     }
 
     const now = new Date();
@@ -380,11 +472,11 @@ router.post("/helpers/checkout", authenticateToken, async (req: any, res) => {
     const duration = Math.max(1, Math.round((now.getTime() - checkInTime.getTime()) / (60 * 1000)));
 
     const checkOut = await prisma.helperAttendance.update({
-      where: { id: attendanceId },
+      where: { id: record.id },
       data: {
         checkOutTime: now,
-        exitGate: gate || "Main Gate",
-        status: "checked-out",
+        exitGate: gate || "Society Gate",
+        status: "Checked Out",
         duration
       }
     });
@@ -399,23 +491,20 @@ router.post("/helpers/checkout", authenticateToken, async (req: any, res) => {
     broadcastUpdate("attendance:update", mapped);
 
     // Send notifications
-    const assignments = await prisma.residentWorkerAssignment.findMany({
-      where: { workerId: record.helperId }
-    });
     for (const a of assignments) {
-      await sendInAppNotification(a.residentId, "Helper Exited Society", `🚪 ${record.helperName} has exited the society.`, "info");
+      await sendInAppNotification(a.residentId, "Helper Exited Society", `${record.helperName} exited society.`, "info");
     }
 
-    await sendInAppNotification(record.helperId, "Society Check-Out Successful", "🚪 Society check-out successful.", "success");
+    await sendInAppNotification(record.helperId, "Society Check-Out Successful", "Security logged your exit.", "success");
 
     const securityUsers = await prisma.user.findMany({ where: { role: "security" } });
     for (const sec of securityUsers) {
-      await sendInAppNotification(sec.id, "Worker Exited", `Worker ${record.helperName} exited society.`, "info");
+      await sendInAppNotification(sec.id, "Exit Recorded", "Exit recorded successfully.", "success");
     }
 
     const secretaryUsers = await prisma.user.findMany({ where: { role: "secretary" } });
     for (const sec of secretaryUsers) {
-      await sendInAppNotification(sec.id, "Worker Attendance Completed", "Worker attendance completed.", "info");
+      await sendInAppNotification(sec.id, "Worker Attendance Completed", "Worker attendance updated.", "info");
     }
 
     res.json(mapped);
@@ -441,7 +530,7 @@ router.post("/helpers/flat-checkin", authenticateToken, async (req: any, res) =>
       data: {
         helperId,
         helperName: worker?.name || "Helper",
-        date: new Date().toISOString().split("T")[0],
+        date: new Date().toLocaleDateString('en-CA'),
         residentId,
         residentName,
         flatNumber,
@@ -512,7 +601,7 @@ router.post("/helpers/flat-complete", authenticateToken, async (req: any, res) =
   }
 
   try {
-    const dateStr = new Date().toISOString().split("T")[0];
+    const dateStr = new Date().toLocaleDateString('en-CA');
     const helperProfile = await prisma.user.findUnique({ where: { id: helperId } });
     const helperName = helperProfile?.name || "Helper";
 
@@ -543,12 +632,12 @@ router.post("/helpers/flat-complete", authenticateToken, async (req: any, res) =
     broadcastUpdate("flat-attendance:update", flatAtt);
 
     // Send notifications
-    await sendInAppNotification(residentId, "Work Completed", `✔ ${helperName} completed today's work.`, "success");
-    await sendInAppNotification(helperId, "Flat Work Completed", "✔ Flat work completed.", "success");
+    await sendInAppNotification(residentId, "Work Completed", `${helperName} completed today's work.`, "success");
+    await sendInAppNotification(helperId, "Flat Work Completed", "Work completion saved.", "success");
 
     const secretaryUsers = await prisma.user.findMany({ where: { role: "secretary" } });
     for (const sec of secretaryUsers) {
-      await sendInAppNotification(sec.id, "Worker Assignment Completed", `Worker ${helperName} completed work in Flat ${flatNumber}.`, "info");
+      await sendInAppNotification(sec.id, "Worker Assignment Completed", "Worker completed assigned jobs.", "info");
     }
 
     res.status(201).json(flatAtt);

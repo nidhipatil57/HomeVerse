@@ -135,15 +135,6 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
   const pendingParcels = parcels.filter(p => p.portal === "society" && p.status === "received");
   const activeEmergencies = emergencies.filter(e => e.status !== "resolved");
 
-  // Domestic workers (mock registered helpers)
-  const domesticWorkers = [
-    { id: "dw-1", name: "Kamla Bai", category: "Maid", assignedUnits: ["A-301", "B-102"], phone: "+91 91000 20001", status: "expected" },
-    { id: "dw-2", name: "Shankar Kumar", category: "Cook", assignedUnits: ["A-301", "C-504"], phone: "+91 91000 20002", status: "inside" },
-    { id: "dw-3", name: "Pooja Sharma", category: "Deep Cleaning", assignedUnits: ["B-404"], phone: "+91 91000 20003", status: "expected" },
-  ];
-  const [activeWorkers, setActiveWorkers] = useState<Record<string, string>>({
-    "dw-2": new Date(Date.now() - 1000 * 60 * 45).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) // Cook is inside
-  });
 
   // Service Plumbers / Electricians (assigned complaints)
   const assignedServiceWorkers = complaints.filter(
@@ -310,47 +301,6 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
     });
   };
 
-  const handleWorkerGateAction = (workerId: string, name: string, assignedFlats: string[]) => {
-    const isInside = activeWorkers[workerId];
-    if (isInside) {
-      // Mark out
-      const updated = { ...activeWorkers };
-      delete updated[workerId];
-      setActiveWorkers(updated);
-
-      // Notify resident
-      assignedFlats.forEach((flat) => {
-        const resident = users.find(u => u.unit === flat);
-        if (resident) {
-          getCommunityStore().sendNotification(
-            resident.id,
-            "Helper Left Society 🚪",
-            `Your domestic helper ${name} has checked out of Gate 1.`,
-            "info"
-          );
-        }
-      });
-    } else {
-      // Mark in
-      setActiveWorkers(prev => ({
-        ...prev,
-        [workerId]: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }));
-
-      // Notify resident
-      assignedFlats.forEach((flat) => {
-        const resident = users.find(u => u.unit === flat);
-        if (resident) {
-          getCommunityStore().sendNotification(
-            resident.id,
-            "Helper Checked In 🏢",
-            `Your domestic helper ${name} has checked into the main gate.`,
-            "success"
-          );
-        }
-      });
-    }
-  };
 
   const handleServiceGateAction = (complaintId: string, workerName: string, residentId: string, isEntering: boolean) => {
     if (isEntering) {

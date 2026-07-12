@@ -369,6 +369,36 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     if ((globalThis as any).__homeverse_listeners_active) return;
     (globalThis as any).__homeverse_listeners_active = true;
 
+    const pollInterval = setInterval(async () => {
+      const criticalEndpoints = [
+        { key: "helpers", path: "/api/visitors/helpers" },
+        { key: "attendance", path: "/api/visitors/attendance" },
+        { key: "flatAttendance", path: "/api/visitors/helpers/flat-attendance" }
+      ];
+      criticalEndpoints.forEach(async ({ key, path }) => {
+        try {
+          const res = await fetch(path);
+          if (res.ok) {
+            let data = await res.json();
+            if (key === "attendance" && Array.isArray(data)) {
+              data = data.map((att: any) => ({
+                ...att,
+                workerId: att.helperId || att.workerId,
+                workerName: att.helperName || att.workerName,
+                workerCategory: att.category || att.workerCategory
+              }));
+            }
+            const currentStr = JSON.stringify(get()[key]);
+            const nextStr = JSON.stringify(data);
+            if (currentStr !== nextStr) {
+              set({ [key]: data } as any);
+            }
+          }
+        } catch (e) {}
+      });
+    }, 3000);
+
+    (globalThis as any).__homeverse_poll_interval = pollInterval;
     const socket = io("http://localhost:5000", {
       path: "/socket.io",
       transports: ["websocket", "polling"],
