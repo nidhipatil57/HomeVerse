@@ -61,41 +61,22 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
   // Find helper profile for check-in shifts
   const helperProfile = useMemo(() => {
     if (!worker) return null;
-    const dbHelper = helpers.find(
+    return helpers.find(
       (h) => h.id === worker.id || h.name.toLowerCase().includes(worker.name.toLowerCase())
     );
-
-    // Seed fallback if worker is user-worker-8 (Sunita)
-    if (worker.id === "user-worker-8" && !dbHelper) {
-      return {
-        id: "user-worker-8",
-        name: "Sunita Patil",
-        category: "Cooking + Cleaning",
-        phone: "+91 87654 32118",
-        workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        expectedArrival: "08:30 AM",
-        expectedExit: "11:30 AM",
-        assignedFlats: ["A-204", "A-302", "C-201"],
-        assignedResidents: ["Sara Shah", "Rahul Mehta", "Priya Desai"],
-        residentIds: ["user-resident-1", "user-resident-6", "user-resident-9"],
-        joinedAt: new Date().toISOString(),
-        portal: "society" as const
-      };
-    }
-    return dbHelper;
   }, [helpers, worker]);
 
   // Today's attendance log
   const todayLog = useMemo(() => {
     if (!helperProfile) return null;
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = new Date().toLocaleDateString('en-CA');
     return attendance.find((a) => a.workerId === helperProfile.id && a.date === todayStr);
   }, [attendance, helperProfile]);
 
   // Today's flat logs
   const todayFlatLogs = useMemo(() => {
     if (!helperProfile) return [];
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = new Date().toLocaleDateString('en-CA');
     return flatAttendance.filter((fa: any) => fa.helperId === helperProfile.id && fa.date === todayStr);
   }, [flatAttendance, helperProfile]);
 

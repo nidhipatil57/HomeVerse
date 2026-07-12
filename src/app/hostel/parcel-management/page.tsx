@@ -147,7 +147,7 @@ export default function WardenParcelManagementPage() {
                 <div>
                   <h4 className="font-bold">Room {p.unit} ({p.recipientName})</h4>
                   <p className="text-[10px] text-muted-foreground">{p.courier} • Location: {p.location}</p>
-                  <p className="text-[9px] text-muted-foreground mt-0.5">Logged: {new Date(p.receivedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  <p className="text-[9px] text-muted-foreground mt-0.5">Logged: {p.dateReceived} {p.timeReceived}</p>
                 </div>
                 <Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-bold">
                   OTP: {p.otp}
