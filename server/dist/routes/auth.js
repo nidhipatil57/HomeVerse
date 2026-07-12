@@ -114,9 +114,21 @@ router.get("/me", auth_js_1.authenticateToken, async (req, res) => {
 // Update Profile
 router.put("/profile", auth_js_1.authenticateToken, async (req, res) => {
     try {
+        const allowedUserFields = [
+            "name", "phone", "gender", "course", "year", "branch",
+            "workerCategory", "availability", "experience", "specializations",
+            "designation", "workingShift", "gate", "unit", "building",
+            "societyName", "hostelName", "collegeName", "communityCode", "ownerOrTenant"
+        ];
+        const updateData = {};
+        for (const key of allowedUserFields) {
+            if (req.body[key] !== undefined) {
+                updateData[key] = req.body[key];
+            }
+        }
         const user = await db_js_1.default.user.update({
             where: { id: req.user.id },
-            data: req.body
+            data: updateData
         });
         const userProfile = { ...user };
         // @ts-ignore
@@ -124,6 +136,7 @@ router.put("/profile", auth_js_1.authenticateToken, async (req, res) => {
         res.json({ user: userProfile });
     }
     catch (error) {
+        console.error("Profile update error:", error);
         res.status(500).json({ error: "Failed to update profile" });
     }
 });

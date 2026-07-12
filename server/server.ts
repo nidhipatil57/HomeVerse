@@ -2,6 +2,8 @@ import express from "express";
 import http from "http";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { execSync } from "child_process";
+import prisma from "./config/db.js";
 import { initSocket } from "./socket/index.js";
 import authRouter from "./routes/auth.js";
 import complaintsRouter from "./routes/complaints.js";
@@ -37,7 +39,37 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", service: "homeverse-backend" });
 });
 
+// Startup Self-Verification
+async function verifyAndSetupDatabase() {
+  console.log("🔍 Running Startup Verification...");
+  try {
+    // 1. Verify database connection
+    await prisma.$connect();
+    console.log("🟢 Database connection successful.");
+
+    // 2. Check table record counts to verify tables exist
+    const userCount = await prisma.user.count();
+    const complaintCount = await prisma.complaint.count();
+    const visitorCount = await prisma.visitor.count();
+    const attendanceCount = await prisma.helperAttendance.count();
+
+    console.log("🟢 Required database tables exist.");
+    console.log("📊 Database Record Counts:");
+    console.log(`   - Users: ${userCount}`);
+    console.log(`   - Complaints: ${complaintCount}`);
+    console.log(`   - Visitors: ${visitorCount}`);
+    console.log(`   - Helper Attendance: ${attendanceCount}`);
+  } catch (error: any) {
+    console.error("❌ Startup Database Verification failed:", error.message);
+  }
+}
+
 // Start the unified backend server
-server.listen(PORT, () => {
-  console.log(`🚀 HomeVerse Backend running on port ${PORT}`);
-});
+async function startServer() {
+  await verifyAndSetupDatabase();
+  server.listen(PORT, () => {
+    console.log(`🚀 HomeVerse Backend running on port ${PORT}`);
+  });
+}
+
+startServer();

@@ -24,6 +24,9 @@ router.get("/announcements", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/announcements", auth_js_1.authenticateToken, async (req, res) => {
     const { title, content, priority, tags } = req.body;
+    if (!title || !content) {
+        return res.status(400).json({ error: "Title and content are required" });
+    }
     try {
         const id = `ANN-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.announcement.create({
@@ -65,6 +68,9 @@ router.get("/leaveRequests", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/leaveRequests", auth_js_1.authenticateToken, async (req, res) => {
     const { studentName, room, parentContact, reason, fromDate, toDate } = req.body;
+    if (!reason || !fromDate || !toDate) {
+        return res.status(400).json({ error: "Reason, fromDate, and toDate are required" });
+    }
     try {
         const id = `LEAVE-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.leaveRequest.create({
@@ -116,6 +122,9 @@ router.get("/laundry", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/laundry", auth_js_1.authenticateToken, async (req, res) => {
     const { machineId, machineName, date, timeSlot } = req.body;
+    if (!machineId || !machineName || !date || !timeSlot) {
+        return res.status(400).json({ error: "Machine details, date, and timeSlot are required" });
+    }
     try {
         const id = `LND-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
         const newItem = await db_js_1.default.laundrySlot.create({
@@ -169,6 +178,9 @@ router.get("/parcels", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/parcels", auth_js_1.authenticateToken, async (req, res) => {
     const { recipientName, recipientId, unit, carrier, courier, trackingNumber } = req.body;
+    if (!recipientName || !unit) {
+        return res.status(400).json({ error: "Recipient name and unit are required" });
+    }
     try {
         const id = `PRC-${Math.floor(100 + Math.random() * 900)}`;
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
@@ -242,6 +254,9 @@ router.get("/roomchange", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/roomchange", auth_js_1.authenticateToken, async (req, res) => {
     const { preferredRoom, reason } = req.body;
+    if (!preferredRoom || !reason) {
+        return res.status(400).json({ error: "Preferred room and reason are required" });
+    }
     try {
         const id = `RCR-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.roomChangeRequest.create({
@@ -299,6 +314,9 @@ router.get("/maintenance", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/maintenance/generate", auth_js_1.authenticateToken, async (req, res) => {
     const { residentId, residentName, unit, month, amount, dueDate } = req.body;
+    if (!residentId || !residentName || !unit || !month || !amount || !dueDate) {
+        return res.status(400).json({ error: "All bill details (residentId, residentName, unit, month, amount, dueDate) are required" });
+    }
     try {
         const id = `BILL-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.maintenanceBill.create({
@@ -358,6 +376,9 @@ router.get("/rent", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/rent/generate", auth_js_1.authenticateToken, async (req, res) => {
     const { unit, building, tenantName, tenantId, amount, dueDate } = req.body;
+    if (!unit || !building || !tenantName || !amount || !dueDate) {
+        return res.status(400).json({ error: "All rent details (unit, building, tenantName, amount, dueDate) are required" });
+    }
     try {
         const id = `RNT-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.rentRecord.create({
@@ -412,6 +433,9 @@ router.get("/events", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/events", auth_js_1.authenticateToken, async (req, res) => {
     const { title, description, date, time, location, organizer, priority } = req.body;
+    if (!title || !description || !date || !time || !location || !organizer) {
+        return res.status(400).json({ error: "All event details (title, description, date, time, location, organizer) are required" });
+    }
     try {
         const id = `EV-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.communityEvent.create({
@@ -491,6 +515,9 @@ router.get("/notifications", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/notifications", auth_js_1.authenticateToken, async (req, res) => {
     const { userId, title, message, type } = req.body;
+    if (!userId || !title || !message) {
+        return res.status(400).json({ error: "userId, title, and message are required" });
+    }
     try {
         const id = `NTF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
         const newItem = await db_js_1.default.notification.create({
@@ -548,6 +575,14 @@ router.get("/roommates", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/roommates", auth_js_1.authenticateToken, async (req, res) => {
     const { sleepingHabits, studyHours, cleanliness, smoking, foodPreference, interests, roomPreference } = req.body;
+    if (sleepingHabits === undefined ||
+        studyHours === undefined ||
+        cleanliness === undefined ||
+        smoking === undefined ||
+        foodPreference === undefined ||
+        roomPreference === undefined) {
+        return res.status(400).json({ error: "Missing required roommate preference fields (sleepingHabits, studyHours, cleanliness, smoking, foodPreference, roomPreference)" });
+    }
     try {
         const record = await db_js_1.default.roommatePreference.upsert({
             where: { userId: req.user.id },
@@ -654,6 +689,9 @@ router.get("/gatepasses", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/gatepasses", auth_js_1.authenticateToken, async (req, res) => {
     const { visitorName, purpose, validOn, qrCodeData } = req.body;
+    if (!visitorName || !purpose || !validOn) {
+        return res.status(400).json({ error: "Visitor name, purpose, and date (validOn) are required" });
+    }
     try {
         const id = `PASS-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.gatePass.create({
@@ -693,6 +731,9 @@ router.get("/vehiclelogs", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/vehiclelogs/entry", auth_js_1.authenticateToken, async (req, res) => {
     const { vehicleNumber, ownerName, ownerUnit, type, gate } = req.body;
+    if (!vehicleNumber || !ownerName || !type) {
+        return res.status(400).json({ error: "Vehicle number, owner name, and type are required" });
+    }
     try {
         const id = `VEH-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.vehicleLog.create({
@@ -744,6 +785,9 @@ router.get("/incidents", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/incidents", auth_js_1.authenticateToken, async (req, res) => {
     const { title, time, location, description, type } = req.body;
+    if (!title || !time || !location || !description || !type) {
+        return res.status(400).json({ error: "All incident report details (title, time, location, description, type) are required" });
+    }
     try {
         const id = `INC-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.incidentReport.create({
@@ -796,6 +840,9 @@ router.get("/marketplace", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/marketplace", auth_js_1.authenticateToken, async (req, res) => {
     const { title, description, price, category, images } = req.body;
+    if (!title || !description || !price || !category) {
+        return res.status(400).json({ error: "Title, description, price, and category are required" });
+    }
     try {
         const id = `MKT-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.marketplaceItem.create({
@@ -851,6 +898,9 @@ router.get("/lostfound", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/lostfound", auth_js_1.authenticateToken, async (req, res) => {
     const { title, description } = req.body;
+    if (!title || !description) {
+        return res.status(400).json({ error: "Title and description are required" });
+    }
     try {
         const id = `LF-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.lostFoundItem.create({
@@ -935,6 +985,9 @@ router.get("/expenses", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.post("/expenses", auth_js_1.authenticateToken, async (req, res) => {
     const { category, vendor, amount, date, notes } = req.body;
+    if (!category || !vendor || !amount || !date) {
+        return res.status(400).json({ error: "Category, vendor, amount, and date are required" });
+    }
     try {
         const id = `EXP-${Math.floor(100 + Math.random() * 900)}`;
         const newItem = await db_js_1.default.societyExpense.create({
@@ -1022,6 +1075,9 @@ router.put("/users/:id/status", auth_js_1.authenticateToken, async (req, res) =>
 });
 router.post("/flats", auth_js_1.authenticateToken, async (req, res) => {
     const { building, wing, floor, flatNumber } = req.body;
+    if (!building || !wing || !floor || !flatNumber) {
+        return res.status(400).json({ error: "Building, wing, floor, and flat number are required" });
+    }
     try {
         const id = `FL-${wing}${flatNumber}`;
         const newFlat = await db_js_1.default.flatInfo.create({
@@ -1063,6 +1119,9 @@ router.get("/facility-bookings", auth_js_1.authenticateToken, async (req, res) =
 });
 router.post("/facility-bookings", auth_js_1.authenticateToken, async (req, res) => {
     const { facility, date, slot } = req.body;
+    if (!facility || !date || !slot) {
+        return res.status(400).json({ error: "Facility, date, and slot are required" });
+    }
     try {
         const id = `FBK-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
         const newBooking = await db_js_1.default.facilityBooking.create({

@@ -1349,13 +1349,16 @@ export const getPrepopulatedExpenses = (): any[] => [
 ];
 
 export const getPrepopulatedFlats = (): any[] => [
-  { id: "FL-A101", building: "A Wing", wing: "A", floor: 1, flatNumber: "101", status: "occupied", residentId: "user-resident-5", residentName: "Amit Shah" },
-  { id: "FL-A102", building: "A Wing", wing: "A", floor: 1, flatNumber: "102", status: "occupied", residentId: "user-resident-6", residentName: "Gaurav Sen" },
+  { id: "FL-A102", building: "A Wing", wing: "A", floor: 1, flatNumber: "102", status: "occupied", residentId: "user-resident-10", residentName: "Gaurav Sen" },
   { id: "FL-A201", building: "A Wing", wing: "A", floor: 2, flatNumber: "201", status: "occupied", residentId: "user-resident-3", residentName: "Sunita Rao" },
   { id: "FL-A204", building: "A Wing", wing: "A", floor: 2, flatNumber: "204", status: "occupied", residentId: "user-resident-1", residentName: "Sara Shah" },
   { id: "FL-A301", building: "A Wing", wing: "A", floor: 3, flatNumber: "301", status: "occupied", residentId: "user-resident-2", residentName: "Nidhi Kumar" },
-  { id: "FL-A302", building: "A Wing", wing: "A", floor: 3, flatNumber: "302", status: "occupied", residentId: "user-secretary-1", residentName: "Rahul Verma" },
+  { id: "FL-A302", building: "A Wing", wing: "A", floor: 3, flatNumber: "302", status: "occupied", residentId: "user-resident-6", residentName: "Rahul Mehta" },
   { id: "FL-B101", building: "B Wing", wing: "B", floor: 1, flatNumber: "101", status: "occupied", residentId: "user-resident-4", residentName: "Kishore Kumar" },
+  { id: "FL-B105", building: "B Wing", wing: "B", floor: 1, flatNumber: "105", status: "occupied", residentId: "user-resident-7", residentName: "Anjali Patil" },
+  { id: "FL-B503", building: "B Wing", wing: "B", floor: 5, flatNumber: "503", status: "occupied", residentId: "user-resident-8", residentName: "Rohan Kulkarni" },
+  { id: "FL-C201", building: "C Wing", wing: "C", floor: 2, flatNumber: "201", status: "occupied", residentId: "user-resident-9", residentName: "Priya Desai" },
+  { id: "FL-C404", building: "C Wing", wing: "C", floor: 4, flatNumber: "404", status: "occupied", residentId: "user-resident-5", residentName: "Amit Joshi" },
   { id: "FL-C101", building: "C Wing", wing: "C", floor: 1, flatNumber: "101", status: "vacant" }
 ];
 
@@ -1381,6 +1384,109 @@ export const getPrepopulatedRentRecords = (): any[] => [
   }
 ];
 
+export const getPrepopulatedHelpersAttendance = (): any[] => {
+  const todayStr = new Date().toISOString().split("T")[0];
+  const checkInTime1 = new Date();
+  checkInTime1.setHours(8, 30, 0, 0);
+  const checkInTime2 = new Date();
+  checkInTime2.setHours(7, 15, 0, 0);
+  const checkOutTime2 = new Date();
+  checkOutTime2.setHours(11, 0, 0, 0);
+
+  return [
+    {
+      id: "ATT-001",
+      helperId: "user-worker-8",
+      helperName: "Sunita Patil",
+      category: "Maid",
+      checkInTime: checkInTime1.toISOString(),
+      checkOutTime: null,
+      date: todayStr,
+      assignedFlats: ["A-204", "A-302", "A-301"],
+      entryGate: "Gate 1",
+      exitGate: null
+    },
+    {
+      id: "ATT-002",
+      helperId: "user-worker-3",
+      helperName: "Meena Sharma",
+      category: "Maid",
+      checkInTime: checkInTime2.toISOString(),
+      checkOutTime: checkOutTime2.toISOString(),
+      date: todayStr,
+      assignedFlats: ["A-204", "B-101"],
+      entryGate: "Gate 1",
+      exitGate: "Gate 1"
+    }
+  ];
+};
+
+export const getPrepopulatedFlatAttendance = (): any[] => {
+  const todayStr = new Date().toISOString().split("T")[0];
+  
+  // Flat check-in/out times for Sunita Patil (user-worker-8)
+  const checkInA204 = new Date();
+  checkInA204.setHours(8, 31, 0, 0);
+  const checkOutA204 = new Date();
+  checkOutA204.setHours(9, 12, 0, 0);
+
+  // Meena Sharma (user-worker-3)
+  const checkInA204Meena = new Date();
+  checkInA204Meena.setHours(7, 20, 0, 0);
+  const checkOutA204Meena = new Date();
+  checkOutA204Meena.setHours(8, 0, 0, 0);
+
+  const checkInB101Meena = new Date();
+  checkInB101Meena.setHours(8, 10, 0, 0);
+  const checkOutB101Meena = new Date();
+  checkOutB101Meena.setHours(8, 55, 0, 0);
+
+  return [
+    {
+      id: "FLA-ATT-001",
+      helperId: "user-worker-8",
+      helperName: "Sunita Patil",
+      date: todayStr,
+      residentId: "user-resident-1", // Sara Shah
+      residentName: "Sara Shah",
+      flatNumber: "A-204",
+      checkInTime: checkInA204.toISOString(),
+      checkOutTime: checkOutA204.toISOString(),
+      duration: 41,
+      servicePerformed: "Cooking",
+      status: "completed"
+    },
+    {
+      id: "FLA-ATT-002",
+      helperId: "user-worker-3",
+      helperName: "Meena Sharma",
+      date: todayStr,
+      residentId: "user-resident-1",
+      residentName: "Sara Shah",
+      flatNumber: "A-204",
+      checkInTime: checkInA204Meena.toISOString(),
+      checkOutTime: checkOutA204Meena.toISOString(),
+      duration: 40,
+      servicePerformed: "Cleaning",
+      status: "completed"
+    },
+    {
+      id: "FLA-ATT-003",
+      helperId: "user-worker-3",
+      helperName: "Meena Sharma",
+      date: todayStr,
+      residentId: "user-resident-4", // Kishore Kumar
+      residentName: "Kishore Kumar",
+      flatNumber: "B-101",
+      checkInTime: checkInB101Meena.toISOString(),
+      checkOutTime: checkOutB101Meena.toISOString(),
+      duration: 45,
+      servicePerformed: "Cleaning",
+      status: "completed"
+    }
+  ];
+};
+
 export const getInitialDb = () => ({
   users: getPrepopulatedUsers(),
   complaints: getPrepopulatedComplaints(),
@@ -1403,5 +1509,7 @@ export const getInitialDb = () => ({
   announcements: getPrepopulatedAnnouncements(),
   expenses: getPrepopulatedExpenses(),
   flats: getPrepopulatedFlats(),
-  rentRecords: getPrepopulatedRentRecords()
+  rentRecords: getPrepopulatedRentRecords(),
+  attendance: getPrepopulatedHelpersAttendance(),
+  flatAttendance: getPrepopulatedFlatAttendance()
 });

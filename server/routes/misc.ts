@@ -21,6 +21,9 @@ router.get("/announcements", authenticateToken, async (req: any, res) => {
 
 router.post("/announcements", authenticateToken, async (req: any, res) => {
   const { title, content, priority, tags } = req.body;
+  if (!title || !content) {
+    return res.status(400).json({ error: "Title and content are required" });
+  }
   try {
     const id = `ANN-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.announcement.create({
@@ -61,6 +64,9 @@ router.get("/leaveRequests", authenticateToken, async (req: any, res) => {
 
 router.post("/leaveRequests", authenticateToken, async (req: any, res) => {
   const { studentName, room, parentContact, reason, fromDate, toDate } = req.body;
+  if (!reason || !fromDate || !toDate) {
+    return res.status(400).json({ error: "Reason, fromDate, and toDate are required" });
+  }
   try {
     const id = `LEAVE-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.leaveRequest.create({
@@ -112,6 +118,9 @@ router.get("/laundry", authenticateToken, async (req: any, res) => {
 
 router.post("/laundry", authenticateToken, async (req: any, res) => {
   const { machineId, machineName, date, timeSlot } = req.body;
+  if (!machineId || !machineName || !date || !timeSlot) {
+    return res.status(400).json({ error: "Machine details, date, and timeSlot are required" });
+  }
   try {
     const id = `LND-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
     const newItem = await prisma.laundrySlot.create({
@@ -164,6 +173,9 @@ router.get("/parcels", authenticateToken, async (req: any, res) => {
 
 router.post("/parcels", authenticateToken, async (req: any, res) => {
   const { recipientName, recipientId, unit, carrier, courier, trackingNumber } = req.body;
+  if (!recipientName || !unit) {
+    return res.status(400).json({ error: "Recipient name and unit are required" });
+  }
   try {
     const id = `PRC-${Math.floor(100 + Math.random() * 900)}`;
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
@@ -237,6 +249,9 @@ router.get("/roomchange", authenticateToken, async (req: any, res) => {
 
 router.post("/roomchange", authenticateToken, async (req: any, res) => {
   const { preferredRoom, reason } = req.body;
+  if (!preferredRoom || !reason) {
+    return res.status(400).json({ error: "Preferred room and reason are required" });
+  }
   try {
     const id = `RCR-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.roomChangeRequest.create({
@@ -293,6 +308,9 @@ router.get("/maintenance", authenticateToken, async (req: any, res) => {
 
 router.post("/maintenance/generate", authenticateToken, async (req: any, res) => {
   const { residentId, residentName, unit, month, amount, dueDate } = req.body;
+  if (!residentId || !residentName || !unit || !month || !amount || !dueDate) {
+    return res.status(400).json({ error: "All bill details (residentId, residentName, unit, month, amount, dueDate) are required" });
+  }
   try {
     const id = `BILL-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.maintenanceBill.create({
@@ -351,6 +369,9 @@ router.get("/rent", authenticateToken, async (req: any, res) => {
 
 router.post("/rent/generate", authenticateToken, async (req: any, res) => {
   const { unit, building, tenantName, tenantId, amount, dueDate } = req.body;
+  if (!unit || !building || !tenantName || !amount || !dueDate) {
+    return res.status(400).json({ error: "All rent details (unit, building, tenantName, amount, dueDate) are required" });
+  }
   try {
     const id = `RNT-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.rentRecord.create({
@@ -405,6 +426,9 @@ router.get("/events", authenticateToken, async (req: any, res) => {
 
 router.post("/events", authenticateToken, async (req: any, res) => {
   const { title, description, date, time, location, organizer, priority } = req.body;
+  if (!title || !description || !date || !time || !location || !organizer) {
+    return res.status(400).json({ error: "All event details (title, description, date, time, location, organizer) are required" });
+  }
   try {
     const id = `EV-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.communityEvent.create({
@@ -486,6 +510,9 @@ router.get("/notifications", authenticateToken, async (req: any, res) => {
 
 router.post("/notifications", authenticateToken, async (req: any, res) => {
   const { userId, title, message, type } = req.body;
+  if (!userId || !title || !message) {
+    return res.status(400).json({ error: "userId, title, and message are required" });
+  }
   try {
     const id = `NTF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
     const newItem = await prisma.notification.create({
@@ -543,6 +570,16 @@ router.get("/roommates", authenticateToken, async (req: any, res) => {
 
 router.post("/roommates", authenticateToken, async (req: any, res) => {
   const { sleepingHabits, studyHours, cleanliness, smoking, foodPreference, interests, roomPreference } = req.body;
+  if (
+    sleepingHabits === undefined ||
+    studyHours === undefined ||
+    cleanliness === undefined ||
+    smoking === undefined ||
+    foodPreference === undefined ||
+    roomPreference === undefined
+  ) {
+    return res.status(400).json({ error: "Missing required roommate preference fields (sleepingHabits, studyHours, cleanliness, smoking, foodPreference, roomPreference)" });
+  }
   try {
     const record = await prisma.roommatePreference.upsert({
       where: { userId: req.user.id },
@@ -648,6 +685,9 @@ router.get("/gatepasses", authenticateToken, async (req: any, res) => {
 
 router.post("/gatepasses", authenticateToken, async (req: any, res) => {
   const { visitorName, purpose, validOn, qrCodeData } = req.body;
+  if (!visitorName || !purpose || !validOn) {
+    return res.status(400).json({ error: "Visitor name, purpose, and date (validOn) are required" });
+  }
   try {
     const id = `PASS-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.gatePass.create({
@@ -687,6 +727,9 @@ router.get("/vehiclelogs", authenticateToken, async (req: any, res) => {
 
 router.post("/vehiclelogs/entry", authenticateToken, async (req: any, res) => {
   const { vehicleNumber, ownerName, ownerUnit, type, gate } = req.body;
+  if (!vehicleNumber || !ownerName || !type) {
+    return res.status(400).json({ error: "Vehicle number, owner name, and type are required" });
+  }
   try {
     const id = `VEH-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.vehicleLog.create({
@@ -738,6 +781,9 @@ router.get("/incidents", authenticateToken, async (req: any, res) => {
 
 router.post("/incidents", authenticateToken, async (req: any, res) => {
   const { title, time, location, description, type } = req.body;
+  if (!title || !time || !location || !description || !type) {
+    return res.status(400).json({ error: "All incident report details (title, time, location, description, type) are required" });
+  }
   try {
     const id = `INC-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.incidentReport.create({
@@ -790,6 +836,9 @@ router.get("/marketplace", authenticateToken, async (req: any, res) => {
 
 router.post("/marketplace", authenticateToken, async (req: any, res) => {
   const { title, description, price, category, images } = req.body;
+  if (!title || !description || !price || !category) {
+    return res.status(400).json({ error: "Title, description, price, and category are required" });
+  }
   try {
     const id = `MKT-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.marketplaceItem.create({
@@ -845,6 +894,9 @@ router.get("/lostfound", authenticateToken, async (req: any, res) => {
 
 router.post("/lostfound", authenticateToken, async (req: any, res) => {
   const { title, description } = req.body;
+  if (!title || !description) {
+    return res.status(400).json({ error: "Title and description are required" });
+  }
   try {
     const id = `LF-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.lostFoundItem.create({
@@ -929,6 +981,9 @@ router.get("/expenses", authenticateToken, async (req: any, res) => {
 
 router.post("/expenses", authenticateToken, async (req: any, res) => {
   const { category, vendor, amount, date, notes } = req.body;
+  if (!category || !vendor || !amount || !date) {
+    return res.status(400).json({ error: "Category, vendor, amount, and date are required" });
+  }
   try {
     const id = `EXP-${Math.floor(100 + Math.random() * 900)}`;
     const newItem = await prisma.societyExpense.create({
@@ -1014,6 +1069,9 @@ router.put("/users/:id/status", authenticateToken, async (req: any, res) => {
 
 router.post("/flats", authenticateToken, async (req: any, res) => {
   const { building, wing, floor, flatNumber } = req.body;
+  if (!building || !wing || !floor || !flatNumber) {
+    return res.status(400).json({ error: "Building, wing, floor, and flat number are required" });
+  }
   try {
     const id = `FL-${wing}${flatNumber}`;
     const newFlat = await prisma.flatInfo.create({
@@ -1055,6 +1113,9 @@ router.get("/facility-bookings", authenticateToken, async (req: any, res) => {
 
 router.post("/facility-bookings", authenticateToken, async (req: any, res) => {
   const { facility, date, slot } = req.body;
+  if (!facility || !date || !slot) {
+    return res.status(400).json({ error: "Facility, date, and slot are required" });
+  }
   try {
     const id = `FBK-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
     const newBooking = await prisma.facilityBooking.create({

@@ -34,6 +34,10 @@ router.get("/", authenticateToken, async (req: any, res) => {
 router.post("/", authenticateToken, async (req: any, res) => {
   const { name, phone, purpose, visitingUnit, visitingResident, expectedAt, date, vehicleNumber } = req.body;
 
+  if (!name || !phone || !purpose) {
+    return res.status(400).json({ error: "Visitor name, phone, and purpose are required" });
+  }
+
   try {
     const visitorId = `VIS-${Math.floor(100 + Math.random() * 900)}`;
     const newVisitor = await prisma.visitor.create({
@@ -276,8 +280,31 @@ router.delete("/helpers/:id", authenticateToken, async (req: any, res) => {
 });
 
 // Helper Attendance (Check-in/Check-out)
+async function sendInAppNotification(userId: string, title: string, message: string, type: string) {
+  try {
+    const id = `NTF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+    const newNotif = await prisma.notification.create({
+      data: {
+        id,
+        userId,
+        title,
+        message,
+        type: type || "info",
+        read: false
+      }
+    });
+    broadcastUpdate("notification:update", newNotif);
+  } catch (e) {
+    console.error("Failed to send in-app notification:", e);
+  }
+}
+
 router.post("/helpers/checkin", authenticateToken, async (req: any, res) => {
   const { helperId, helperName, category, gate, assignedFlats } = req.body;
+
+  if (!helperId || !helperName || !category) {
+    return res.status(400).json({ error: "Helper ID, helper name, and category are required" });
+  }
 
   try {
     const attendanceId = `ATT-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
@@ -292,49 +319,281 @@ router.post("/helpers/checkin", authenticateToken, async (req: any, res) => {
         checkInTime: new Date(),
         date: dateStr,
         assignedFlats: assignedFlats || [],
-        entryGate: gate || "Main Gate"
+        entryGate: gate || "Main Gate",
+        status: "checked-in"
       }
     });
 
-    broadcastUpdate("attendance:update", checkIn);
-    res.status(201).json(checkIn);
+    const mapped = {
+      ...checkIn,
+      workerId: checkIn.helperId,
+      workerName: checkIn.helperName,
+      workerCategory: checkIn.category
+    };
+
+    broadcastUpdate("attendance:update", mapped);
+
+    // Send notifications
+    const assignments = await prisma.residentWorkerAssignment.findMany({
+      where: { workerId: helperId }
+    });
+    for (const a of assignments) {
+      await sendInAppNotification(a.residentId, "Helper Entered Society", `✅ ${helperName} has entered the society.`, "success");
+    }
+
+    await sendInAppNotification(helperId, "Society Check-In Successful", "✅ Society check-in successful.", "success");
+
+    const securityUsers = await prisma.user.findMany({ where: { role: "security" } });
+    for (const sec of securityUsers) {
+      await sendInAppNotification(sec.id, "Worker Entered", `Worker ${helperName} entered society.`, "info");
+    }
+
+    const secretaryUsers = await prisma.user.findMany({ where: { role: "secretary" } });
+    for (const sec of secretaryUsers) {
+      await sendInAppNotification(sec.id, "Daily Attendance Updated", "Daily attendance updated.", "info");
+    }
+
+    res.status(201).json(mapped);
   } catch (error) {
     res.status(500).json({ error: "Failed helper checkin" });
   }
 });
 
-router.post("/helpers/checkout", authenticateToken, async (req, res) => {
+router.post("/helpers/checkout", authenticateToken, async (req: any, res) => {
   const { attendanceId, gate } = req.body;
 
+  if (!attendanceId) {
+    return res.status(400).json({ error: "Attendance ID is required" });
+  }
+
   try {
+    const record = await prisma.helperAttendance.findUnique({
+      where: { id: attendanceId }
+    });
+
+    if (!record) {
+      return res.status(404).json({ error: "Attendance record not found" });
+    }
+
+    const now = new Date();
+    const checkInTime = record.checkInTime ? new Date(record.checkInTime) : now;
+    const duration = Math.max(1, Math.round((now.getTime() - checkInTime.getTime()) / (60 * 1000)));
+
     const checkOut = await prisma.helperAttendance.update({
       where: { id: attendanceId },
       data: {
-        checkOutTime: new Date(),
-        exitGate: gate || "Main Gate"
+        checkOutTime: now,
+        exitGate: gate || "Main Gate",
+        status: "checked-out",
+        duration
       }
     });
 
-    broadcastUpdate("attendance:update", checkOut);
-    res.json(checkOut);
+    const mapped = {
+      ...checkOut,
+      workerId: checkOut.helperId,
+      workerName: checkOut.helperName,
+      workerCategory: checkOut.category
+    };
+
+    broadcastUpdate("attendance:update", mapped);
+
+    // Send notifications
+    const assignments = await prisma.residentWorkerAssignment.findMany({
+      where: { workerId: record.helperId }
+    });
+    for (const a of assignments) {
+      await sendInAppNotification(a.residentId, "Helper Exited Society", `🚪 ${record.helperName} has exited the society.`, "info");
+    }
+
+    await sendInAppNotification(record.helperId, "Society Check-Out Successful", "🚪 Society check-out successful.", "success");
+
+    const securityUsers = await prisma.user.findMany({ where: { role: "security" } });
+    for (const sec of securityUsers) {
+      await sendInAppNotification(sec.id, "Worker Exited", `Worker ${record.helperName} exited society.`, "info");
+    }
+
+    const secretaryUsers = await prisma.user.findMany({ where: { role: "secretary" } });
+    for (const sec of secretaryUsers) {
+      await sendInAppNotification(sec.id, "Worker Attendance Completed", "Worker attendance completed.", "info");
+    }
+
+    res.json(mapped);
   } catch (error) {
     res.status(500).json({ error: "Failed helper checkout" });
   }
 });
 
+// Flat Check-In / Check-Out
+router.post("/helpers/flat-checkin", authenticateToken, async (req: any, res) => {
+  const { helperId, flatNumber, residentId, residentName, servicePerformed } = req.body;
+
+  if (!helperId || !flatNumber || !residentId || !residentName) {
+    return res.status(400).json({ error: "Helper ID, flat number, resident ID, and resident name are required" });
+  }
+
+  try {
+    const worker = await prisma.user.findUnique({
+      where: { id: helperId }
+    });
+
+    const flatAtt = await prisma.flatAttendance.create({
+      data: {
+        helperId,
+        helperName: worker?.name || "Helper",
+        date: new Date().toISOString().split("T")[0],
+        residentId,
+        residentName,
+        flatNumber,
+        checkInTime: new Date(),
+        servicePerformed: servicePerformed || "Service",
+        status: "working"
+      }
+    });
+
+    broadcastUpdate("flat-attendance:update", flatAtt);
+
+    // Send notifications
+    await sendInAppNotification(residentId, "Helper Arrived at Flat", `🏠 ${worker?.name || "Helper"} has arrived at your flat.`, "success");
+    await sendInAppNotification(helperId, "Flat Check-In Successful", "🏠 Flat check-in successful.", "success");
+
+    res.status(201).json(flatAtt);
+  } catch (error) {
+    res.status(500).json({ error: "Failed flat checkin" });
+  }
+});
+
+router.post("/helpers/flat-checkout", authenticateToken, async (req: any, res) => {
+  const { flatAttendanceId } = req.body;
+
+  if (!flatAttendanceId) {
+    return res.status(400).json({ error: "Flat attendance ID is required" });
+  }
+
+  try {
+    const record = await prisma.flatAttendance.findUnique({
+      where: { id: flatAttendanceId }
+    });
+
+    if (!record) {
+      return res.status(404).json({ error: "Flat attendance record not found" });
+    }
+
+    const now = new Date();
+    const checkInTime = new Date(record.checkInTime);
+    const duration = Math.max(1, Math.round((now.getTime() - checkInTime.getTime()) / (60 * 1000)));
+
+    const updated = await prisma.flatAttendance.update({
+      where: { id: flatAttendanceId },
+      data: {
+        checkOutTime: now,
+        duration,
+        status: "completed"
+      }
+    });
+
+    broadcastUpdate("flat-attendance:update", updated);
+
+    // Send notifications
+    await sendInAppNotification(record.residentId, "Work Completed", `✔ ${record.helperName} has completed today's work.`, "success");
+    await sendInAppNotification(record.helperId, "Flat Work Completed", "✔ Flat work completed.", "success");
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: "Failed flat checkout" });
+  }
+});
+
+router.post("/helpers/flat-complete", authenticateToken, async (req: any, res) => {
+  const { helperId, flatNumber, residentId, residentName, servicePerformed, notes, photoUrl } = req.body;
+
+  if (!helperId || !flatNumber || !residentId || !residentName) {
+    return res.status(400).json({ error: "Helper ID, flat number, resident ID, and resident name are required" });
+  }
+
+  try {
+    const dateStr = new Date().toISOString().split("T")[0];
+    const helperProfile = await prisma.user.findUnique({ where: { id: helperId } });
+    const helperName = helperProfile?.name || "Helper";
+
+    const todayLog = await prisma.helperAttendance.findFirst({
+      where: { helperId, date: dateStr }
+    });
+    const checkInTime = todayLog?.checkInTime ? new Date(todayLog.checkInTime) : new Date();
+    const duration = Math.max(1, Math.round((new Date().getTime() - checkInTime.getTime()) / (60 * 1000)));
+
+    const flatAtt = await prisma.flatAttendance.create({
+      data: {
+        helperId,
+        helperName,
+        date: dateStr,
+        residentId,
+        residentName,
+        flatNumber,
+        checkInTime,
+        checkOutTime: new Date(),
+        duration,
+        servicePerformed: servicePerformed || "Service",
+        status: "completed",
+        notes: notes || null,
+        photoUrl: photoUrl || null
+      }
+    });
+
+    broadcastUpdate("flat-attendance:update", flatAtt);
+
+    // Send notifications
+    await sendInAppNotification(residentId, "Work Completed", `✔ ${helperName} completed today's work.`, "success");
+    await sendInAppNotification(helperId, "Flat Work Completed", "✔ Flat work completed.", "success");
+
+    const secretaryUsers = await prisma.user.findMany({ where: { role: "secretary" } });
+    for (const sec of secretaryUsers) {
+      await sendInAppNotification(sec.id, "Worker Assignment Completed", `Worker ${helperName} completed work in Flat ${flatNumber}.`, "info");
+    }
+
+    res.status(201).json(flatAtt);
+  } catch (error) {
+    console.error("Flat complete error:", error);
+    res.status(500).json({ error: "Failed to record work completion" });
+  }
+});
+
+router.get("/helpers/flat-attendance", authenticateToken, async (req: any, res) => {
+  try {
+    const list = await prisma.flatAttendance.findMany({
+      orderBy: { checkInTime: "asc" }
+    });
+    res.json(list);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch flat attendance" });
+  }
+});
+
 router.get("/attendance", authenticateToken, async (req: any, res) => {
   try {
-    const { role, unit } = req.user;
+    const { role, unit, id: userId } = req.user;
     let attendance;
 
     if (role === "secretary" || role === "security") {
       attendance = await prisma.helperAttendance.findMany();
+    } else if (role === "worker") {
+      attendance = await prisma.helperAttendance.findMany({
+        where: { helperId: userId }
+      });
     } else {
       attendance = await prisma.helperAttendance.findMany({
-        where: { assignedFlats: { has: unit } }
+        where: { assignedFlats: { has: unit || "" } }
       });
     }
-    res.json(attendance);
+
+    const normalized = attendance.map((att: any) => ({
+      ...att,
+      workerId: att.helperId,
+      workerName: att.helperName,
+      workerCategory: att.category
+    }));
+
+    res.json(normalized);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch helper attendance" });
   }
@@ -359,6 +618,10 @@ router.get("/favorites", authenticateToken, async (req: any, res) => {
 
 router.post("/favorites", authenticateToken, async (req: any, res) => {
   const { name, phone, category } = req.body;
+
+  if (!name || !phone || !category) {
+    return res.status(400).json({ error: "Name, phone, and category are required" });
+  }
 
   try {
     const id = `FAV-${Math.floor(100 + Math.random() * 900)}`;

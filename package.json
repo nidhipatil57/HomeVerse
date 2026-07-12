@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "next dev",
+    "dev:backend": "npm --prefix server run dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "firebase:seed": "tsx scripts/seed.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "npm --prefix server run prisma:seed"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -33,6 +34,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^10.0.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",

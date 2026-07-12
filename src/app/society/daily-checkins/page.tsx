@@ -26,11 +26,12 @@ const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Sat
 export default function DailyCheckInsPage() {
   const { user } = useAuth();
   const {
-    helpers, attendance, registerHelper, deleteHelper, initializeDb
+    helpers, attendance, flatAttendance, registerHelper, deleteHelper, initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
       helpers: state.helpers || [],
       attendance: state.attendance || [],
+      flatAttendance: state.flatAttendance || [],
       registerHelper: state.registerHelper,
       deleteHelper: state.deleteHelper,
       initializeDb: state.initializeDb,
@@ -361,51 +362,57 @@ export default function DailyCheckInsPage() {
                 myHelpers.map((helper) => {
                   const todayStr = new Date().toISOString().split("T")[0];
                   const todayLog = attendance.find(a => a.workerId === helper.id && a.date === todayStr);
+                  const todayFlatLogs = flatAttendance.filter(fa => fa.helperId === helper.id && fa.date === todayStr);
+                  const myFlatLog = todayFlatLogs.find(fa => fa.flatNumber === user?.unit);
 
                   let statusText = "Not Arrived";
                   let statusColor = "bg-gray-500/10 text-gray-500 border-gray-500/20";
-                  let logDetails = null;
-                  let missedCheckIn = false;
-                  let runningLate = false;
-                  let minutesLate = 0;
-
-                  const expTime = parseTime(helper.expectedArrival);
-                  const now = new Date();
-                  const expectedShiftTime = new Date();
-                  expectedShiftTime.setHours(expTime.hours, expTime.mins, 0, 0);
-
                   if (todayLog) {
                     if (todayLog.checkOutTime) {
-                      statusText = "Checked Out";
-                      statusColor = "bg-amber-500/10 text-amber-600 border-amber-500/20";
-                      logDetails = {
-                        time: new Date(todayLog.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        gate: todayLog.exitGate,
-                        duration: todayLog.duration
-                      };
+                      statusText = "Exited Society";
+                      statusColor = "bg-orange-500/10 text-orange-600 border-orange-500/20";
+                    } else if (myFlatLog && myFlatLog.status === "completed") {
+                      statusText = "Completed Work";
+                      statusColor = "bg-green-500/15 text-green-600 border-green-500/20";
                     } else {
-                      statusText = "Checked In";
-                      statusColor = "bg-green-500/10 text-green-600 border-green-500/20";
-                      logDetails = {
-                        time: new Date(todayLog.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        gate: todayLog.entryGate
-                      };
-                      if (todayLog.status === "late") {
-                        runningLate = true;
-                        const checkIn = new Date(todayLog.checkInTime);
-                        const diffMs = checkIn.getTime() - expectedShiftTime.getTime();
-                        minutesLate = Math.max(0, Math.round(diffMs / (60 * 1000)));
-                      }
+                      statusText = "Inside Society";
+                      statusColor = "bg-green-500/15 text-green-600 border-green-500/20";
                     }
                   } else {
-                    if (now.getTime() > expectedShiftTime.getTime() + 15 * 60 * 1000) {
-                      missedCheckIn = true;
+                    const expTime = parseTime(helper.expectedArrival);
+                    const expectedShiftTime = new Date();
+                    expectedShiftTime.setHours(expTime.hours, expTime.mins, 0, 0);
+                    if (new Date().getTime() > expectedShiftTime.getTime() + 15 * 60 * 1000) {
                       statusText = "Delayed / Missed";
                       statusColor = "bg-red-500/10 text-red-600 border-red-500/20 animate-pulse";
                     }
                   }
 
                   const helperAttendanceHistory = attendance.filter(a => a.workerId === helper.id && a.id !== todayLog?.id).slice(-4);
+
+                  // Create timeline milestones for today
+                  const milestones = [];
+                  if (todayLog) {
+                    milestones.push({
+                      label: "Entered Society",
+                      time: new Date(todayLog.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                      detail: `${todayLog.entryGate || "Main Gate"} (Recorded by Security)`
+                    });
+                  }
+                  if (myFlatLog && myFlatLog.status === "completed") {
+                    milestones.push({
+                      label: "Completed Work",
+                      time: new Date(myFlatLog.checkOutTime || myFlatLog.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                      detail: myFlatLog.notes ? `Notes: "${myFlatLog.notes}"` : "Completed"
+                    });
+                  }
+                  if (todayLog && todayLog.checkOutTime) {
+                    milestones.push({
+                      label: "Exited Society",
+                      time: new Date(todayLog.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                      detail: `${todayLog.exitGate || "Main Gate"} (Recorded by Security)`
+                    });
+                  }
 
                   return (
                     <div key={helper.id} className="p-4 border border-border bg-secondary/10 hover:bg-secondary/20 transition-all rounded-2xl text-xs space-y-4">
@@ -431,62 +438,37 @@ export default function DailyCheckInsPage() {
                         </div>
                       </div>
 
-                      <div className="p-3.5 rounded-xl bg-card border border-border/60 flex flex-col sm:flex-row justify-between sm:items-center gap-2.5">
-                        <div className="space-y-1">
-                          {statusText === "Checked In" && logDetails && (
-                            <p className="font-semibold text-foreground flex items-center gap-1">
-                              <CheckCircle2 className="w-4 h-4 text-green-500" /> Currently <span className="text-green-600">Inside Society</span>. Checked in at {logDetails.time}.
-                            </p>
-                          )}
-                          {statusText === "Checked Out" && logDetails && (
-                            <p className="font-semibold text-muted-foreground flex items-center gap-1">
-                              <LogOut className="w-4 h-4 text-amber-500" /> Helper checked out at {logDetails.time}. Worked for {logDetails.duration} mins.
-                            </p>
-                          )}
-                          {statusText === "Not Arrived" && !missedCheckIn && (
-                            <p className="font-semibold text-muted-foreground flex items-center gap-1">
-                              <Clock className="w-4 h-4 text-gray-400" /> Expected shift has not started yet. Not arrived at gate.
-                            </p>
-                          )}
-                          {missedCheckIn && (
-                            <p className="font-semibold text-red-500 flex items-center gap-1">
-                              <AlertTriangle className="w-4 h-4 text-red-500" /> {helper.name} has not yet entered the society.
-                            </p>
-                          )}
-                          
-                          {todayLog && (
-                            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                              <MapPin className="w-3.5 h-3.5 text-indigo-400" /> Gate: {todayLog.checkOutTime ? todayLog.exitGate : todayLog.entryGate}
-                            </p>
-                          )}
-                          {runningLate && (
-                            <p className="text-[10px] text-amber-600 font-bold flex items-center gap-1">
-                              ⚠️ Running {minutesLate} minutes late today.
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex gap-2">
+                      {/* Today's Status Timeline */}
+                      <div className="p-4 rounded-xl bg-card border border-border/60 space-y-3">
+                        <h4 className="font-bold text-foreground text-[10px] uppercase tracking-wider text-muted-foreground">Today&apos;s Live Status Tracker</h4>
+                        {milestones.length === 0 ? (
+                          <p className="text-muted-foreground font-semibold flex items-center gap-1.5 py-1">
+                            <Clock className="w-4 h-4 text-gray-400" /> Expected shift has not started yet. Not arrived at society gate.
+                          </p>
+                        ) : (
+                          <div className="relative pl-5 border-l-2 border-primary/20 space-y-4 py-1">
+                            {milestones.map((m, mIdx) => (
+                              <div key={mIdx} className="relative">
+                                <div className="absolute -left-[26px] top-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-card flex items-center justify-center">
+                                  <Check className="w-2 h-2 text-white" />
+                                </div>
+                                <div className="flex justify-between items-start text-[11px] font-semibold text-foreground">
+                                  <span>{m.label}</span>
+                                  <span className="text-muted-foreground">{m.time} ({m.detail})</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex justify-end pt-2 border-t border-border/40">
                           <Button 
                             variant="ghost" 
                             size="sm"
                             onClick={() => setExpandedHelper(expandedHelper === helper.id ? null : helper.id)}
                             className="text-primary hover:text-primary hover:bg-primary/5 h-8 rounded-lg text-[10px] font-bold"
                           >
-                            {expandedHelper === helper.id ? "Hide Logs" : "View Attendance"}
+                            {expandedHelper === helper.id ? "Hide Logs" : "View Attendance History"}
                           </Button>
-                          {helper.id !== "user-worker-8" && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => {
-                                if(confirm("Delete helper profile?")) deleteHelper(helper.id);
-                              }}
-                              className="text-red-500 hover:text-red-600 hover:bg-red-500/5 h-8 rounded-lg"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
                         </div>
                       </div>
 
@@ -502,26 +484,42 @@ export default function DailyCheckInsPage() {
                             {helperAttendanceHistory.length === 0 ? (
                               <p className="text-[10px] text-muted-foreground italic">No past attendance logs logged this week.</p>
                             ) : (
-                              <div className="grid gap-2">
-                                {helperAttendanceHistory.map((hist) => (
-                                  <div key={hist.id} className="p-3 border border-border/40 rounded-xl bg-card flex justify-between items-center text-[11px]">
-                                    <div className="flex items-center gap-2">
-                                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                                      <span className="font-bold text-foreground">{hist.date}</span>
-                                      <Badge className={
-                                        hist.status === "late" 
-                                          ? "bg-amber-500/10 text-amber-600 border-amber-500/20 text-[9px]"
-                                          : "bg-green-500/10 text-green-600 border-green-500/20 text-[9px]"
-                                      } variant="outline">{hist.status === "late" ? "Late" : "Present"}</Badge>
+                              <div className="grid gap-3">
+                                {helperAttendanceHistory.map((hist) => {
+                                  const dayFlatLog = flatAttendance.find(fa => fa.helperId === helper.id && fa.date === hist.date && fa.flatNumber === user?.unit && fa.status === "completed");
+                                  return (
+                                    <div key={hist.id} className="p-3 border border-border/40 rounded-xl bg-card space-y-2 text-[11px] font-semibold">
+                                      <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-2">
+                                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                                          <span className="font-bold text-foreground">{hist.date}</span>
+                                          <Badge className={
+                                            hist.status === "late" 
+                                              ? "bg-amber-500/10 text-amber-600 border-amber-500/20 text-[9px]"
+                                              : "bg-green-500/10 text-green-600 border-green-500/20 text-[9px]"
+                                          } variant="outline">{hist.status === "late" ? "Late" : "Present"}</Badge>
+                                        </div>
+                                      </div>
+
+                                      <div className="pl-2.5 border-l border-border/60 space-y-1.5 text-[10px] text-muted-foreground font-medium">
+                                        <div className="flex justify-between">
+                                          <span>Entered Society</span>
+                                          <span>{hist.checkInTime ? `${new Date(hist.checkInTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} (${hist.entryGate || "Main Gate"})` : "—"}</span>
+                                        </div>
+                                        {dayFlatLog && (
+                                          <div className="flex justify-between text-green-600">
+                                            <span>Completed Work</span>
+                                            <span>{dayFlatLog.checkOutTime ? new Date(dayFlatLog.checkOutTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "Completed"}</span>
+                                          </div>
+                                        )}
+                                        <div className="flex justify-between">
+                                          <span>Exited Society</span>
+                                          <span>{hist.checkOutTime ? `${new Date(hist.checkOutTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} (${hist.exitGate || "Main Gate"})` : "Inside"}</span>
+                                        </div>
+                                      </div>
                                     </div>
-                                    <div className="text-right text-muted-foreground font-medium">
-                                      <span>In: {new Date(hist.checkInTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} ({hist.entryGate})</span>
-                                      {hist.checkOutTime && (
-                                        <span className="ml-2">➔ Out: {new Date(hist.checkOutTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} ({hist.exitGate})</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                           </motion.div>

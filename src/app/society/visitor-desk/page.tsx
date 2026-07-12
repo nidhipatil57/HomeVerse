@@ -45,7 +45,8 @@ export default function SecurityVisitorDeskPage() {
   const { user, initialize } = useAuth();
   const {
     visitors, checkInVisitor, checkOutVisitor, denyVisitorEntry,
-    submitVisitorRequest, logEmergencyVisitor, complaints, initializeDb
+    submitVisitorRequest, logEmergencyVisitor, complaints, initializeDb,
+    helpers, attendance, checkInHelper, checkOutHelper
   } = useCommunityStore(
     useShallow((state) => ({
       visitors: state.visitors || [],
@@ -56,6 +57,10 @@ export default function SecurityVisitorDeskPage() {
       logEmergencyVisitor: state.logEmergencyVisitor,
       complaints: state.complaints || [],
       initializeDb: state.initializeDb,
+      helpers: state.helpers || [],
+      attendance: state.attendance || [],
+      checkInHelper: state.checkInHelper,
+      checkOutHelper: state.checkOutHelper
     }))
   );
 
@@ -273,32 +278,16 @@ export default function SecurityVisitorDeskPage() {
   };
 
   // Log recurring Helper / Maid entry attendance
-  const handleLogHelperAttendance = async (helper: typeof domesticWorkers[0], type: "check-in" | "check-out") => {
+  const handleLogHelperAttendance = async (helper: any, type: "check-in" | "check-out") => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const todayLog = attendance.find(a => a.workerId === helper.id && a.date === todayStr);
+
     if (type === "check-in") {
-      await submitVisitorRequest({
-        name: helper.name,
-        phone: helper.phone,
-        purpose: `Daily Helper Attendance - ${helper.category}`,
-        visitorType: helper.category,
-        visitType: "recurring",
-        visitingUnit: helper.assignedUnits[0],
-        visitingResident: "Resident",
-        expectedAt: new Date().toISOString(),
-        status: "checked-in",
-        date: new Date().toISOString().split("T")[0],
-        portal: "society"
-      });
-      // Check in the entry
-      setTimeout(async () => {
-        const added = useCommunityStore.getState().visitors.find(v => v.name === helper.name && v.status === "approved");
-        if (added) await checkInVisitor(added.id, "Domestic Helper checked-in");
-      }, 300);
+      await checkInHelper(helper.id, helper.name, helper.category, "Main Gate", helper.assignedFlats);
       alert(`Attendance Logged: ${helper.name} entered.`);
     } else {
-      // Find helper check-in and exit
-      const activeHelper = checkedInQueue.find(v => v.name === helper.name);
-      if (activeHelper) {
-        await checkOutVisitor(activeHelper.id);
+      if (todayLog) {
+        await checkOutHelper(todayLog.id, "Main Gate");
         alert(`Attendance Logged: ${helper.name} exited.`);
       } else {
         alert("Helper not checked in.");
@@ -683,8 +672,12 @@ export default function SecurityVisitorDeskPage() {
             <div className="p-4 space-y-3">
               <span className="text-[10px] font-bold text-foreground uppercase tracking-wider block">Domestic helper Roster</span>
               <div className="grid gap-2.5">
-                {domesticWorkers.map((helper) => {
-                  const activeEntry = checkedInQueue.find(v => v.name === helper.name);
+                {helpers.map((helper) => {
+                  const todayStr = new Date().toISOString().split("T")[0];
+                  const todayLog = attendance.find(a => a.workerId === helper.id && a.date === todayStr);
+                  const isInside = todayLog && !todayLog.checkOutTime;
+                  const isCheckedOut = todayLog && todayLog.checkOutTime;
+
                   return (
                     <div key={helper.id} className="p-3 border border-border/50 bg-card rounded-2xl flex justify-between items-center text-xs">
                       <div className="flex gap-2 items-center">
@@ -694,24 +687,26 @@ export default function SecurityVisitorDeskPage() {
                         <div>
                           <span className="font-bold text-foreground">{helper.name}</span>
                           <span className="text-muted-foreground font-semibold ml-2">({helper.category})</span>
-                          <p className="text-[9px] text-muted-foreground">Flats: {helper.assignedUnits.join(", ")} • shift: {helper.schedule}</p>
+                          <p className="text-[9px] text-muted-foreground">Flats: {helper.assignedFlats?.join(", ") || "None"} • shift: {helper.expectedArrival} – {helper.expectedExit}</p>
                         </div>
                       </div>
                       <div className="flex gap-1.5">
-                        {!activeEntry ? (
+                        {!todayLog ? (
                           <Button
                             onClick={() => handleLogHelperAttendance(helper, "check-in")}
                             className="bg-green-600 hover:bg-green-700 text-white border-0 h-8 rounded-lg text-[9px] font-semibold"
                           >
                             Check In
                           </Button>
-                        ) : (
+                        ) : isInside ? (
                           <Button
                             onClick={() => handleLogHelperAttendance(helper, "check-out")}
                             className="bg-amber-600 hover:bg-amber-700 text-white border-0 h-8 rounded-lg text-[9px] font-semibold"
                           >
                             Log Exit
                           </Button>
+                        ) : (
+                          <Badge className="bg-gray-500/10 text-gray-500 border-gray-500/20 text-[9px] font-bold">Shift Finished</Badge>
                         )}
                       </div>
                     </div>

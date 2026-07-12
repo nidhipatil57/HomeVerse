@@ -137,15 +137,30 @@ router.get("/me", authenticateToken, async (req: any, res) => {
 // Update Profile
 router.put("/profile", authenticateToken, async (req: any, res) => {
   try {
+    const allowedUserFields = [
+      "name", "phone", "gender", "course", "year", "branch",
+      "workerCategory", "availability", "experience", "specializations",
+      "designation", "workingShift", "gate", "unit", "building",
+      "societyName", "hostelName", "collegeName", "communityCode", "ownerOrTenant"
+    ];
+
+    const updateData: any = {};
+    for (const key of allowedUserFields) {
+      if (req.body[key] !== undefined) {
+        updateData[key] = req.body[key];
+      }
+    }
+
     const user = await prisma.user.update({
       where: { id: req.user.id },
-      data: req.body
+      data: updateData
     });
     const userProfile = { ...user };
     // @ts-ignore
     delete userProfile.password;
     res.json({ user: userProfile });
   } catch (error) {
+    console.error("Profile update error:", error);
     res.status(500).json({ error: "Failed to update profile" });
   }
 });
