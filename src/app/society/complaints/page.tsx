@@ -570,7 +570,7 @@ export default function ComplaintsPage() {
                 </Badge>
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Enterprise ticket management, real-time Firestore sync, and AI diagnostics.
+                Enterprise ticket management, real-time database sync, and AI diagnostics.
               </p>
             </div>
           </div>
