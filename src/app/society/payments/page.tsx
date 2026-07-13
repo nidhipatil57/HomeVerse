@@ -23,12 +23,13 @@ import {
 export default function PaymentsPage() {
   const { user, initialize } = useAuth();
   const {
-    payments, collections, createCollection, editCollection, cancelCollection,
+    payments, collections, maintenanceBills, createCollection, editCollection, cancelCollection,
     payPayment, sendPaymentReminder, users, initializeDb, generateBulkMaintenanceBills
   } = useCommunityStore(
     useShallow((state) => ({
       payments: state.payments || [],
       collections: state.collections || [],
+      maintenanceBills: state.maintenanceBills || [],
       createCollection: state.createCollection,
       editCollection: state.editCollection,
       cancelCollection: state.cancelCollection,
@@ -75,6 +76,15 @@ export default function PaymentsPage() {
   const [billingMonth, setBillingMonth] = useState("August 2026");
   const [chargeMaintenance, setChargeMaintenance] = useState(3000);
   const [chargeWater, setChargeWater] = useState(500);
+  const [billingDueDate, setBillingDueDate] = useState("15 August 2026");
+  const [billingLateFee, setBillingLateFee] = useState("");
+  const [billingDescription, setBillingDescription] = useState("Monthly Maintenance Charges");
+  const [billingApplicableTo, setBillingApplicableTo] = useState("Entire Society");
+  const [billingSelectedBuilding, setBillingSelectedBuilding] = useState("Wing A");
+
+  // Collections Ledger View States
+  const [selectedLedgerCollection, setSelectedLedgerCollection] = useState<any>(null);
+  const [ledgerSearch, setLedgerSearch] = useState("");
 
   useEffect(() => {
     initialize();
@@ -165,7 +175,19 @@ export default function PaymentsPage() {
   const handleDownloadReceipt = (payment: any) => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    
+
+    let month = "N/A";
+    if (payment.paymentType === "Maintenance") {
+      const linkedBill = maintenanceBills?.find(b => b.id === payment.referenceId);
+      if (linkedBill) {
+        month = linkedBill.month;
+      } else {
+        month = "August 2026"; // Fallback
+      }
+    }
+
+    const generatedTimestamp = new Date().toLocaleString();
+
     printWindow.document.write(`
       <html>
         <head>
@@ -195,22 +217,32 @@ export default function PaymentsPage() {
               <div class="receipt-title">PAYMENT ACKNOWLEDGEMENT & RECEIPT</div>
             </div>
             <div class="details-grid">
-              <span class="label">Transaction ID:</span>
+              <span class="label">Receipt Number:</span>
+              <span class="value">REC-${payment.id.split("-").pop()}</span>
+              <span class="label">Transaction ID (Mock):</span>
               <span class="value">${payment.transactionId || "N/A"}</span>
-              <span class="label">Payment ID:</span>
-              <span class="value">${payment.id}</span>
-              <span class="label">Flat Number:</span>
-              <span class="value">Flat ${payment.unit}</span>
               <span class="label">Resident Name:</span>
               <span class="value">${payment.residentName}</span>
-              <span class="label">Payment Date:</span>
-              <span class="value">${payment.paidDate || "N/A"}</span>
+              <span class="label">Flat Number:</span>
+              <span class="value">Flat ${payment.unit}</span>
+              <span class="label">Society Name:</span>
+              <span class="value">Sunshine Complex Co-Op Society</span>
               <span class="label">Payment Type:</span>
               <span class="value">${payment.paymentType}</span>
+              <span class="label">Month:</span>
+              <span class="value">${month}</span>
+              <span class="label">Payment Date:</span>
+              <span class="value">${payment.paidDate || "N/A"}</span>
+              <span class="label">Payment Status:</span>
+              <span class="value" style="color: #10b981; font-weight: 750;">${payment.status?.toUpperCase() || "PAID"}</span>
               <span class="label">Payment Method:</span>
               <span class="value">${payment.paymentMethod || "Card"}</span>
-              <span class="label">Status:</span>
-              <span class="value" style="color: #10b981;">SUCCESSFUL / PAID</span>
+              <span class="label">Generated Timestamp:</span>
+              <span class="value">${generatedTimestamp}</span>
+              ${payment.lateFee ? `
+                <span class="label" style="color: #ef4444;">Late Fee Penalty:</span>
+                <span class="value" style="color: #ef4444;">₹${payment.lateFee}</span>
+              ` : ''}
             </div>
             <div class="amount-section">
               <div style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;">Amount Paid</div>
@@ -226,7 +258,7 @@ export default function PaymentsPage() {
               </div>
             </div>
             <div class="footer-note">
-              This is a digital certificate generated on behalf of HomeVerse and does not require physical signatures.
+              This is a digital certificate generated on behalf of HomeVerse Sunshine Co-Op Society and does not require physical signatures.
             </div>
           </div>
         </body>
@@ -385,17 +417,22 @@ export default function PaymentsPage() {
     setCollFlats("");
   };
 
-  const handleGenerateBulkBills = (e: React.FormEvent) => {
+  const handleGenerateBulkBills = async (e: React.FormEvent) => {
     e.preventDefault();
-    generateBulkMaintenanceBills({
+    await generateBulkMaintenanceBills({
       month: billingMonth,
       amount: Number(chargeMaintenance) + Number(chargeWater),
+      dueDate: billingDueDate,
+      lateFee: billingLateFee ? Number(billingLateFee) : undefined,
+      description: billingDescription,
+      applicableTo: billingApplicableTo,
+      selectedBuilding: billingApplicableTo === "Selected Building" ? billingSelectedBuilding : undefined,
       breakdown: [
         { label: "Maintenance", amount: Number(chargeMaintenance) },
         { label: "Water Charges", amount: Number(chargeWater) }
       ]
     });
-    alert(`Bulk maintenance bills generated for approved residents for ${billingMonth}!`);
+    alert(`Bulk maintenance bills generated for ${billingMonth}!`);
   };
 
   if (!mounted || !user) return null;
@@ -529,7 +566,11 @@ export default function PaymentsPage() {
                   <form onSubmit={handleGenerateBulkBills} className="space-y-4 text-xs">
                     <div>
                       <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Billing Month Cycle</label>
-                      <Input value={billingMonth} onChange={e => setBillingMonth(e.target.value)} className="h-9 rounded-lg" required />
+                      <Input value={billingMonth} onChange={e => setBillingMonth(e.target.value)} className="h-9 rounded-lg" placeholder="e.g. July 2026" required />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Billing Description</label>
+                      <Input value={billingDescription} onChange={e => setBillingDescription(e.target.value)} className="h-9 rounded-lg" placeholder="Monthly Maintenance Charges" required />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -541,9 +582,46 @@ export default function PaymentsPage() {
                         <Input type="number" value={chargeWater} onChange={e => setChargeWater(Number(e.target.value))} className="h-9 rounded-lg" required />
                       </div>
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Due Date</label>
+                        <Input value={billingDueDate} onChange={e => setBillingDueDate(e.target.value)} className="h-9 rounded-lg" placeholder="e.g. 15 July" required />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Late Fee (₹/day, optional)</label>
+                        <Input type="number" value={billingLateFee} onChange={e => setBillingLateFee(e.target.value)} className="h-9 rounded-lg" placeholder="e.g. 100" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Applicable To</label>
+                        <select
+                          value={billingApplicableTo}
+                          onChange={e => setBillingApplicableTo(e.target.value)}
+                          className="w-full h-9 rounded-lg border border-border bg-card px-2 text-xs"
+                        >
+                          <option value="Entire Society">Entire Society</option>
+                          <option value="Selected Building">Selected Building</option>
+                        </select>
+                      </div>
+                      {billingApplicableTo === "Selected Building" && (
+                        <div>
+                          <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Select Building</label>
+                          <select
+                            value={billingSelectedBuilding}
+                            onChange={e => setBillingSelectedBuilding(e.target.value)}
+                            className="w-full h-9 rounded-lg border border-border bg-card px-2 text-xs"
+                          >
+                            <option value="Wing A">Wing A</option>
+                            <option value="Wing B">Wing B</option>
+                            <option value="Wing C">Wing C</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
                     <div className="p-3 bg-amber-500/10 text-amber-600 rounded-xl border border-amber-500/20 text-[10px] flex items-center gap-1.5">
                       <AlertTriangle className="w-4.5 h-4.5 shrink-0" />
-                      This triggers bill generation for all active complex flats.
+                      This triggers bill generation for targeted approved flats.
                     </div>
                     <Button type="submit" className="w-full h-9 rounded-xl gradient-primary text-white border-0 font-semibold shadow-md">
                       Dispatch Bulk Invoices
@@ -752,7 +830,18 @@ export default function PaymentsPage() {
                               <p className="text-[10px] text-muted-foreground mt-0.5">{c.description || "No description provided."}</p>
                               <p className="text-[9px] text-muted-foreground mt-1">Due: {c.dueDate}</p>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-1.5 items-center">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedLedgerCollection(c);
+                                  setLedgerSearch("");
+                                }}
+                                className="h-7 px-2 rounded-lg text-[10px] font-semibold text-primary border-primary/20 hover:bg-primary/5 flex items-center gap-1 shrink-0"
+                              >
+                                <Users className="w-3.5 h-3.5" /> Ledger
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -893,6 +982,125 @@ export default function PaymentsPage() {
             </Card>
           </div>
         )}
+        {/* Collection Ledger Dialog Modal */}
+        <Dialog open={!!selectedLedgerCollection} onOpenChange={(open) => { if (!open) setSelectedLedgerCollection(null); }}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-card text-card-foreground border-border/50 rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold flex items-center justify-between pr-4">
+                <span>{selectedLedgerCollection?.title} – Participant Ledger</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const printWindow = window.open("", "_blank");
+                    if (!printWindow) return;
+                    const filtered = payments.filter((p: any) => p.referenceId === selectedLedgerCollection.id && 
+                      (p.residentName.toLowerCase().includes(ledgerSearch.toLowerCase()) || p.unit.toLowerCase().includes(ledgerSearch.toLowerCase()))
+                    );
+                    const rows = filtered.map((p: any) => `
+                      <tr>
+                        <td style="padding:8px;border-bottom:1px solid #ddd;">${p.residentName}</td>
+                        <td style="padding:8px;border-bottom:1px solid #ddd;">Flat ${p.unit}</td>
+                        <td style="padding:8px;border-bottom:1px solid #ddd;">₹${p.amount}</td>
+                        <td style="padding:8px;border-bottom:1px solid #ddd;">${p.status}</td>
+                        <td style="padding:8px;border-bottom:1px solid #ddd;">${p.paidDate || "N/A"}</td>
+                        <td style="padding:8px;border-bottom:1px solid #ddd;">${p.transactionId || "N/A"}</td>
+                      </tr>
+                    `).join("");
+                    printWindow.document.write(`
+                      <html>
+                        <head>
+                          <title>Ledger - ${selectedLedgerCollection.title}</title>
+                          <style>body{font-family:sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;margin-top:20px;}</style>
+                        </head>
+                        <body onload="window.print(); window.close();">
+                          <h2>Ledger: ${selectedLedgerCollection.title}</h2>
+                          <p>Target Amount: ₹${selectedLedgerCollection.amount} | Type: ${selectedLedgerCollection.type}</p>
+                          <table>
+                            <thead>
+                              <tr style="background:#f4f4f4;text-align:left;">
+                                <th style="padding:8px;">Resident</th>
+                                <th style="padding:8px;">Flat</th>
+                                <th style="padding:8px;">Amount</th>
+                                <th style="padding:8px;">Status</th>
+                                <th style="padding:8px;">Paid Date</th>
+                                <th style="padding:8px;">Txn ID</th>
+                              </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                          </table>
+                        </body>
+                      </html>
+                    `);
+                    printWindow.document.close();
+                  }}
+                  className="h-8 text-xs font-semibold rounded-lg shrink-0 border-primary/20 text-primary hover:bg-primary/5"
+                >
+                  <Download className="w-3.5 h-3.5 mr-1" /> Export Ledger
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by resident name or flat..."
+                  value={ledgerSearch}
+                  onChange={e => setLedgerSearch(e.target.value)}
+                  className="pl-9 h-9 rounded-xl text-xs"
+                />
+              </div>
+
+              <div className="border border-border/40 rounded-xl overflow-hidden text-xs">
+                <div className="max-h-[350px] overflow-y-auto divide-y divide-border/20">
+                  {payments
+                    .filter((p: any) => p.referenceId === selectedLedgerCollection?.id)
+                    .filter((p: any) => {
+                      const term = ledgerSearch.toLowerCase();
+                      return p.residentName.toLowerCase().includes(term) || p.unit.toLowerCase().includes(term);
+                    })
+                    .map((p: any) => (
+                      <div key={p.id} className="p-3.5 flex items-center justify-between hover:bg-secondary/10 transition-colors">
+                        <div>
+                          <div className="font-bold text-foreground">Flat {p.unit} • {p.residentName}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            {p.status === "Paid" ? `Paid on ${p.paidDate} via ${p.paymentMethod || "Card"}` : `Dues pending since ${p.dueDate}`}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="font-bold">₹{p.amount}</span>
+                          <Badge variant={p.status === "Paid" ? "default" : "destructive"} className="text-[9px] font-bold">
+                            {p.status}
+                          </Badge>
+                          {p.status === "Paid" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDownloadReceipt(p)}
+                              className="h-7 w-7 p-0 rounded-lg hover:bg-secondary"
+                            >
+                              <Receipt className="w-3.5 h-3.5 text-primary" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  {payments
+                    .filter((p: any) => p.referenceId === selectedLedgerCollection?.id)
+                    .filter((p: any) => {
+                      const term = ledgerSearch.toLowerCase();
+                      return p.residentName.toLowerCase().includes(term) || p.unit.toLowerCase().includes(term);
+                    }).length === 0 && (
+                      <div className="text-center py-12 text-muted-foreground text-xs">
+                        No matching records found in ledger.
+                      </div>
+                    )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }

@@ -270,7 +270,16 @@ interface CommunityState {
   addExpense: (expense: Omit<SocietyExpense, 'id'>) => Promise<void>;
   addRentRecord: (rent: Omit<RentRecord, 'id'>) => Promise<void>;
   payRentRecord: (id: string) => Promise<void>;
-  generateBulkMaintenanceBills: (billDetails: { month: string; amount: number; breakdown: { label: string; amount: number }[] }) => Promise<void>;
+  generateBulkMaintenanceBills: (billDetails: {
+    month: string;
+    amount: number;
+    dueDate?: string;
+    lateFee?: number;
+    description?: string;
+    applicableTo?: string;
+    selectedBuilding?: string;
+    breakdown?: { label: string; amount: number }[];
+  }) => Promise<void>;
   deleteMarketplaceItem: (itemId: string) => Promise<void>;
   updateWorkerServices: (workerId: string, details: {
     specializations: string[];

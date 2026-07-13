@@ -307,19 +307,26 @@ router.get("/maintenance", authenticateToken, async (req: any, res) => {
 });
 
 router.post("/maintenance/generate", authenticateToken, async (req: any, res) => {
-  const { residentId, residentName, unit, month, amount, dueDate, breakdown } = req.body;
+  const { residentId, residentName, unit, month, amount, dueDate, breakdown, lateFee, description, applicableTo, selectedBuilding } = req.body;
 
   try {
     // If no residentId is provided, perform bulk generation for all approved residents
     if (!residentId) {
+      const filter: any = { role: "resident", status: "approved" };
+      if (applicableTo === "Selected Building" && selectedBuilding) {
+        filter.building = selectedBuilding;
+      }
+
       const residents = await prisma.user.findMany({
-        where: { role: "resident", status: "approved" }
+        where: filter
       });
 
       const generatedBills = [];
       const billMonth = month || "July 2026";
       const billAmount = parseFloat(amount) || 3500;
       const billDueDate = dueDate || "15 August";
+      const billLateFee = lateFee ? parseFloat(lateFee) : null;
+      const billDesc = description || "Monthly Maintenance Charges";
 
       for (const r of residents) {
         const id = `BILL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
@@ -334,7 +341,9 @@ router.post("/maintenance/generate", authenticateToken, async (req: any, res) =>
             month: billMonth,
             amount: billAmount,
             dueDate: billDueDate,
-            status: "pending"
+            status: "pending",
+            description: billDesc,
+            lateFee: billLateFee
           }
         });
 
@@ -352,12 +361,14 @@ router.post("/maintenance/generate", authenticateToken, async (req: any, res) =>
             amount: billAmount,
             status: "pending",
             dueDate: billDueDate,
-            referenceId: id
+            referenceId: id,
+            description: billDesc,
+            lateFee: billLateFee
           }
         });
 
         // 3. Send in-app notification: Maintenance bill generated.
-        await sendInAppNotification(r.id, "Maintenance Bill Generated", "Maintenance bill generated.", "info");
+        await sendInAppNotification(r.id, "Maintenance Bill Generated 🧾", `📢 ${billMonth} maintenance bill has been generated. Due date: ${billDueDate}`, "warning");
 
         generatedBills.push(bill);
         broadcastUpdate("maintenance:update", bill);
@@ -368,6 +379,9 @@ router.post("/maintenance/generate", authenticateToken, async (req: any, res) =>
 
     // Otherwise, generate a single maintenance bill
     const id = `BILL-${Math.floor(100 + Math.random() * 900)}`;
+    const billLateFee = lateFee ? parseFloat(lateFee) : null;
+    const billDesc = description || "Monthly Maintenance Charges";
+
     const bill = await prisma.maintenanceBill.create({
       data: {
         id,
@@ -377,7 +391,9 @@ router.post("/maintenance/generate", authenticateToken, async (req: any, res) =>
         month,
         amount: parseFloat(amount),
         dueDate,
-        status: "pending"
+        status: "pending",
+        description: billDesc,
+        lateFee: billLateFee
       }
     });
 
@@ -395,12 +411,14 @@ router.post("/maintenance/generate", authenticateToken, async (req: any, res) =>
         amount: parseFloat(amount),
         status: "pending",
         dueDate,
-        referenceId: id
+        referenceId: id,
+        description: billDesc,
+        lateFee: billLateFee
       }
     });
 
     // Send notification
-    await sendInAppNotification(residentId, "Maintenance Bill Generated", "Maintenance bill generated.", "info");
+    await sendInAppNotification(residentId, "Maintenance Bill Generated 🧾", `📢 ${month} maintenance bill has been generated. Due date: ${dueDate}`, "warning");
 
     broadcastUpdate("maintenance:update", bill);
     res.status(201).json(bill);
@@ -673,12 +691,13 @@ router.put("/payments/:id/pay", authenticateToken, async (req: any, res) => {
     }
 
     // Send notifications
-    await sendInAppNotification(payment.residentId, "Payment Successful", "Payment successful.", "success");
-    await sendInAppNotification(payment.residentId, "Receipt Ready", "Receipt ready to download.", "success");
+    await sendInAppNotification(payment.residentId, "Payment Successful ✅", `${payment.paymentType} payment successful. Receipt generated. Thank you.`, "success");
+    await sendInAppNotification(payment.residentId, "Receipt Ready 📄", "📄 Receipt is ready to download.", "success");
 
     const secretaryUsers = await prisma.user.findMany({ where: { role: "secretary" } });
     for (const sec of secretaryUsers) {
-      await sendInAppNotification(sec.id, "Resident Payment Received", "Resident completed payment.", "success");
+      await sendInAppNotification(sec.id, "Resident Payment Received ✅", `✅ ${payment.residentName} (${payment.building || ""} Flat ${payment.unit}) paid ${payment.paymentType}.`, "success");
+      await sendInAppNotification(sec.id, "Collection Progress Updated 📊", `📊 Collection progress updated for ${payment.paymentType}.`, "info");
     }
 
     // Check if collection target reached
