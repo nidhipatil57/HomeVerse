@@ -349,48 +349,181 @@ export const getPrepopulatedMarketplaceItems = (): any[] => [
   }
 ];
 
-export const getPrepopulatedLostFoundItems = (): any[] => [
+export const getPrepopulatedFoundItems = (): any[] => [
   {
     id: "LF-001",
-    title: "Metal Blue Water Bottle",
-    description: "Milton steel water bottle found at the mess hall near water cooler.",
-    status: "reported",
-    reporterId: "user-student-1",
-    reporterName: "Aarav Mehta",
+    reporterId: "user-student-2",
+    reporterName: "Priya Sharma",
+    communityCode: "VESIT26",
+    category: "Other",
+    description: "Casio Scientific Calculator fx-991EX found in library study room 3.",
+    images: ["/images/found-calculator.jpg"],
+    foundLocation: "Library study room 3",
+    dateFound: "2026-07-04",
+    timeFound: "16:30",
+    additionalNotes: "Model fx-991EX, has some scratches.",
+    status: "Pending Verification",
     portal: "hostel",
-    createdAt: "2026-07-04T16:30:00"
+    createdAt: "2026-07-04T16:30:00Z"
   },
   {
     id: "LF-002",
-    title: "Bunch of Keys with Leather Keychain",
-    description: "Found on the floor near A Wing lift entrance. Has 3 keys attached.",
-    status: "reported",
     reporterId: "user-resident-2",
     reporterName: "Nidhi Kumar",
+    communityCode: "SUN123",
+    category: "Keys",
+    description: "Bunch of keys found on the floor near A Wing lift entrance. Has 3 keys attached.",
+    images: ["/images/found-keys.jpg"],
+    foundLocation: "Near A Wing lift entrance",
+    dateFound: "2026-07-05",
+    timeFound: "09:00",
+    additionalNotes: "Keyring has a small leather strap.",
+    status: "Available for Claim",
     portal: "society",
-    createdAt: "2026-07-05T09:00:00"
+    createdAt: "2026-07-05T09:00:00Z"
   },
   {
     id: "LF-003",
-    title: "Brown Leather Wallet",
-    description: "Found in Clubhouse lobby. Contains some cash and a transportation card.",
-    status: "claimed",
     reporterId: "user-security-1",
     reporterName: "Raj Singh",
-    claimantId: "user-resident-1",
-    claimantName: "Sara Shah",
+    communityCode: "SUN123",
+    category: "Wallet",
+    description: "Brown leather wallet found in Clubhouse lobby. Contains some cash and transportation card.",
+    images: ["/images/found-wallet.jpg"],
+    foundLocation: "Clubhouse lobby",
+    dateFound: "2026-07-02",
+    timeFound: "18:00",
+    additionalNotes: "Handed over to security desk immediately.",
+    status: "Returned",
     portal: "society",
-    createdAt: "2026-07-02T18:00:00"
+    createdAt: "2026-07-02T18:00:00Z"
   },
   {
     id: "LF-004",
-    title: "Casio Scientific Calculator",
-    description: "Found in library study room 3. Model fx-991EX.",
-    status: "reported",
-    reporterId: "user-student-2",
-    reporterName: "Priya Sharma",
-    portal: "hostel",
-    createdAt: "2026-07-05T14:30:00"
+    reporterId: "user-resident-1",
+    reporterName: "Sara Shah",
+    communityCode: "SUN123",
+    category: "Water Bottle",
+    description: "Milton steel water bottle found at the clubhouse table.",
+    images: ["/images/found-bottle.jpg"],
+    foundLocation: "Clubhouse table",
+    dateFound: "2026-07-06",
+    timeFound: "11:00",
+    additionalNotes: "Blue color, steel cap.",
+    status: "Claim Pending Verification",
+    portal: "society",
+    createdAt: "2026-07-06T11:00:00Z"
+  },
+  {
+    id: "LF-005",
+    reporterId: "user-resident-2",
+    reporterName: "Nidhi Kumar",
+    communityCode: "SUN123",
+    category: "Earbuds",
+    description: "White Bluetooth Earbuds found near gym treadmill.",
+    images: ["/images/found-earbuds.jpg"],
+    foundLocation: "Gym treadmill",
+    dateFound: "2026-07-07",
+    timeFound: "10:00",
+    additionalNotes: "Left case open.",
+    status: "Ready for Pickup",
+    portal: "society",
+    createdAt: "2026-07-07T10:00:00Z"
+  }
+];
+
+export const getPrepopulatedClaims = (): any[] => [
+  {
+    id: "CLM-001",
+    itemId: "LF-003",
+    residentId: "user-resident-1",
+    residentName: "Sara Shah",
+    claimReason: "I lost my brown wallet in the clubhouse yesterday. It has my transportation card.",
+    itemDetails: "Casio transportation card, two banknotes, brown faux leather.",
+    proofImage: "",
+    contactNumber: "+91 98765 43210",
+    status: "Returned",
+    approvalDate: "2026-07-03T10:00:00.000Z",
+    collectionDate: "2026-07-03T10:30:00.000Z",
+    collectionTime: "10:30 AM",
+    collectedBy: "Sara Shah",
+    verifiedBySecurity: "Raj Singh"
+  },
+  {
+    id: "CLM-002",
+    itemId: "LF-004",
+    residentId: "user-resident-2",
+    residentName: "Nidhi Kumar",
+    claimReason: "My Milton blue bottle was left at the clubhouse table during the committee meeting.",
+    itemDetails: "Blue color, scratched bottom, has a yellow sticker.",
+    proofImage: "",
+    contactNumber: "+91 87654 32110",
+    status: "Claim Pending Verification"
+  },
+  {
+    id: "CLM-003",
+    itemId: "LF-005",
+    residentId: "user-resident-1",
+    residentName: "Sara Shah",
+    claimReason: "I forgot my white earbuds at the gym treadmill.",
+    itemDetails: "White case, has a small black mark on the side.",
+    proofImage: "",
+    contactNumber: "+91 98765 43210",
+    status: "Approved",
+    approvalDate: "2026-07-07T12:00:00.000Z"
+  }
+];
+
+export const getPrepopulatedLostReports = (): any[] => [
+  {
+    id: "LR-001",
+    residentId: "user-resident-1",
+    itemName: "Black Leather Wallet",
+    category: "Wallet",
+    brand: "Wildhorn",
+    colour: "Black",
+    description: "Lost my black leather wallet near the clubhouse gym entrance or parking area.",
+    distinguishingFeatures: "Contains a college ID and a driver's license for Sara Shah.",
+    dateLost: "2026-07-14",
+    timeLost: "18:00",
+    lastSeenLocation: "Clubhouse Gym Entrance",
+    status: "Searching",
+    images: [],
+    additionalNotes: "Reward if found.",
+    portal: "society",
+    communityCode: "SUN123",
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "LR-002",
+    residentId: "user-resident-2",
+    itemName: "Silver Ring",
+    category: "Jewellery",
+    brand: "Orra",
+    colour: "Silver",
+    description: "Lost a silver band ring in the common playground area.",
+    distinguishingFeatures: "Engraved with initials 'NK'.",
+    dateLost: "2026-07-13",
+    timeLost: "17:00",
+    lastSeenLocation: "Garden Playground",
+    status: "Possible Match Found",
+    images: [],
+    additionalNotes: "Very sentimental.",
+    portal: "society",
+    communityCode: "SUN123",
+    createdAt: new Date().toISOString()
+  }
+];
+
+export const getPrepopulatedItemMatches = (): any[] => [
+  {
+    id: "MT-001",
+    lostReportId: "LR-002",
+    foundItemId: "LF-002",
+    status: "Suggested",
+    verifiedBy: null,
+    verificationDate: null,
+    createdAt: new Date()
   }
 ];
 
@@ -1496,7 +1629,10 @@ export const getInitialDb = () => ({
   parcels: getPrepopulatedParcels(),
   facilityBookings: [],
   marketplaceItems: getPrepopulatedMarketplaceItems(),
-  lostFoundItems: getPrepopulatedLostFoundItems(),
+  foundItems: getPrepopulatedFoundItems(),
+  claims: getPrepopulatedClaims(),
+  lostReports: getPrepopulatedLostReports(),
+  itemMatches: getPrepopulatedItemMatches(),
   roomChangeRequests: [],
   maintenanceBills: getPrepopulatedMaintenanceBills(),
   communityEvents: getPrepopulatedCommunityEvents(),

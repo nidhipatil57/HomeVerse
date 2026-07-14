@@ -74,18 +74,83 @@ export interface MarketplaceItem {
   createdAt: string;
 }
 
-export interface LostFoundItem {
+export interface Claim {
   id: string;
-  title: string;
-  description: string;
-  image?: string;
-  status: "reported" | "claimed";
+  itemId: string;
+  residentId: string;
+  residentName: string;
+  claimReason: string;
+  itemDetails?: string;
+  proofImage?: string;
+  contactNumber?: string;
+  status: "Claim Pending Verification" | "Ready for Pickup" | "Returned" | "Rejected";
+  approvalDate?: string;
+  collectionDate?: string;
+  collectionTime?: string;
+  collectedBy?: string;
+  verifiedBySecurity?: string;
+  createdAt: string;
+}
+
+export interface FoundItem {
+  id: string;
   reporterId: string;
   reporterName: string;
-  claimantId?: string;
-  claimantName?: string;
+  communityCode: string;
+  category: string;
+  brand?: string;
+  colour?: string;
+  description: string;
+  images: string[];
+  foundLocation: string;
+  dateFound: string;
+  timeFound: string;
+  additionalNotes?: string;
+  status: "Pending Verification" | "Available for Claim" | "Claim Pending Verification" | "Ready for Pickup" | "Returned" | "Rejected" | "Possible Match Found" | "Owner Identified";
   portal: PortalType;
   createdAt: string;
+  claims?: Claim[];
+  matches?: ItemMatch[];
+}
+
+export interface LostReport {
+  id: string;
+  residentId?: string;
+  itemName: string;
+  category: string;
+  brand?: string;
+  colour?: string;
+  description: string;
+  distinguishingFeatures?: string;
+  dateLost: string;
+  timeLost?: string;
+  lastSeenLocation: string;
+  status: "Searching" | "Possible Match Found" | "Matched" | "Returned" | "Closed";
+  images: string[];
+  additionalNotes?: string;
+  portal: PortalType;
+  communityCode: string;
+  createdAt: string;
+  updatedAt?: string;
+  matches?: ItemMatch[];
+  residentName?: string;
+  flatNumber?: string;
+}
+
+export interface ItemMatch {
+  id: string;
+  lostReportId: string;
+  foundItemId: string;
+  status: "Suggested" | "Confirmed" | "Rejected";
+  verifiedBy?: string;
+  verificationDate?: string;
+  collectionDate?: string;
+  collectionTime?: string;
+  collectedBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+  lostReport?: LostReport;
+  foundItem?: FoundItem;
 }
 
 export interface RoomChangeRequest {
@@ -154,7 +219,9 @@ interface CommunityState {
   parcels: Parcel[];
   facilityBookings: FacilityBooking[];
   marketplaceItems: MarketplaceItem[];
-  lostFoundItems: LostFoundItem[];
+  lostFoundItems: FoundItem[];
+  lostReports: LostReport[];
+  itemMatches: ItemMatch[];
   roomChangeRequests: RoomChangeRequest[];
   maintenanceBills: MaintenanceBill[];
   communityEvents: CommunityEvent[];
@@ -240,9 +307,28 @@ interface CommunityState {
   sellMarketplaceItem: (id: string) => Promise<void>;
 
   // Lost & Found Transactions
-  reportLostFoundItem: (item: Omit<LostFoundItem, "id" | "status" | "createdAt">) => Promise<void>;
-  claimLostFoundItem: (id: string, claimantId: string, claimantName: string) => Promise<void>;
+  reportLostFoundItem: (item: Omit<FoundItem, "id" | "status" | "createdAt">) => Promise<void>;
+  claimLostFoundItem: (
+    id: string,
+    residentId: string,
+    residentName: string,
+    claimReason: string,
+    itemDetails?: string,
+    proofImage?: string,
+    contactNumber?: string
+  ) => Promise<void>;
   resolveLostFoundItem: (id: string) => Promise<void>;
+  verifyFoundItem: (id: string) => Promise<void>;
+  rejectFoundItem: (id: string) => Promise<void>;
+  approveClaim: (claimId: string) => Promise<void>;
+  rejectClaim: (claimId: string) => Promise<void>;
+  pickupItem: (claimId: string, collectedBy: string, verifiedBySecurity: string) => Promise<void>;
+  reportLostItem: (report: Omit<LostReport, "id" | "status" | "createdAt">) => Promise<void>;
+  confirmMatch: (matchId: string, verifiedBy: string) => Promise<void>;
+  rejectMatch: (matchId: string) => Promise<void>;
+  handoverMatchedItem: (matchId: string, collectedBy: string, verifiedBySecurity: string) => Promise<void>;
+  fetchLostReports: () => Promise<void>;
+  fetchMatches: () => Promise<void>;
 
   // Society Finance & Billing Transactions
   payMaintenanceBill: (id: string) => Promise<void>;
@@ -306,6 +392,8 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   facilityBookings: [],
   marketplaceItems: [],
   lostFoundItems: [],
+  lostReports: [],
+  itemMatches: [],
   roomChangeRequests: [],
   maintenanceBills: [],
   communityEvents: [],
@@ -356,6 +444,8 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           { key: "incidents", path: "/api/incidents" },
           { key: "marketplaceItems", path: "/api/marketplace" },
           { key: "lostFoundItems", path: "/api/lostfound" },
+          { key: "lostReports", path: "/api/lostfound/lost" },
+          { key: "itemMatches", path: "/api/lostfound/matches" },
           { key: "flats", path: "/api/flats" },
           { key: "expenses", path: "/api/expenses" },
           { key: "users", path: "/api/users" },
@@ -729,6 +819,30 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         set({ lostFoundItems: next });
       } else {
         set({ lostFoundItems: [updated, ...current] });
+      }
+    });
+
+    socket.on("lostreport:update", (updated: any) => {
+      const current = get().lostReports || [];
+      const index = current.findIndex(l => l.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ lostReports: next });
+      } else {
+        set({ lostReports: [updated, ...current] });
+      }
+    });
+
+    socket.on("itemmatch:update", (updated: any) => {
+      const current = get().itemMatches || [];
+      const index = current.findIndex(m => m.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ itemMatches: next });
+      } else {
+        set({ itemMatches: [updated, ...current] });
       }
     });
 
@@ -1150,20 +1264,104 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
   },
 
-  claimLostFoundItem: async (id, claimantId, claimantName) => {
+  claimLostFoundItem: async (id, residentId, residentName, claimReason, itemDetails, proofImage, contactNumber) => {
     await fetch(`/api/lostfound/${id}/claim`, {
-      method: "PUT",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ claimantId, claimantName })
+      body: JSON.stringify({ residentId, residentName, claimReason, itemDetails, proofImage, contactNumber })
     });
   },
 
   resolveLostFoundItem: async (id) => {
-    await fetch(`/api/lostfound/${id}/claim`, {
+    await fetch(`/api/lostfound/${id}/verify`, {
+      method: "PUT"
+    });
+  },
+
+  verifyFoundItem: async (id) => {
+    await fetch(`/api/lostfound/${id}/verify`, {
+      method: "PUT"
+    });
+  },
+
+  rejectFoundItem: async (id) => {
+    await fetch(`/api/lostfound/${id}/reject`, {
+      method: "PUT"
+    });
+  },
+
+  approveClaim: async (claimId) => {
+    await fetch(`/api/lostfound/claims/${claimId}/approve`, {
+      method: "PUT"
+    });
+  },
+
+  rejectClaim: async (claimId) => {
+    await fetch(`/api/lostfound/claims/${claimId}/reject`, {
+      method: "PUT"
+    });
+  },
+
+  pickupItem: async (claimId, collectedBy, verifiedBySecurity) => {
+    await fetch(`/api/lostfound/claims/${claimId}/pickup`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "claimed" })
+      body: JSON.stringify({ collectedBy, verifiedBySecurity })
     });
+  },
+
+  reportLostItem: async (report) => {
+    await fetch("/api/lostfound/lost", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(report)
+    });
+  },
+
+  confirmMatch: async (matchId, verifiedBy) => {
+    await fetch(`/api/lostfound/matches/${matchId}/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ verifiedBy })
+    });
+  },
+
+  rejectMatch: async (matchId) => {
+    await fetch(`/api/lostfound/matches/${matchId}/reject`, {
+      method: "POST"
+    });
+  },
+
+  handoverMatchedItem: async (matchId, collectedBy, verifiedBySecurity) => {
+    await fetch(`/api/lostfound/matches/${matchId}/handover`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ collectedBy, verifiedBySecurity })
+    });
+  },
+
+  fetchLostReports: async () => {
+    try {
+      const res = await fetch("/api/lostfound/lost");
+      if (res.ok) {
+        const data = await res.json();
+        set({ lostReports: data });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  },
+
+  fetchMatches: async () => {
+    try {
+      const res = await fetch("/api/lostfound/matches");
+      if (res.ok) {
+        const data = await res.json();
+        set({ itemMatches: data });
+      }
+    } catch (e) {
+      console.error(e);
+    }
   },
 
   payMaintenanceBill: async (id) => {

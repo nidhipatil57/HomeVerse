@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Shield, Users, CheckCircle2, Clock, AlertTriangle, FileCheck, Package, Eye, Trash, Plus, Search, Bot, ArrowRight, Wrench, Key, Star, XCircle, PlusCircle, LogOut, MapPin, Activity, Car, AlertCircle, Camera, Check, ShieldAlert, Ban, UserCheck, ShieldClose, FileText
+  Shield, Users, CheckCircle2, Clock, AlertTriangle, FileCheck, Package, Eye, Trash, Plus, Search, Bot, ArrowRight, Wrench, Key, Star, XCircle, PlusCircle, LogOut, MapPin, Activity, Car, AlertCircle, Camera, Check, ShieldAlert, Ban, UserCheck, ShieldClose, FileText, ClipboardList
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,9 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
   const {
     visitors, checkInVisitor, checkOutVisitor, denyVisitorEntry,
     parcels, addParcel, pickupParcelWithOTP,
-    lostFoundItems, reportLostFoundItem, resolveLostFoundItem,
+    lostFoundItems, lostReports, itemMatches, reportLostFoundItem, resolveLostFoundItem,
+    verifyFoundItem, rejectFoundItem, approveClaim, rejectClaim, pickupItem,
+    confirmMatch, rejectMatch, handoverMatchedItem, fetchLostReports, fetchMatches,
     emergencies, updateEmergencyStatus,
     gatePasses, issueGatePass,
     vehicleLogs, logVehicleEntry, logVehicleExit,
@@ -34,9 +36,21 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
       parcels: state.parcels,
       addParcel: state.addParcel,
       pickupParcelWithOTP: state.pickupParcelWithOTP,
-      lostFoundItems: state.lostFoundItems,
+      lostFoundItems: state.lostFoundItems || [],
+      lostReports: state.lostReports || [],
+      itemMatches: state.itemMatches || [],
       reportLostFoundItem: state.reportLostFoundItem,
       resolveLostFoundItem: state.resolveLostFoundItem,
+      verifyFoundItem: state.verifyFoundItem,
+      rejectFoundItem: state.rejectFoundItem,
+      approveClaim: state.approveClaim,
+      rejectClaim: state.rejectClaim,
+      pickupItem: state.pickupItem,
+      confirmMatch: state.confirmMatch,
+      rejectMatch: state.rejectMatch,
+      handoverMatchedItem: state.handoverMatchedItem,
+      fetchLostReports: state.fetchLostReports,
+      fetchMatches: state.fetchMatches,
       emergencies: state.emergencies || [],
       updateEmergencyStatus: state.updateEmergencyStatus,
       gatePasses: state.gatePasses || [],
@@ -69,6 +83,11 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
     }
   }, [tabParam]);
 
+  useEffect(() => {
+    fetchLostReports();
+    fetchMatches();
+  }, [fetchLostReports, fetchMatches]);
+
   // Modals / Input States
   const [denyReason, setDenyReason] = useState("");
   const [activeDenyId, setActiveDenyId] = useState("");
@@ -87,12 +106,22 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
   const [releaseParcelId, setReleaseParcelId] = useState("");
   const [parcelReleaseError, setParcelReleaseError] = useState("");
 
-  // Lost & Found creation state
+  // Lost & Found creation state & tabs
   const [newFound, setNewFound] = useState({
     title: "",
+    category: "Keys",
     description: "",
     location: "",
+    dateFound: "",
+    timeFound: "",
+    additionalNotes: "",
   });
+  const [showHandoverDialog, setShowHandoverDialog] = useState(false);
+  const [selectedClaimForHandover, setSelectedClaimForHandover] = useState<any>(null);
+  const [collectedBy, setCollectedBy] = useState("");
+  const [verifiedBySecurity, setVerifiedBySecurity] = useState(security?.name || "Security");
+  const [resolving, setResolving] = useState(false);
+  const [lostFoundSubTab, setLostFoundSubTab] = useState("pending");
 
   // Incident creation state
   const [newIncident, setNewIncident] = useState({
@@ -134,6 +163,13 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
   const activeDeliveries = visitors.filter(v => v.portal === "society" && v.status === "checked-in" && v.purpose.toLowerCase().includes("delivery"));
   const pendingParcels = parcels.filter(p => p.portal === "society" && p.status === "received");
   const activeEmergencies = emergencies.filter(e => e.status !== "resolved");
+
+  // Lost & Found counters
+  const activeLostReportsCount = lostReports.filter(r => r.status === "Searching" || r.status === "Possible Match Found").length;
+  const activeFoundItemsCount = lostFoundItems.filter(item => item.portal === "society" && item.status === "Available for Claim").length;
+  const possibleMatchesCount = itemMatches.filter(m => m.status === "Suggested").length;
+  const itemsReturnedCount = lostFoundItems.filter(item => item.portal === "society" && item.status === "Returned").length + itemMatches.filter(m => m.status === "Confirmed" && m.collectionDate).length;
+  const unmatchedReportsCount = lostReports.filter(r => r.status === "Searching").length;
 
 
   // Service Plumbers / Electricians (assigned complaints)
@@ -203,20 +239,37 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
     }
   };
 
-  const handleAddFoundSubmit = (e: React.FormEvent) => {
+  const handleAddFoundSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFound.title) return;
+    if (!newFound.title || !newFound.category || !newFound.location) return;
 
-    reportLostFoundItem({
-      title: newFound.title,
-      description: `${newFound.description || "Found at gate."} Location: ${newFound.location}`,
+    const today = new Date().toISOString().split("T")[0];
+    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+    await reportLostFoundItem({
+      category: newFound.category,
+      description: `${newFound.title} - ${newFound.description}`,
+      images: ["/images/found-placeholder.jpg"],
+      foundLocation: newFound.location,
+      dateFound: newFound.dateFound || today,
+      timeFound: newFound.timeFound || timeNow,
+      additionalNotes: newFound.additionalNotes || "",
+      reporterId: security?.id || "sec-guard-1",
+      reporterName: security?.name || "Rahul",
       portal: "society",
-      reporterId: security.id,
-      reporterName: security.name,
-      image: "/images/found-placeholder.jpg"
+      communityCode: security?.communityCode || "SUN123"
     });
 
-    setNewFound({ title: "", description: "", location: "" });
+    setNewFound({ 
+      title: "", 
+      category: "Keys", 
+      description: "", 
+      location: "", 
+      dateFound: "", 
+      timeFound: "", 
+      additionalNotes: "" 
+    });
+    alert("Recovered item cataloged in society bulletin!");
   };
 
   const handleAddIncidentSubmit = (e: React.FormEvent) => {
@@ -853,49 +906,105 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
 
         {/* LOST & FOUND HUB TAB */}
         {activeTab === "lostfound" && (
-          <div className="grid lg:grid-cols-12 gap-6 animate-fadeIn">
+          <div className="space-y-6 animate-fadeIn">
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              {[
+                { label: "Active Lost Reports", value: activeLostReportsCount, icon: ClipboardList, color: "text-amber-500 bg-amber-500/10" },
+                { label: "Active Found Items", value: activeFoundItemsCount, icon: PlusCircle, color: "text-blue-500 bg-blue-500/10" },
+                { label: "Possible Matches", value: possibleMatchesCount, icon: ShieldAlert, color: "text-indigo-500 bg-indigo-500/10" },
+                { label: "Items Returned", value: itemsReturnedCount, icon: CheckCircle2, color: "text-green-500 bg-green-500/10" },
+                { label: "Unmatched Reports", value: unmatchedReportsCount, icon: Clock, color: "text-purple-500 bg-purple-500/10" },
+              ].map((stat, i) => (
+                <Card key={i} className="border-border/50 shadow-sm">
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${stat.color}`}>
+                      <stat.icon className="w-5.5 h-5.5" />
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold font-[family-name:var(--font-heading)]">{stat.value}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="grid lg:grid-cols-12 gap-6">
             {/* Left: Log new found property */}
-            <Card className="lg:col-span-5 border-border/50">
+            <Card className="lg:col-span-5 border-border/50 h-fit">
               <CardHeader className="pb-3 border-b border-border/20">
                 <CardTitle className="text-base font-bold flex items-center gap-2">
                   <PlusCircle className="w-4.5 h-4.5 text-blue-500" />
-                  Log Found Property
+                  Log Recovered Property
                 </CardTitle>
-                <CardDescription>Log found keys, phones, or wallets found in common areas</CardDescription>
+                <CardDescription>Catalog items handed over to security desk gate 1</CardDescription>
               </CardHeader>
               <CardContent className="p-5">
                 <form onSubmit={handleAddFoundSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[11px] font-bold text-muted-foreground block mb-1">Item Name</label>
+                      <Input
+                        placeholder="e.g. Set of Keys"
+                        value={newFound.title}
+                        onChange={(e) => setNewFound(prev => ({ ...prev, title: e.target.value }))}
+                        className="rounded-xl h-10 text-xs"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-muted-foreground block mb-1">Category</label>
+                      <select
+                        value={newFound.category}
+                        onChange={(e) => setNewFound(prev => ({ ...prev, category: e.target.value }))}
+                        className="w-full h-10 px-3 border border-border rounded-xl bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                        required
+                      >
+                        {["Keys", "Wallet", "Mobile Phone", "Earbuds", "Watch", "Jewellery", "Water Bottle", "Books", "ID Card", "Debit/Credit Card", "Documents", "Bag", "Umbrella", "Clothes", "Other"].map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                   <div>
-                    <label className="text-[11px] font-bold text-muted-foreground block mb-1">Item Title</label>
+                    <label className="text-[11px] font-bold text-muted-foreground block mb-1">Location Found</label>
                     <Input
-                      placeholder="e.g. Brass Ring Keys Set"
-                      value={newFound.title}
-                      onChange={(e) => setNewFound(prev => ({ ...prev, title: e.target.value }))}
-                      className="rounded-xl h-10"
+                      placeholder="e.g. Lift lobby level B1 Tower A"
+                      value={newFound.location}
+                      onChange={(e) => setNewFound(prev => ({ ...prev, location: e.target.value }))}
+                      className="rounded-xl h-10 text-xs"
                       required
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-muted-foreground block mb-1">Found Location</label>
-                    <Input
-                      placeholder="e.g. Lift Lobby 2nd floor Tower A"
-                      value={newFound.location}
-                      onChange={(e) => setNewFound(prev => ({ ...prev, location: e.target.value }))}
-                      className="rounded-xl h-10"
-                      required
-                    />
+                    <label className="text-[11px] font-bold text-muted-foreground block mb-1">Date & Time Found</label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        type="date"
+                        value={newFound.dateFound}
+                        onChange={(e) => setNewFound(prev => ({ ...prev, dateFound: e.target.value }))}
+                        className="rounded-xl h-10 text-xs"
+                      />
+                      <Input
+                        type="time"
+                        value={newFound.timeFound}
+                        onChange={(e) => setNewFound(prev => ({ ...prev, timeFound: e.target.value }))}
+                        className="rounded-xl h-10 text-xs"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="text-[11px] font-bold text-muted-foreground block mb-1">Description / Notes</label>
                     <Input
-                      placeholder="e.g. Has a small key fob with a leather tag."
+                      placeholder="e.g. keychain with red ribbon tag"
                       value={newFound.description}
                       onChange={(e) => setNewFound(prev => ({ ...prev, description: e.target.value }))}
-                      className="rounded-xl h-10"
+                      className="rounded-xl h-10 text-xs"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-muted-foreground block mb-1">Upload Proof Photo</label>
+                    <label className="text-[11px] font-bold text-muted-foreground block mb-1">Upload Photo</label>
                     <div className="p-3 border border-dashed border-border rounded-xl flex items-center justify-center gap-2 hover:bg-secondary/20 cursor-pointer">
                       <Camera className="w-5 h-5 text-muted-foreground" />
                       <span className="text-xs text-muted-foreground">found_item_photo.jpg (Default)</span>
@@ -904,64 +1013,190 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
 
                   <Button
                     type="submit"
-                    className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl h-11 border-0 shadow-md font-semibold"
+                    className="w-full gradient-primary text-white rounded-xl h-11 border-0 shadow-md font-semibold text-xs"
                   >
-                    Log Item & Broadcast Notice
+                    Catalog Item
                   </Button>
                 </form>
               </CardContent>
             </Card>
 
-            {/* Right: Active / Claimed items grid */}
-            <Card className="lg:col-span-7 border-border/50 flex flex-col h-[520px] overflow-hidden">
+            {/* Right: Active / Claimed items grid with tabs */}
+            <Card className="lg:col-span-7 border-border/50 flex flex-col h-[600px] overflow-hidden">
               <CardHeader className="border-b border-border/20 pb-3">
-                <CardTitle className="text-base font-bold flex items-center gap-2">
-                  <Search className="w-4.5 h-4.5 text-indigo-500" />
-                  Active Claims Feed
-                </CardTitle>
-                <CardDescription>Verify resident identity for claimed items and mark them collected</CardDescription>
+                <div className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <ClipboardList className="w-4.5 h-4.5 text-indigo-500" />
+                      Lost & Found Registry Hub
+                    </CardTitle>
+                    <CardDescription>Physical verification, claim review, and physical handover resolution</CardDescription>
+                  </div>
+                  <Button 
+                    type="button"
+                    onClick={() => window.location.href = "/society/security-lost-found"} 
+                    className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white border-0 text-xs font-semibold px-4 h-9 shadow-sm"
+                  >
+                    Open Dedicated Portal ➜
+                  </Button>
+                </div>
+                
+                {/* Sub tabs list */}
+                <div className="flex gap-1.5 mt-3 bg-secondary/30 p-1 rounded-lg w-fit">
+                  {["pending", "claims", "pickup", "history"].map(tab => {
+                    const filteredList = lostFoundItems.filter(item => item.portal === "society");
+                    let count = 0;
+                    if (tab === "pending") count = filteredList.filter(item => item.status === "Pending Verification").length;
+                    else if (tab === "claims") count = filteredList.filter(item => item.status === "Claim Pending Verification").length;
+                    else if (tab === "pickup") count = filteredList.filter(item => item.status === "Ready for Pickup").length;
+                    else if (tab === "history") count = filteredList.filter(item => item.status === "Returned" || item.status === "Rejected" || item.status === "Available for Claim").length;
+
+                    return (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setLostFoundSubTab(tab)}
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors ${
+                          lostFoundSubTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:bg-secondary/40"
+                        }`}
+                      >
+                        <span className="capitalize">{tab}</span> ({count})
+                      </button>
+                    );
+                  })}
+                </div>
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto p-4 space-y-3">
-                {lostFoundItems.filter(item => item.portal === "society" && item.status !== "collected" as any).length === 0 ? (
-                  <div className="text-center py-20 text-muted-foreground text-sm flex flex-col items-center justify-center gap-2">
-                    <Search className="w-8 h-8 text-muted-foreground/30" />
-                    No active property items currently logged.
-                  </div>
-                ) : (
-                  lostFoundItems.filter(item => item.portal === "society" && item.status !== "collected" as any).map(item => (
-                    <div key={item.id} className="p-4 rounded-xl border border-border bg-card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-foreground">{item.title}</span>
-                          <Badge className={item.status === "claimed" ? "bg-amber-500/10 text-amber-500 border-amber-500/20 text-[9px]" : "bg-blue-500/10 text-blue-500 border-blue-500/20 text-[9px]"}>
-                            {item.status.toUpperCase()}
-                          </Badge>
+                {/* Pending Verification */}
+                {lostFoundSubTab === "pending" && (
+                  (() => {
+                    const items = lostFoundItems.filter(item => item.portal === "society" && item.status === "Pending Verification");
+                    if (items.length === 0) return <div className="text-center py-20 text-muted-foreground text-xs">No pending verification reports.</div>;
+                    return items.map(item => (
+                      <div key={item.id} className="p-3.5 rounded-xl border border-border bg-card hover:bg-secondary/5 transition-colors text-xs space-y-2 flex justify-between items-center gap-4">
+                        <div className="space-y-1">
+                          <div className="font-bold text-foreground">{item.category}</div>
+                          <div className="text-muted-foreground text-[11px]">{item.description}</div>
+                          <div className="text-[10px] text-muted-foreground">Reporter: {item.reporterName} | Location: {item.foundLocation}</div>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
-                        {item.status === "claimed" && (
-                          <div className="text-[11px] font-semibold text-amber-500 mt-1">
-                            Claimant: {item.claimantName} (Resident)
+                        <div className="flex gap-2 shrink-0">
+                          <Button size="sm" onClick={() => verifyFoundItem(item.id)} className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8 text-[10px] font-semibold border-0">
+                            Verify Received
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => rejectFoundItem(item.id)} className="text-red-500 border-red-500/20 hover:bg-red-500/10 rounded-lg h-8 text-[10px] font-semibold">
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    ));
+                  })()
+                )}
+
+                {/* Active Claims */}
+                {lostFoundSubTab === "claims" && (
+                  (() => {
+                    const items = lostFoundItems.filter(item => item.portal === "society" && item.status === "Claim Pending Verification");
+                    if (items.length === 0) return <div className="text-center py-20 text-muted-foreground text-xs">No active claims awaiting verification.</div>;
+                    return items.map(item => {
+                      const pendingClaims = item.claims?.filter(c => c.status === "Claim Pending Verification") || [];
+                      return (
+                        <div key={item.id} className="p-3.5 rounded-xl border border-border bg-card space-y-2.5 text-xs">
+                          <div className="border-b pb-2 flex justify-between items-center">
+                            <div>
+                              <span className="font-bold text-foreground">{item.category}</span>
+                              <span className="text-[10px] text-muted-foreground block">{item.description}</span>
+                            </div>
+                            <span className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">Ref: {item.id}</span>
+                          </div>
+                          <div className="space-y-2">
+                            {pendingClaims.map(claim => (
+                              <div key={claim.id} className="p-2.5 rounded-lg border border-border bg-secondary/10 flex justify-between items-center gap-4">
+                                <div className="space-y-1">
+                                  <div className="font-bold text-foreground">Claimant: {claim.residentName}</div>
+                                  <div className="text-muted-foreground text-[10px]">Reason: &quot;{claim.claimReason}&quot;</div>
+                                  {claim.contactNumber && <div className="text-[10px] text-primary">Phone: {claim.contactNumber}</div>}
+                                </div>
+                                <div className="flex gap-2 shrink-0">
+                                  <Button size="sm" onClick={() => approveClaim(claim.id)} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg h-7 text-[9px] font-bold border-0">
+                                    Approve
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => rejectClaim(claim.id)} className="text-red-500 border-red-500/20 hover:bg-red-500/10 rounded-lg h-7 text-[9px] font-bold">
+                                    Reject
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()
+                )}
+
+                {/* Ready for Handover */}
+                {lostFoundSubTab === "pickup" && (
+                  (() => {
+                    const items = lostFoundItems.filter(item => item.portal === "society" && item.status === "Ready for Pickup");
+                    if (items.length === 0) return <div className="text-center py-20 text-muted-foreground text-xs">No items waiting for collection.</div>;
+                    return items.map(item => {
+                      const approvedClaim = item.claims?.find(c => c.status === "Ready for Pickup");
+                      if (!approvedClaim) return null;
+                      return (
+                        <div key={item.id} className="p-3.5 rounded-xl border border-border bg-card hover:bg-secondary/5 transition-colors text-xs space-y-2 flex justify-between items-center gap-4">
+                          <div className="space-y-1">
+                            <div className="font-bold text-foreground">{item.category}</div>
+                            <div className="text-muted-foreground text-[11px]">{item.description}</div>
+                            <div className="text-[10px] text-indigo-500 font-bold">Claimant: {approvedClaim.residentName} (Ready for Pickup)</div>
+                          </div>
+                          <div className="shrink-0">
+                            <Button size="sm" onClick={() => {
+                              setSelectedClaimForHandover({ claim: approvedClaim, item });
+                              setCollectedBy(approvedClaim.residentName);
+                              setShowHandoverDialog(true);
+                            }} className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8 text-[10px] font-semibold border-0">
+                              Mark Returned
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()
+                )}
+
+                {/* Registry History */}
+                {lostFoundSubTab === "history" && (
+                  (() => {
+                    const items = lostFoundItems.filter(item => item.portal === "society" && (item.status === "Returned" || item.status === "Rejected" || item.status === "Available for Claim"));
+                    if (items.length === 0) return <div className="text-center py-20 text-muted-foreground text-xs">History is empty.</div>;
+                    return items.map(item => (
+                      <div key={item.id} className="p-3 rounded-xl border border-border bg-card hover:bg-secondary/5 transition-colors text-xs flex justify-between items-center gap-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold">{item.category}</span>
+                            <Badge className={`text-[8px] px-1 h-4 font-bold ${
+                              item.status === "Returned" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
+                              item.status === "Rejected" ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                              "bg-secondary text-foreground"
+                            }`}>
+                              {item.status}
+                            </Badge>
+                          </div>
+                          <div className="text-muted-foreground text-[10px] mt-0.5">{item.description}</div>
+                          <div className="text-[9px] text-muted-foreground mt-0.5">Reporter: {item.reporterName} | Date: {item.dateFound}</div>
+                        </div>
+                        {item.status === "Returned" && (
+                          <div className="text-[9px] text-muted-foreground text-right">
+                            <div className="font-bold text-emerald-600">Returned</div>
+                            <div>Recipient: {item.claims?.find(c => c.status === "Returned")?.collectedBy}</div>
                           </div>
                         )}
                       </div>
-                      <div className="shrink-0">
-                        {item.status === "claimed" ? (
-                          <Button
-                            size="sm"
-                            onClick={() => resolveLostFoundItem(item.id)}
-                            className="bg-green-600 hover:bg-green-700 text-white rounded-xl h-8 px-3 text-xs font-semibold border-0"
-                          >
-                            Verify & Handover
-                          </Button>
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground">Awaiting Claim...</span>
-                        )}
-                      </div>
-                    </div>
-                  ))
+                    ));
+                  })()
                 )}
               </CardContent>
             </Card>
+          </div>
           </div>
         )}
 
@@ -1295,6 +1530,73 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setShowDenyModal(false)} className="rounded-xl">Cancel</Button>
               <Button onClick={submitDeny} disabled={!denyReason} className="bg-red-600 hover:bg-red-700 text-white rounded-xl border-0">Confirm Denial</Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+      {/* HANDOVER CONFIRMATION MODAL */}
+      {showHandoverDialog && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-card border border-border shadow-2xl rounded-3xl p-6 w-full max-w-md text-xs space-y-4"
+          >
+            <h3 className="text-base font-bold font-[family-name:var(--font-heading)] text-indigo-600 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-indigo-600" />
+              Log Handover Verification
+            </h3>
+            <p className="text-muted-foreground">Verify the resident is physically present at the security desk before submitting handover details.</p>
+            {selectedClaimForHandover && (
+              <div className="p-3 bg-secondary/30 rounded-xl space-y-1">
+                <div className="font-bold text-foreground">Item: {selectedClaimForHandover.item.category}</div>
+                <div className="text-muted-foreground">Description: {selectedClaimForHandover.item.description}</div>
+                <div className="text-muted-foreground">Claimant: {selectedClaimForHandover.claim.residentName}</div>
+              </div>
+            )}
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground block mb-1">Handed Over To / Collected By</label>
+              <Input
+                value={collectedBy}
+                onChange={(e) => setCollectedBy(e.target.value)}
+                className="h-10 text-xs rounded-xl"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground block mb-1">Verified By (Security Officer Name)</label>
+              <Input
+                value={verifiedBySecurity}
+                onChange={(e) => setVerifiedBySecurity(e.target.value)}
+                className="h-10 text-xs rounded-xl"
+                required
+              />
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="ghost" onClick={() => {
+                setShowHandoverDialog(false);
+                setSelectedClaimForHandover(null);
+              }} className="rounded-xl">Cancel</Button>
+              <Button 
+                onClick={async () => {
+                  if (!collectedBy || !verifiedBySecurity) return;
+                  setResolving(true);
+                  try {
+                    await pickupItem(selectedClaimForHandover.claim.id, collectedBy, verifiedBySecurity);
+                    setShowHandoverDialog(false);
+                    setSelectedClaimForHandover(null);
+                    alert("Handover completed and resolved successfully.");
+                  } catch (e) {
+                    alert("Failed to resolve handover.");
+                  } finally {
+                    setResolving(false);
+                  }
+                }}
+                disabled={resolving || !collectedBy || !verifiedBySecurity}
+                className="bg-green-600 hover:bg-green-700 text-white rounded-xl border-0"
+              >
+                {resolving ? "Confirming..." : "Confirm Handover"}
+              </Button>
             </div>
           </motion.div>
         </div>

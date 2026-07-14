@@ -1287,62 +1287,932 @@ router.put("/marketplace/:id/status", authenticateToken, async (req: any, res) =
   }
 });
 
+function isPossibleMatch(lost: any, found: any) {
+  if (lost.category.toLowerCase() !== found.category.toLowerCase()) {
+    return false;
+  }
+
+  const lostDate = new Date(lost.dateLost);
+  const foundDate = new Date(found.dateFound);
+  const diffTime = Math.abs(foundDate.getTime() - lostDate.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  if (diffDays > 10) {
+    return false;
+  }
+
+  let score = 0;
+  const getWords = (str: string) => (str || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(Boolean);
+  
+  const lostNameWords = getWords(lost.itemName);
+  const foundDescWords = getWords(found.description);
+  
+  const nameOverlap = lostNameWords.filter(w => foundDescWords.includes(w));
+  if (nameOverlap.length > 0) score += 30;
+
+  if (lost.colour && found.description.toLowerCase().includes(lost.colour.toLowerCase())) {
+    score += 30;
+  }
+  if (found.colour && lost.description.toLowerCase().includes(found.colour.toLowerCase())) {
+    score += 30;
+  }
+
+  const lostLocWords = getWords(lost.lastSeenLocation);
+  const foundLocWords = getWords(found.foundLocation);
+  const locOverlap = lostLocWords.filter(w => foundLocWords.includes(w));
+  if (locOverlap.length > 0) score += 20;
+
+  const lostDescWords = getWords(lost.description);
+  const descOverlap = lostDescWords.filter(w => foundDescWords.includes(w));
+  if (descOverlap.length > 1) score += 20;
+
+  if (lost.brand && found.description.toLowerCase().includes(lost.brand.toLowerCase())) {
+    score += 20;
+  }
+  if (found.brand && lost.description.toLowerCase().includes(found.brand.toLowerCase())) {
+    score += 20;
+  }
+
+  return score >= 40;
+}
+
+async function triggerSmartMatching(itemOrReport: { type: "lost" | "found", id: string }) {
+  try {
+    if (itemOrReport.type === "lost") {
+      const lostReport = await prisma.lostReport.findUnique({
+        where: { id: itemOrReport.id }
+      });
+      if (!lostReport) return;
+
+      const availableFound = await prisma.foundItem.findMany({
+        where: {
+          communityCode: lostReport.communityCode,
+          portal: lostReport.portal,
+          status: { in: ["Available for Claim", "Possible Match Found"] }
+        }
+      });
+
+      let matchCreated = false;
+      for (const foundItem of availableFound) {
+        if (isPossibleMatch(lostReport, foundItem)) {
+          const existing = await prisma.itemMatch.findFirst({
+            where: { lostReportId: lostReport.id, foundItemId: foundItem.id }
+          });
+          if (!existing) {
+            const mId = `MT-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+            await prisma.itemMatch.create({
+              data: {
+                id: mId,
+                lostReportId: lostReport.id,
+                foundItemId: foundItem.id,
+                status: "Suggested"
+              }
+            });
+            matchCreated = true;
+
+            if (foundItem.status === "Available for Claim") {
+              const updatedFound = await prisma.foundItem.update({
+                where: { id: foundItem.id },
+                data: { status: "Possible Match Found" }
+              });
+              broadcastUpdate("lostfound:update", updatedFound);
+            }
+
+            const securityRole = lostReport.portal === "society" ? "security" : "warden";
+            const secUsers = await prisma.user.findMany({
+              where: { portal: lostReport.portal, role: securityRole }
+            });
+            for (const sec of secUsers) {
+              await sendInAppNotification(
+                sec.id,
+                "Possible Match Suggested",
+                `Smart Matching found a possible match for lost item: ${lostReport.itemName} and found item ID ${foundItem.id}`,
+                "info"
+              );
+            }
+          }
+        }
+      }
+
+      if (matchCreated) {
+        const updatedLost = await prisma.lostReport.update({
+          where: { id: lostReport.id },
+          data: { status: "Possible Match Found" }
+        });
+        const lrUser = await prisma.user.findUnique({ where: { id: lostReport.residentId } });
+        broadcastUpdate("lostreport:update", {
+          ...updatedLost,
+          residentName: lrUser?.name || "Resident",
+          flatNumber: lrUser?.unit || "N/A"
+        });
+      }
+    } else {
+      const foundItem = await prisma.foundItem.findUnique({
+        where: { id: itemOrReport.id }
+      });
+      if (!foundItem || foundItem.status !== "Available for Claim") return;
+
+      const searchingLost = await prisma.lostReport.findMany({
+        where: {
+          communityCode: foundItem.communityCode,
+          portal: foundItem.portal,
+          status: { in: ["Searching", "Possible Match Found"] }
+        }
+      });
+
+      let matchCreated = false;
+      for (const lostReport of searchingLost) {
+        if (isPossibleMatch(lostReport, foundItem)) {
+          const existing = await prisma.itemMatch.findFirst({
+            where: { lostReportId: lostReport.id, foundItemId: foundItem.id }
+          });
+          if (!existing) {
+            const mId = `MT-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+            await prisma.itemMatch.create({
+              data: {
+                id: mId,
+                lostReportId: lostReport.id,
+                foundItemId: foundItem.id,
+                status: "Suggested"
+              }
+            });
+            matchCreated = true;
+
+            if (lostReport.status === "Searching") {
+              const updatedLost = await prisma.lostReport.update({
+                where: { id: lostReport.id },
+                data: { status: "Possible Match Found" }
+              });
+              const lrUser = await prisma.user.findUnique({ where: { id: lostReport.residentId } });
+              broadcastUpdate("lostreport:update", {
+                ...updatedLost,
+                residentName: lrUser?.name || "Resident",
+                flatNumber: lrUser?.unit || "N/A"
+              });
+            }
+
+            const securityRole = foundItem.portal === "society" ? "security" : "warden";
+            const secUsers = await prisma.user.findMany({
+              where: { portal: foundItem.portal, role: securityRole }
+            });
+            for (const sec of secUsers) {
+              await sendInAppNotification(
+                sec.id,
+                "Possible Match Suggested",
+                `Smart Matching found a possible match for lost item: ${lostReport.itemName} and found item ID ${foundItem.id}`,
+                "info"
+              );
+            }
+          }
+        }
+      }
+
+      if (matchCreated) {
+        const updatedFound = await prisma.foundItem.update({
+          where: { id: foundItem.id },
+          data: { status: "Possible Match Found" }
+        });
+        broadcastUpdate("lostfound:update", updatedFound);
+      }
+    }
+  } catch (error) {
+    console.error("Error in triggerSmartMatching:", error);
+  }
+}
+
 // ==========================================
 // 🧸 Lost & Found Items
 // ==========================================
 router.get("/lostfound", authenticateToken, async (req: any, res) => {
   try {
-    const list = await prisma.lostFoundItem.findMany({
-      where: { portal: req.user.portal },
+    const { role, portal, id: userId } = req.user;
+    const list = await prisma.foundItem.findMany({
+      where: { portal },
+      include: {
+        claims: true
+      },
       orderBy: { createdAt: "desc" }
     });
-    res.json(list);
+
+    if (role === "security" || role === "secretary" || role === "warden") {
+      return res.json(list);
+    }
+
+    const sanitizedList = list
+      .filter(item => {
+        if (item.status === "Pending Verification" || item.status === "Rejected") {
+          return item.reporterId === userId;
+        }
+        return true;
+      })
+      .map(item => {
+        if (item.reporterId !== userId) {
+          return {
+            ...item,
+            reporterId: "hidden",
+            reporterName: "Community Member"
+          };
+        }
+        return item;
+      });
+
+    res.json(sanitizedList);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch lost/found items" });
   }
 });
 
 router.post("/lostfound", authenticateToken, async (req: any, res) => {
-  const { title, description } = req.body;
-  if (!title || !description) {
-    return res.status(400).json({ error: "Title and description are required" });
+  const { category, brand, colour, description, images, foundLocation, dateFound, timeFound, additionalNotes } = req.body;
+  if (!category || !description || !foundLocation || !dateFound || !timeFound) {
+    return res.status(400).json({ error: "Required fields are missing" });
   }
   try {
-    const id = `LF-${Math.floor(100 + Math.random() * 900)}`;
-    const newItem = await prisma.lostFoundItem.create({
+    const { id: userId, name: userName, portal } = req.user;
+    const dbUser = await prisma.user.findUnique({ where: { id: userId } });
+    const communityCode = dbUser?.communityCode || (portal === "society" ? "SUN123" : "VESIT26");
+
+    const id = `LF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+    const newItem = await prisma.foundItem.create({
       data: {
         id,
-        title,
+        reporterId: userId,
+        reporterName: userName,
+        communityCode,
+        category,
+        brand: brand || "",
+        colour: colour || "",
         description,
-        status: "reported",
-        reporterId: req.user.id,
-        reporterName: req.user.name || "User",
-        portal: req.user.portal
+        images: images || [],
+        foundLocation,
+        dateFound,
+        timeFound,
+        additionalNotes: additionalNotes || "",
+        status: "Pending Verification",
+        portal
+      },
+      include: {
+        claims: true
       }
     });
+
+    const securityRole = portal === "society" ? "security" : "warden";
+    const securityUsers = await prisma.user.findMany({
+      where: { portal, role: securityRole }
+    });
+
+    for (const sec of securityUsers) {
+      await sendInAppNotification(
+        sec.id,
+        "New Found Item Submitted",
+        `A new item (${category}) has been reported by a resident and is awaiting verification.`,
+        "info"
+      );
+    }
+
+    await sendInAppNotification(
+      userId,
+      "Report Submitted Successfully",
+      "Your Lost & Found report has been received and is pending security verification.",
+      "success"
+    );
+
     broadcastUpdate("lostfound:update", newItem);
     res.status(201).json(newItem);
   } catch (error) {
-    res.status(500).json({ error: "Failed to report lost/found item" });
+    console.error(error);
+    res.status(500).json({ error: "Failed to report found item" });
   }
 });
 
-router.put("/lostfound/:id/claim", authenticateToken, async (req: any, res) => {
+router.put("/lostfound/:id/verify", authenticateToken, async (req: any, res) => {
   const { id } = req.params;
-  const { claimantId, claimantName } = req.body;
   try {
-    const updated = await prisma.lostFoundItem.update({
+    const item = await prisma.foundItem.findUnique({ where: { id } });
+    if (!item) {
+      return res.status(404).json({ error: "Found item not found" });
+    }
+
+    const updated = await prisma.foundItem.update({
       where: { id },
-      data: {
-        status: "claimed",
-        claimantId: claimantId || req.user.id,
-        claimantName: claimantName || req.user.name || "Claimant"
-      }
+      data: { status: "Available for Claim" },
+      include: { claims: true }
     });
+
+    await sendInAppNotification(
+      item.reporterId,
+      "Found Item Verified",
+      `Security has verified your submitted item: ${item.category}. It is now available for claims.`,
+      "success"
+    );
+
+    const securityRole = item.portal === "society" ? "security" : "warden";
+    await sendInAppNotification(
+      req.user.id,
+      "Item Verified",
+      `You verified found item ID ${id}. Status set to Available for Claim.`,
+      "success"
+    );
+
+    broadcastUpdate("lostfound:update", updated);
+    triggerSmartMatching({ type: "found", id });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to verify item" });
+  }
+});
+
+router.put("/lostfound/:id/reject", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  try {
+    const item = await prisma.foundItem.findUnique({ where: { id } });
+    if (!item) {
+      return res.status(404).json({ error: "Found item not found" });
+    }
+
+    const updated = await prisma.foundItem.update({
+      where: { id },
+      data: { status: "Rejected" },
+      include: { claims: true }
+    });
+
+    await sendInAppNotification(
+      item.reporterId,
+      "Found Item Report Rejected",
+      `Security has rejected your submitted item report: ${item.category}.`,
+      "error"
+    );
+
     broadcastUpdate("lostfound:update", updated);
     res.json(updated);
   } catch (error) {
-    res.status(500).json({ error: "Failed to claim item" });
+    res.status(500).json({ error: "Failed to reject item" });
+  }
+});
+
+router.post("/lostfound/:id/claim", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const { claimReason, itemDetails, proofImage, contactNumber } = req.body;
+  if (!claimReason) {
+    return res.status(400).json({ error: "Claim reason is required" });
+  }
+
+  try {
+    const { id: userId, name: userName, portal } = req.user;
+    const item = await prisma.foundItem.findUnique({ where: { id } });
+    if (!item) {
+      return res.status(404).json({ error: "Found item not found" });
+    }
+
+    const claimId = `CLM-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+    await prisma.claim.create({
+      data: {
+        id: claimId,
+        itemId: id,
+        residentId: userId,
+        residentName: userName,
+        claimReason,
+        itemDetails: itemDetails || "",
+        proofImage: proofImage || "",
+        contactNumber: contactNumber || "",
+        status: "Claim Pending Verification"
+      }
+    });
+
+    const updatedItem = await prisma.foundItem.update({
+      where: { id },
+      data: { status: "Claim Pending Verification" },
+      include: { claims: true }
+    });
+
+    const securityRole = portal === "society" ? "security" : "warden";
+    const securityUsers = await prisma.user.findMany({
+      where: { portal, role: securityRole }
+    });
+
+    for (const sec of securityUsers) {
+      await sendInAppNotification(
+        sec.id,
+        "New Claim Request Received",
+        `A resident has submitted a claim for item: ${item.category}.`,
+        "info"
+      );
+    }
+
+    await sendInAppNotification(
+      userId,
+      "Claim Request Submitted",
+      "Your claim request has been submitted and is pending verification.",
+      "success"
+    );
+
+    broadcastUpdate("lostfound:update", updatedItem);
+    res.status(201).json(updatedItem);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to submit claim request" });
+  }
+});
+
+router.put("/lostfound/claims/:claimId/approve", authenticateToken, async (req: any, res) => {
+  const { claimId } = req.params;
+  try {
+    const claim = await prisma.claim.findUnique({ where: { id: claimId } });
+    if (!claim) {
+      return res.status(404).json({ error: "Claim not found" });
+    }
+
+    await prisma.claim.update({
+      where: { id: claimId },
+      data: {
+        status: "Ready for Pickup",
+        approvalDate: new Date()
+      }
+    });
+
+    const updatedItem = await prisma.foundItem.update({
+      where: { id: claim.itemId },
+      data: { status: "Ready for Pickup" },
+      include: { claims: true }
+    });
+
+    await sendInAppNotification(
+      claim.residentId,
+      "Claim Request Approved",
+      "Your claim has been approved. Please collect your item from the Security Desk.",
+      "success"
+    );
+
+    const otherClaims = await prisma.claim.findMany({
+      where: {
+        itemId: claim.itemId,
+        id: { not: claimId },
+        status: "Claim Pending Verification"
+      }
+    });
+
+    for (const other of otherClaims) {
+      await prisma.claim.update({
+        where: { id: other.id },
+        data: { status: "Rejected" }
+      });
+      await sendInAppNotification(
+        other.residentId,
+        "Claim Request Rejected",
+        `Your claim request for item ${updatedItem.category} was rejected because it was claimed by another resident.`,
+        "error"
+      );
+    }
+
+    await sendInAppNotification(
+      req.user.id,
+      "Claim Approved",
+      `You approved claim CLM-${claimId}. Status set to Ready for Pickup.`,
+      "success"
+    );
+
+    broadcastUpdate("lostfound:update", updatedItem);
+    res.json(updatedItem);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to approve claim" });
+  }
+});
+
+router.put("/lostfound/claims/:claimId/reject", authenticateToken, async (req: any, res) => {
+  const { claimId } = req.params;
+  try {
+    const claim = await prisma.claim.findUnique({ where: { id: claimId } });
+    if (!claim) {
+      return res.status(404).json({ error: "Claim not found" });
+    }
+
+    await prisma.claim.update({
+      where: { id: claimId },
+      data: { status: "Rejected" }
+    });
+
+    const pendingClaims = await prisma.claim.findMany({
+      where: {
+        itemId: claim.itemId,
+        status: "Claim Pending Verification"
+      }
+    });
+
+    let nextStatus = "Available for Claim";
+    if (pendingClaims.length > 0) {
+      nextStatus = "Claim Pending Verification";
+    }
+
+    const updatedItem = await prisma.foundItem.update({
+      where: { id: claim.itemId },
+      data: { status: nextStatus },
+      include: { claims: true }
+    });
+
+    await sendInAppNotification(
+      claim.residentId,
+      "Claim Request Rejected",
+      "Your claim request has been rejected after verification.",
+      "error"
+    );
+
+    broadcastUpdate("lostfound:update", updatedItem);
+    res.json(updatedItem);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to reject claim" });
+  }
+});
+
+router.put("/lostfound/claims/:claimId/pickup", authenticateToken, async (req: any, res) => {
+  const { claimId } = req.params;
+  const { collectedBy, verifiedBySecurity } = req.body;
+  try {
+    const claim = await prisma.claim.findUnique({ where: { id: claimId } });
+    if (!claim) {
+      return res.status(404).json({ error: "Claim not found" });
+    }
+
+    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    await prisma.claim.update({
+      where: { id: claimId },
+      data: {
+        status: "Returned",
+        collectionDate: new Date(),
+        collectionTime: timeString,
+        collectedBy: collectedBy || claim.residentName,
+        verifiedBySecurity: verifiedBySecurity || req.user.name || "Security"
+      }
+    });
+
+    const updatedItem = await prisma.foundItem.update({
+      where: { id: claim.itemId },
+      data: { status: "Returned" },
+      include: { claims: true }
+    });
+
+    await sendInAppNotification(
+      claim.residentId,
+      "Item Handed Over",
+      "Your item has been marked as returned. Thank you!",
+      "success"
+    );
+
+    await sendInAppNotification(
+      req.user.id,
+      "Item Marked as Returned",
+      `Handover resolved for claim CLM-${claimId}.`,
+      "success"
+    );
+
+    broadcastUpdate("lostfound:update", updatedItem);
+    res.json(updatedItem);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to log handover" });
+  }
+});
+
+// ==========================================
+// 🎒 Lost Reports & Smart Matching
+// ==========================================
+router.get("/lostfound/lost", authenticateToken, async (req: any, res) => {
+  try {
+    const { role, portal, id: userId } = req.user;
+    const dbUser = await prisma.user.findUnique({ where: { id: userId } });
+    const communityCode = dbUser?.communityCode || (portal === "society" ? "SUN123" : "VESIT26");
+
+    const list = await prisma.lostReport.findMany({
+      where: { portal, communityCode },
+      include: {
+        resident: true,
+        matches: {
+          include: {
+            foundItem: true
+          }
+        }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    if (role === "security" || role === "secretary" || role === "warden") {
+      const formatted = list.map(report => ({
+        ...report,
+        residentName: report.resident.name,
+        flatNumber: report.resident.unit || "N/A",
+        resident: undefined
+      }));
+      return res.json(formatted);
+    }
+
+    const filtered = list.filter(r => r.residentId === userId).map(report => ({
+      ...report,
+      residentName: report.resident.name,
+      flatNumber: report.resident.unit || "N/A",
+      resident: undefined
+    }));
+
+    res.json(filtered);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch lost reports" });
+  }
+});
+
+router.post("/lostfound/lost", authenticateToken, async (req: any, res) => {
+  const { itemName, category, brand, colour, description, distinguishingFeatures, dateLost, timeLost, lastSeenLocation, images, additionalNotes } = req.body;
+  if (!itemName || !category || !description || !dateLost || !lastSeenLocation) {
+    return res.status(400).json({ error: "Required fields are missing" });
+  }
+  try {
+    const { id: userId, portal } = req.user;
+    const dbUser = await prisma.user.findUnique({ where: { id: userId } });
+    const communityCode = dbUser?.communityCode || (portal === "society" ? "SUN123" : "VESIT26");
+
+    const id = `LR-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+    const newReport = await prisma.lostReport.create({
+      data: {
+        id,
+        residentId: userId,
+        itemName,
+        category,
+        brand: brand || "",
+        colour: colour || "",
+        description,
+        distinguishingFeatures: distinguishingFeatures || "",
+        dateLost,
+        timeLost: timeLost || "",
+        lastSeenLocation,
+        images: images || [],
+        additionalNotes: additionalNotes || "",
+        status: "Searching",
+        portal,
+        communityCode
+      }
+    });
+
+    const securityRole = portal === "society" ? "security" : "warden";
+    const secUsers = await prisma.user.findMany({
+      where: { portal, role: securityRole }
+    });
+    for (const sec of secUsers) {
+      await sendInAppNotification(
+        sec.id,
+        "New Lost Item Reported",
+        `A resident has reported a lost item: ${itemName} (${category}).`,
+        "info"
+      );
+    }
+
+    broadcastUpdate("lostreport:update", {
+      ...newReport,
+      residentName: dbUser?.name || "Resident",
+      flatNumber: dbUser?.unit || "N/A"
+    });
+
+    triggerSmartMatching({ type: "lost", id });
+
+    res.status(201).json(newReport);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to submit lost report" });
+  }
+});
+
+router.get("/lostfound/matches", authenticateToken, async (req: any, res) => {
+  try {
+    const { portal } = req.user;
+    const list = await prisma.itemMatch.findMany({
+      where: {
+        lostReport: { portal }
+      },
+      include: {
+        lostReport: {
+          include: { resident: true }
+        },
+        foundItem: {
+          include: { reporter: true }
+        }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    const formatted = list.map(match => ({
+      ...match,
+      lostReport: {
+        ...match.lostReport,
+        residentName: match.lostReport.resident.name,
+        flatNumber: match.lostReport.resident.unit || "N/A",
+        resident: undefined
+      },
+      foundItem: {
+        ...match.foundItem,
+        reporterName: match.foundItem.reporter.name,
+        reporter: undefined
+      }
+    }));
+
+    res.json(formatted);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch item matches" });
+  }
+});
+
+router.post("/lostfound/matches/:matchId/confirm", authenticateToken, async (req: any, res) => {
+  const { matchId } = req.params;
+  const { verifiedBy } = req.body;
+  try {
+    const match = await prisma.itemMatch.findUnique({
+      where: { id: matchId },
+      include: { lostReport: true, foundItem: true }
+    });
+    if (!match) {
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    const updatedMatch = await prisma.itemMatch.update({
+      where: { id: matchId },
+      data: {
+        status: "Confirmed",
+        verifiedBy: verifiedBy || req.user.name || "Security",
+        verificationDate: new Date()
+      }
+    });
+
+    const updatedLost = await prisma.lostReport.update({
+      where: { id: match.lostReportId },
+      data: { status: "Matched" }
+    });
+
+    const updatedFound = await prisma.foundItem.update({
+      where: { id: match.foundItemId },
+      data: { status: "Owner Identified" }
+    });
+
+    await sendInAppNotification(
+      match.lostReport.residentId,
+      "Lost Item Matched",
+      `Good news! An item matching your Lost Item Report (${match.lostReport.itemName}) has been identified. Please visit the Security Desk to verify and collect your belongings.`,
+      "success"
+    );
+
+    const otherMatches = await prisma.itemMatch.findMany({
+      where: {
+        id: { not: matchId },
+        OR: [
+          { lostReportId: match.lostReportId },
+          { foundItemId: match.foundItemId }
+        ],
+        status: "Suggested"
+      }
+    });
+
+    for (const om of otherMatches) {
+      await prisma.itemMatch.update({
+        where: { id: om.id },
+        data: { status: "Rejected" }
+      });
+    }
+
+    const lrUser = await prisma.user.findUnique({ where: { id: match.lostReport.residentId } });
+    broadcastUpdate("lostreport:update", {
+      ...updatedLost,
+      residentName: lrUser?.name || "Resident",
+      flatNumber: lrUser?.unit || "N/A"
+    });
+    broadcastUpdate("lostfound:update", updatedFound);
+    broadcastUpdate("itemmatch:update", {
+      ...updatedMatch,
+      lostReport: {
+        ...match.lostReport,
+        residentName: lrUser?.name || "Resident",
+        flatNumber: lrUser?.unit || "N/A"
+      },
+      foundItem: match.foundItem
+    });
+
+    res.json({ success: true, match: updatedMatch });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to confirm match" });
+  }
+});
+
+router.post("/lostfound/matches/:matchId/reject", authenticateToken, async (req: any, res) => {
+  const { matchId } = req.params;
+  try {
+    const match = await prisma.itemMatch.findUnique({
+      where: { id: matchId },
+      include: { lostReport: true, foundItem: true }
+    });
+    if (!match) {
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    const updatedMatch = await prisma.itemMatch.update({
+      where: { id: matchId },
+      data: { status: "Rejected" }
+    });
+
+    const remainingLostMatches = await prisma.itemMatch.count({
+      where: { lostReportId: match.lostReportId, status: { in: ["Suggested", "Confirmed"] } }
+    });
+    if (remainingLostMatches === 0) {
+      const updatedLost = await prisma.lostReport.update({
+        where: { id: match.lostReportId },
+        data: { status: "Searching" }
+      });
+      const lrUser = await prisma.user.findUnique({ where: { id: match.lostReport.residentId } });
+      broadcastUpdate("lostreport:update", {
+        ...updatedLost,
+        residentName: lrUser?.name || "Resident",
+        flatNumber: lrUser?.unit || "N/A"
+      });
+    }
+
+    const remainingFoundMatches = await prisma.itemMatch.count({
+      where: { foundItemId: match.foundItemId, status: { in: ["Suggested", "Confirmed"] } }
+    });
+    if (remainingFoundMatches === 0) {
+      const updatedFound = await prisma.foundItem.update({
+        where: { id: match.foundItemId },
+        data: { status: "Available for Claim" }
+      });
+      broadcastUpdate("lostfound:update", updatedFound);
+    }
+
+    res.json({ success: true, match: updatedMatch });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to reject match" });
+  }
+});
+
+router.put("/lostfound/matches/:matchId/handover", authenticateToken, async (req: any, res) => {
+  const { matchId } = req.params;
+  const { collectedBy, verifiedBySecurity } = req.body;
+  try {
+    const match = await prisma.itemMatch.findUnique({
+      where: { id: matchId },
+      include: { lostReport: true, foundItem: true }
+    });
+    if (!match) {
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const updatedMatch = await prisma.itemMatch.update({
+      where: { id: matchId },
+      data: {
+        status: "Confirmed",
+        collectionDate: new Date(),
+        collectionTime: timeString,
+        collectedBy: collectedBy || match.lostReport.residentId,
+        verifiedBy: verifiedBySecurity || req.user.name || "Security"
+      }
+    });
+
+    const updatedLost = await prisma.lostReport.update({
+      where: { id: match.lostReportId },
+      data: { status: "Returned" }
+    });
+
+    const updatedFound = await prisma.foundItem.update({
+      where: { id: match.foundItemId },
+      data: { status: "Returned" }
+    });
+
+    await sendInAppNotification(
+      match.lostReport.residentId,
+      "Item Returned Successfully",
+      `Your lost item (${match.lostReport.itemName}) has been successfully handed over to you.`,
+      "success"
+    );
+
+    const lrUser = await prisma.user.findUnique({ where: { id: match.lostReport.residentId } });
+    broadcastUpdate("lostreport:update", {
+      ...updatedLost,
+      residentName: lrUser?.name || "Resident",
+      flatNumber: lrUser?.unit || "N/A"
+    });
+    broadcastUpdate("lostfound:update", updatedFound);
+    broadcastUpdate("itemmatch:update", {
+      ...updatedMatch,
+      lostReport: {
+        ...match.lostReport,
+        residentName: lrUser?.name || "Resident",
+        flatNumber: lrUser?.unit || "N/A"
+      },
+      foundItem: updatedFound
+    });
+
+    res.json({ success: true, match: updatedMatch });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to handover item" });
   }
 });
 
