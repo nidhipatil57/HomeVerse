@@ -60,6 +60,9 @@ model User {
   gatePasses       GatePass[]
   facilityBookings FacilityBooking[]
   rsvps            EventRsvp[]
+  foundItems       FoundItem[]           @relation("ReporterUser")
+  claims           Claim[]               @relation("ResidentClaims")
+  lostReports      LostReport[]          @relation("ResidentLostReports")
 }
 
 model Complaint {
@@ -242,20 +245,105 @@ model MarketplaceItem {
   @@index([portal])
 }
 
-model LostFoundItem {
-  id           String   @id
-  title        String
-  description  String
-  status       String
-  reporterId   String
-  reporterName String
-  claimantId   String?
-  claimantName String?
-  portal       String
-  createdAt    DateTime @default(now())
+model FoundItem {
+  id              String   @id
+  reporterId      String
+  reporterName    String
+  communityCode   String
+  category        String
+  brand           String?
+  colour          String?
+  description     String
+  images          String[]
+  foundLocation   String
+  dateFound       String
+  timeFound       String
+  additionalNotes String?
+  status          String   // "Pending Verification", "Available for Claim", "Claim Pending Verification", "Ready for Pickup", "Returned", "Rejected"
+  portal          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  claims          Claim[]
+  matches         ItemMatch[]
+  reporter        User     @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@index([reporterId])
+  @@index([communityCode])
   @@index([portal])
+}
+
+model Claim {
+  id                 String    @id
+  itemId             String
+  residentId         String
+  residentName       String
+  claimReason        String
+  itemDetails        String?
+  proofImage         String?
+  contactNumber      String?
+  status             String    // "Claim Pending Verification", "Ready for Pickup", "Returned", "Rejected"
+  approvalDate       DateTime?
+  collectionDate     DateTime?
+  collectionTime     String?
+  collectedBy        String?
+  verifiedBySecurity String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  item               FoundItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  resident           User      @relation("ResidentClaims", fields: [residentId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@index([residentId])
+}
+
+model LostReport {
+  id                    String      @id
+  residentId            String
+  itemName              String
+  category              String
+  brand                 String?
+  colour                String?
+  description           String
+  distinguishingFeatures String?
+  dateLost              String
+  timeLost              String?
+  lastSeenLocation      String
+  status                String      // "Searching", "Possible Match Found", "Matched", "Returned", "Closed"
+  images                String[]
+  additionalNotes       String?
+  portal                String      // "society", "hostel"
+  communityCode         String
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  resident              User        @relation("ResidentLostReports", fields: [residentId], references: [id], onDelete: Cascade)
+  matches               ItemMatch[]
+
+  @@index([residentId])
+  @@index([communityCode])
+  @@index([portal])
+}
+
+model ItemMatch {
+  id               String     @id
+  lostReportId     String
+  foundItemId      String
+  status           String     // "Suggested", "Confirmed", "Rejected"
+  verifiedBy       String?
+  verificationDate DateTime?
+  collectionDate   DateTime?
+  collectionTime   String?
+  collectedBy      String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  lostReport       LostReport @relation(fields: [lostReportId], references: [id], onDelete: Cascade)
+  foundItem        FoundItem  @relation(fields: [foundItemId], references: [id], onDelete: Cascade)
+
+  @@index([lostReportId])
+  @@index([foundItemId])
 }
 
 model RoomChangeRequest {

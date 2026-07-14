@@ -40,7 +40,7 @@ export default function HostelLostFoundPage() {
   const activeLfItems = lostFoundItems.filter(item => item.portal === "hostel");
 
   const filteredItems = activeLfItems.filter((item) => {
-    const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase()) ||
+    const matchesSearch = item.category.toLowerCase().includes(search.toLowerCase()) ||
       item.description.toLowerCase().includes(search.toLowerCase());
     return matchesSearch;
   });
@@ -83,18 +83,23 @@ export default function HostelLostFoundPage() {
                 </div>
                 <div className="p-4 flex-1 flex flex-col justify-between">
                   <div>
-                    <h4 className="text-sm font-bold text-foreground line-clamp-1">{item.title}</h4>
+                    <h4 className="text-sm font-bold text-foreground line-clamp-1">{item.category}</h4>
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
                     <p className="text-[10px] text-muted-foreground mt-2 font-semibold">Found by: {item.reporterName}</p>
                   </div>
 
                   <div className="mt-4 pt-3 border-t flex justify-end items-center">
-                    {item.status === "reported" ? (
+                    {item.status === "Available for Claim" ? (
                       !isReporter ? (
                         <Button
                           size="sm"
                           onClick={() => {
-                            claimLostFoundItem(item.id, user?.id || "user-student-1", user?.name || "Aarav Mehta");
+                            claimLostFoundItem(
+                              item.id,
+                              user?.id || "user-student-1",
+                              user?.name || "Aarav Mehta",
+                              "Hostel resident claim"
+                            );
                             alert("Claim request logged! Warden and reporter notified.");
                           }}
                           className="rounded-lg h-8 text-[10px] px-3 font-semibold gradient-primary text-white border-0"
@@ -103,9 +108,13 @@ export default function HostelLostFoundPage() {
                         </Button>
                       ) : (
                         <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-[10px]">
-                          Pending Claim
+                          Available for Claim
                         </Badge>
                       )
+                    ) : item.status === "Claim Pending Verification" || item.status === "Ready for Pickup" ? (
+                      <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px]">
+                        Claim Pending
+                      </Badge>
                     ) : (
                       <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 text-[10px] flex items-center gap-1">
                         <Check className="w-3 h-3" /> Handed Over
