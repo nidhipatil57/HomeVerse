@@ -181,6 +181,87 @@ export interface MaintenanceBill {
   breakdown?: { label: string; amount: number }[];
 }
 
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  userId: string;
+  userName: string;
+  flatNumber?: string;
+  contactNumber?: string;
+  registeredAt: string;
+  guestCount: number;
+  guestNames?: string;
+  rsvpStatus: string;
+}
+
+export interface EventVolunteer {
+  id: string;
+  eventId: string;
+  userId: string;
+  volunteerName: string;
+  flatNumber?: string;
+  contactNumber?: string;
+  role: string;
+  volunteeredAt: string;
+}
+
+export interface EventAttendance {
+  id: string;
+  eventId: string;
+  userId: string;
+  userName: string;
+  flatNumber?: string;
+  markedAt: string;
+  markedBy: string;
+}
+
+export interface EventFeedback {
+  id: string;
+  eventId: string;
+  userId: string;
+  userName: string;
+  rating: number;
+  comment?: string;
+  suggestions?: string;
+  wouldAttendSimilar: boolean;
+  submittedAt: string;
+}
+
+export interface EventGalleryPhoto {
+  id: string;
+  eventId: string;
+  imageUrl: string;
+  uploadedAt: string;
+}
+
+export interface EventPollVote {
+  id: string;
+  pollId: string;
+  userId: string;
+  userName: string;
+  option: string;
+  votedAt: string;
+}
+
+export interface EventPoll {
+  id: string;
+  eventId: string;
+  question: string;
+  options: string[];
+  status: "Open" | "Closed";
+  createdAt: string;
+  votes?: EventPollVote[];
+}
+
+export interface EventExpense {
+  id: string;
+  eventId: string;
+  category: string;
+  amount: number;
+  description?: string;
+  date: string;
+}
+
 export interface CommunityEvent {
   id: string;
   title: string;
@@ -190,7 +271,32 @@ export interface CommunityEvent {
   location: string;
   organizer: string;
   priority: "normal" | "important" | "urgent";
-  rsvps: string[];
+  rsvps: any[];
+  
+  category?: string;
+  bannerImage?: string;
+  endTime?: string;
+  contactPerson?: string;
+  contactNumber?: string;
+  maxParticipants?: number;
+  registrationDeadline?: string;
+  entryFee?: number;
+  registrationRequired?: boolean;
+  volunteerRequired?: boolean;
+  visibility?: string;
+  rules?: string;
+  thingsToBring?: string;
+  budget?: number;
+  status?: string;
+  createdAt?: string;
+
+  registrations?: EventRegistration[];
+  volunteers?: EventVolunteer[];
+  attendance?: EventAttendance[];
+  feedbacks?: EventFeedback[];
+  gallery?: EventGalleryPhoto[];
+  polls?: EventPoll[];
+  expenses?: EventExpense[];
 }
 
 export interface Notification {
@@ -339,8 +445,18 @@ interface CommunityState {
   payMaintenanceBill: (id: string) => Promise<void>;
 
   // Community Events
-  createEvent: (ev: Omit<CommunityEvent, "id" | "rsvps">) => Promise<void>;
-  rsvpEvent: (id: string, userId: string) => Promise<void>;
+  createEvent: (ev: any) => Promise<void>;
+  updateEventDetails: (id: string, data: any) => Promise<void>;
+  cancelEvent: (id: string) => Promise<void>;
+  registerForEvent: (id: string, data: any) => Promise<void>;
+  volunteerForEvent: (id: string, data: any) => Promise<void>;
+  markEventAttendance: (id: string, userId: string, isAttending: boolean) => Promise<void>;
+  submitEventFeedback: (id: string, data: any) => Promise<void>;
+  uploadEventPhoto: (id: string, imageUrl: string) => Promise<void>;
+  createEventPoll: (id: string, question: string, options: string[]) => Promise<void>;
+  voteInPoll: (pollId: string, option: string) => Promise<void>;
+  logEventExpense: (id: string, data: any) => Promise<void>;
+  rsvpEvent: (id: string, status: string) => Promise<void>;
 
   // Notifications
   sendNotification: (userId: string, title: string, message: string, type: Notification["type"]) => Promise<void>;
@@ -1403,11 +1519,91 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
   },
 
-  rsvpEvent: async (id, userId) => {
+  updateEventDetails: async (id, data) => {
+    await fetch(`/api/events/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+  },
+
+  cancelEvent: async (id) => {
+    await fetch(`/api/events/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "Cancelled" })
+    });
+  },
+
+  registerForEvent: async (id, data) => {
+    await fetch(`/api/events/${id}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+  },
+
+  volunteerForEvent: async (id, data) => {
+    await fetch(`/api/events/${id}/volunteer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+  },
+
+  markEventAttendance: async (id, userId, isAttending) => {
+    await fetch(`/api/events/${id}/attendance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, isAttending })
+    });
+  },
+
+  submitEventFeedback: async (id, data) => {
+    await fetch(`/api/events/${id}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+  },
+
+  uploadEventPhoto: async (id, imageUrl) => {
+    await fetch(`/api/events/${id}/gallery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl })
+    });
+  },
+
+  createEventPoll: async (id, question, options) => {
+    await fetch(`/api/events/${id}/polls`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, options })
+    });
+  },
+
+  voteInPoll: async (pollId, option) => {
+    await fetch(`/api/events/polls/${pollId}/vote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ option })
+    });
+  },
+
+  logEventExpense: async (id, data) => {
+    await fetch(`/api/events/${id}/expenses`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+  },
+
+  rsvpEvent: async (id, status) => {
     await fetch(`/api/events/${id}/rsvp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, status: "Going" })
+      body: JSON.stringify({ status })
     });
   },
 

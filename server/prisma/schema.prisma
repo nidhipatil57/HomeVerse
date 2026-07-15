@@ -60,6 +60,11 @@ model User {
   gatePasses       GatePass[]
   facilityBookings FacilityBooking[]
   rsvps            EventRsvp[]
+  eventRegistrations EventRegistration[]
+  eventVolunteers    EventVolunteer[]
+  eventAttendances   EventAttendance[]
+  eventFeedbacks     EventFeedback[]
+  eventPollVotes     EventPollVote[]
   foundItems       FoundItem[]           @relation("ReporterUser")
   claims           Claim[]               @relation("ResidentClaims")
   lostReports      LostReport[]          @relation("ResidentLostReports")
@@ -380,16 +385,166 @@ model MaintenanceBill {
 }
 
 model CommunityEvent {
-  id            String   @id
-  title         String
-  description   String
-  date          String
-  time          String
-  location      String
-  organizer     String
-  priority      String
-  communityCode String
-  rsvps         EventRsvp[]
+  id                    String              @id
+  title                 String
+  description           String
+  date                  String
+  time                  String
+  location              String
+  organizer             String
+  priority              String
+  communityCode         String
+  
+  // New fields for comprehensive Events Module
+  category              String              @default("Other") // Festival, Sports, etc.
+  bannerImage           String?             // URL or base64
+  endTime               String?             // e.g. "22:00"
+  contactPerson         String?
+  contactNumber         String?
+  maxParticipants       Int?
+  registrationDeadline  String?
+  entryFee              Float?
+  registrationRequired  Boolean             @default(true)
+  volunteerRequired     Boolean             @default(false)
+  visibility            String              @default("public") // public, private
+  rules                 String?
+  thingsToBring         String?
+  budget                Float               @default(0.0)
+  status                String              @default("Active") // Active, Cancelled
+  createdAt             DateTime            @default(now())
+  
+  // Relations
+  rsvps                 EventRsvp[]
+  registrations         EventRegistration[]
+  volunteers            EventVolunteer[]
+  attendance            EventAttendance[]
+  feedbacks             EventFeedback[]
+  gallery               EventGalleryPhoto[]
+  polls                 EventPoll[]
+  expenses              EventExpense[]
+}
+
+model EventRegistration {
+  id             String         @id @default(uuid())
+  eventId        String
+  userId         String
+  userName       String
+  flatNumber     String?
+  contactNumber  String?
+  registeredAt   DateTime       @default(now())
+  guestCount     Int            @default(0)
+  guestNames     String?
+  rsvpStatus     String         @default("Going") // Going, Maybe, Not Going
+  
+  event          CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model EventVolunteer {
+  id             String         @id @default(uuid())
+  eventId        String
+  userId         String
+  volunteerName  String
+  flatNumber     String?
+  contactNumber  String?
+  role           String         // Decoration, Registration Desk, Food Distribution, etc.
+  volunteeredAt  DateTime       @default(now())
+
+  event          CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model EventAttendance {
+  id             String         @id @default(uuid())
+  eventId        String
+  userId         String
+  userName       String
+  flatNumber     String?
+  markedAt       DateTime       @default(now())
+  markedBy       String         @default("Secretary")
+
+  event          CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model EventFeedback {
+  id                 String         @id @default(uuid())
+  eventId            String
+  userId             String
+  userName           String
+  rating             Int            // 1-5
+  comment            String?
+  suggestions        String?
+  wouldAttendSimilar  Boolean        @default(true)
+  submittedAt        DateTime       @default(now())
+
+  event          CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model EventGalleryPhoto {
+  id         String         @id @default(uuid())
+  eventId    String
+  imageUrl   String
+  uploadedAt DateTime       @default(now())
+
+  event      CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model EventPoll {
+  id            String          @id @default(uuid())
+  eventId       String
+  question      String
+  options       String[]
+  status        String          @default("Open") // Open, Closed
+  createdAt     DateTime        @default(now())
+
+  event         CommunityEvent  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  votes         EventPollVote[]
+
+  @@index([eventId])
+}
+
+model EventPollVote {
+  id        String    @id @default(uuid())
+  pollId    String
+  userId    String
+  userName  String
+  option    String
+  votedAt   DateTime  @default(now())
+
+  poll      EventPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([pollId])
+  @@index([userId])
+}
+
+model EventExpense {
+  id          String         @id @default(uuid())
+  eventId     String
+  category    String         // Decoration, Food, Stage, Prizes, Electricity, Cleaning, Miscellaneous
+  amount      Float
+  description String?
+  date        String
+
+  event       CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
 }
 
 model EventRsvp {

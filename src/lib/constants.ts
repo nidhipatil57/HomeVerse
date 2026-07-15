@@ -118,6 +118,7 @@ export const SECURITY_SIDEBAR_ITEMS = [
   { label: 'Lost & Found', href: '/society/security-lost-found', icon: 'Search' },
   { label: 'Incident Reports', href: '/society/incident-reports', icon: 'FileText' },
   { label: 'CCTV', href: '/society/cctv', icon: 'Camera' },
+  { label: 'Events Schedule', href: '/society/dashboard?tab=events', icon: 'Calendar' },
   { label: 'Security Notices', href: '/society/announcements', icon: 'Megaphone' },
   { label: 'Notifications', href: '/society/notifications', icon: 'Megaphone' },
   { label: 'Settings', href: '/society/settings', icon: 'Settings' },
