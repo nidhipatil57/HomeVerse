@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Shield, Users, CheckCircle2, Clock, AlertTriangle, FileCheck, Package, Eye, Trash, Plus, Search, Bot, ArrowRight, Wrench, Key, Star, XCircle, PlusCircle, LogOut, MapPin, Activity, Car, AlertCircle, Camera, Check, ShieldAlert, Ban, UserCheck, ShieldClose, FileText, ClipboardList
+  Shield, Users, CheckCircle2, Clock, AlertTriangle, FileCheck, Package, Eye, Trash, Plus, Search, Bot, ArrowRight, Wrench, Key, Star, XCircle, PlusCircle, LogOut, MapPin, Activity, Car, AlertCircle, Camera, Check, ShieldAlert, Ban, UserCheck, ShieldClose, FileText, ClipboardList, Calendar
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
     incidents, addIncidentReport,
     announcements, addAnnouncement,
     users, complaints, updateComplaintStatus,
-    helpers, attendance, checkInHelper, checkOutHelper
+    helpers, attendance, checkInHelper, checkOutHelper, communityEvents
   } = useCommunityStore(
     useShallow((state) => ({
       visitors: state.visitors,
@@ -68,7 +68,8 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
       helpers: state.helpers || [],
       attendance: state.attendance || [],
       checkInHelper: state.checkInHelper,
-      checkOutHelper: state.checkOutHelper
+      checkOutHelper: state.checkOutHelper,
+      communityEvents: state.communityEvents || []
     }))
   );
 
@@ -1486,6 +1487,113 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        )}
+
+        {/* EVENTS TAB */}
+        {activeTab === "events" && (
+          <div className="space-y-6 animate-fadeIn text-xs">
+            <Card className="border-border/50">
+              <CardHeader className="pb-3 border-b border-border/20">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-indigo-500" />
+                  Today's Gated Operational Events
+                </CardTitle>
+                <CardDescription>Event logistics, venue bookings, guest lists, and security crowd prep</CardDescription>
+              </CardHeader>
+              <CardContent className="p-5 space-y-4">
+                {(() => {
+                  const todayStr = new Date().toISOString().split("T")[0];
+                  // Roster events that are active and scheduled
+                  const activeEvents = communityEvents.filter(e => e.status !== "Cancelled");
+                  if (activeEvents.length === 0) {
+                    return <div className="text-center py-16 text-muted-foreground">No events scheduled on today's gate roster.</div>;
+                  }
+
+                  return activeEvents.map((ev) => {
+                    const totalParticipants = ev.registrations?.reduce((acc, curr) => acc + 1 + curr.guestCount, 0) || 0;
+                    const totalGuests = ev.registrations?.reduce((acc, curr) => acc + curr.guestCount, 0) || 0;
+                    const totalVols = ev.volunteers?.length || 0;
+
+                    return (
+                      <div key={ev.id} className="p-4 rounded-xl border border-border/60 bg-card space-y-4">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-3">
+                          <div>
+                            <span className="text-[10px] text-indigo-500 font-extrabold uppercase">{ev.category}</span>
+                            <h3 className="text-sm font-bold text-foreground mt-0.5">{ev.title}</h3>
+                          </div>
+                          <Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold px-2 py-0.5">
+                            Active Operational
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                          <div>
+                            <span className="text-muted-foreground block text-[9px] uppercase tracking-wider">Event Venue</span>
+                            <span className="font-bold text-foreground">{ev.location}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[9px] uppercase tracking-wider">Roster Timings</span>
+                            <span className="font-bold text-foreground">{ev.time} {ev.endTime ? `to ${ev.endTime}` : ""}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[9px] uppercase tracking-wider">Expected Crowd (Estimate)</span>
+                            <span className="font-bold text-indigo-600 text-sm">{ev.maxParticipants || "Uncapped"} (Registered: {totalParticipants})</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[9px] uppercase tracking-wider">Gated Expected Guests</span>
+                            <span className="font-bold text-amber-600 text-sm">{totalGuests} Guests</span>
+                          </div>
+                        </div>
+
+                        {/* Guest & Volunteer Detail lists */}
+                        <div className="grid md:grid-cols-2 gap-4 pt-3 border-t">
+                          {/* Expected Guest List */}
+                          <div className="space-y-2">
+                            <span className="text-[10px] text-muted-foreground font-bold uppercase block">Gated Guest list ({totalGuests} persons)</span>
+                            <div className="max-h-[150px] overflow-y-auto border rounded-lg p-2.5 space-y-1.5 bg-secondary/5">
+                              {ev.registrations?.filter(r => r.guestCount > 0).map((r, i) => (
+                                <div key={i} className="flex justify-between items-center text-[10px] border-b pb-1 last:border-0 last:pb-0">
+                                  <div>
+                                    <span className="font-semibold block">{r.userName} (Flat {r.flatNumber})</span>
+                                    {r.guestNames && <span className="text-muted-foreground text-[9px] block">Names: {r.guestNames}</span>}
+                                  </div>
+                                  <Badge variant="outline" className="text-[9px] font-extrabold">{r.guestCount} Guests</Badge>
+                                </div>
+                              ))}
+                              {totalGuests === 0 && (
+                                <div className="text-center py-4 text-muted-foreground text-[10px]">No external guests registered.</div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Volunteers list */}
+                          <div className="space-y-2">
+                            <span className="text-[10px] text-muted-foreground font-bold uppercase block">Volunteer Duty Roster ({totalVols} residents)</span>
+                            <div className="max-h-[150px] overflow-y-auto border rounded-lg p-2.5 space-y-1.5 bg-secondary/5">
+                              {ev.volunteers?.map((v, i) => (
+                                <div key={i} className="flex justify-between items-center text-[10px] border-b pb-1 last:border-0 last:pb-0">
+                                  <div>
+                                    <span className="font-semibold block">{v.volunteerName} (Flat {v.flatNumber})</span>
+                                    <span className="text-muted-foreground text-[8px] block">Contact: {v.contactNumber}</span>
+                                  </div>
+                                  <Badge className="bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 text-[9px] font-bold">
+                                    {v.role}
+                                  </Badge>
+                                </div>
+                              ))}
+                              {totalVols === 0 && (
+                                <div className="text-center py-4 text-muted-foreground text-[10px]">No volunteers registered yet.</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>

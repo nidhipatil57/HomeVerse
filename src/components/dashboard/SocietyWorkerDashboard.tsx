@@ -26,7 +26,8 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
     checkInHelper,
     checkOutHelper,
     completeFlatWork,
-    initializeDb
+    initializeDb,
+    communityEvents
   } = useCommunityStore(
     useShallow((state) => ({
       complaints: state.complaints,
@@ -39,6 +40,7 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
       checkOutHelper: state.checkOutHelper,
       completeFlatWork: state.completeFlatWork,
       initializeDb: state.initializeDb,
+      communityEvents: state.communityEvents || []
     }))
   );
 
@@ -322,6 +324,50 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
                     </div>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Event Duty Assignments Card */}
+            <Card className="border-border/60 bg-card overflow-hidden shadow-md mt-4">
+              <CardHeader className="pb-2 border-b bg-secondary/15">
+                <CardTitle className="text-xs font-bold uppercase text-indigo-600 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4" /> Gated Event Duty Roster
+                </CardTitle>
+                <CardDescription className="text-[10px]">Your coordinator assignments for society events</CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3 max-h-[220px] overflow-y-auto">
+                {(() => {
+                  const myEventDuties = (communityEvents || []).filter((ev) => 
+                    ev.volunteers?.some((v) => v.userId === worker?.id || v.volunteerName.toLowerCase().includes(worker?.name.toLowerCase()))
+                  );
+
+                  if (myEventDuties.length === 0) {
+                    return <p className="text-[10px] text-muted-foreground italic text-center py-4">No event duties assigned for today.</p>;
+                  }
+
+                  return myEventDuties.map((ev) => {
+                    const myAssignment = ev.volunteers?.find((v) => v.userId === worker?.id || v.volunteerName.toLowerCase().includes(worker?.name.toLowerCase()));
+                    return (
+                      <div key={ev.id} className="p-3 rounded-xl border border-border/40 bg-secondary/5 space-y-1.5 text-[10px] font-semibold">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-foreground truncate max-w-[120px]">{ev.title}</span>
+                          <Badge className="bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 text-[8.5px] font-bold">
+                            {myAssignment?.role || "Volunteer"}
+                          </Badge>
+                        </div>
+                        <div className="text-muted-foreground">
+                          <div>📍 Venue: {ev.location}</div>
+                          <div>🕒 Time: {ev.time} {ev.endTime ? `to ${ev.endTime}` : ""}</div>
+                          {ev.contactPerson && (
+                            <div className="mt-1 text-indigo-600 font-bold">
+                              Coordinator: {ev.contactPerson} ({ev.contactNumber})
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </CardContent>
             </Card>
           </div>
