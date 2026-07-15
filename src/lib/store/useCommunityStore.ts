@@ -106,7 +106,7 @@ export interface FoundItem {
   dateFound: string;
   timeFound: string;
   additionalNotes?: string;
-  status: "Pending Verification" | "Available for Claim" | "Claim Pending Verification" | "Ready for Pickup" | "Returned" | "Rejected" | "Possible Match Found" | "Owner Identified";
+  status: "Pending Verification" | "Available" | "Suggested To Resident" | "Claim Requested" | "Claim Confirmed" | "Returned" | "Rejected" | "Available for Claim" | "Claim Pending Verification" | "Ready for Pickup" | "Possible Match Found" | "Owner Identified";
   portal: PortalType;
   createdAt: string;
   claims?: Claim[];
@@ -125,7 +125,7 @@ export interface LostReport {
   dateLost: string;
   timeLost?: string;
   lastSeenLocation: string;
-  status: "Searching" | "Possible Match Found" | "Matched" | "Returned" | "Closed";
+  status: "Searching" | "Belonging Suggested" | "Claim Requested" | "Claim Confirmed" | "Returned" | "Closed" | "Possible Match Found" | "Matched";
   images: string[];
   additionalNotes?: string;
   portal: PortalType;
@@ -147,6 +147,8 @@ export interface ItemMatch {
   collectionDate?: string;
   collectionTime?: string;
   collectedBy?: string;
+  securityNote?: string;
+  additionalPhoto?: string;
   createdAt: string;
   updatedAt?: string;
   lostReport?: LostReport;
@@ -327,6 +329,9 @@ interface CommunityState {
   confirmMatch: (matchId: string, verifiedBy: string) => Promise<void>;
   rejectMatch: (matchId: string) => Promise<void>;
   handoverMatchedItem: (matchId: string, collectedBy: string, verifiedBySecurity: string) => Promise<void>;
+  suggestBelonging: (lostReportId: string, foundItemId: string, securityNote?: string, additionalPhoto?: string) => Promise<void>;
+  claimSuggestedMatch: (matchId: string) => Promise<void>;
+  rejectSuggestedMatch: (matchId: string) => Promise<void>;
   fetchLostReports: () => Promise<void>;
   fetchMatches: () => Promise<void>;
 
@@ -1315,6 +1320,26 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(report)
+    });
+  },
+
+  suggestBelonging: async (lostReportId, foundItemId, securityNote, additionalPhoto) => {
+    await fetch("/api/lostfound/suggest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lostReportId, foundItemId, securityNote, additionalPhoto })
+    });
+  },
+
+  claimSuggestedMatch: async (matchId) => {
+    await fetch(`/api/lostfound/matches/${matchId}/claim`, {
+      method: "POST"
+    });
+  },
+
+  rejectSuggestedMatch: async (matchId) => {
+    await fetch(`/api/lostfound/matches/${matchId}/reject-match`, {
+      method: "POST"
     });
   },
 

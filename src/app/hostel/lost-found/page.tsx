@@ -89,7 +89,7 @@ export default function HostelLostFoundPage() {
                   </div>
 
                   <div className="mt-4 pt-3 border-t flex justify-end items-center">
-                    {item.status === "Available for Claim" ? (
+                    {item.status === "Available" ? (
                       !isReporter ? (
                         <Button
                           size="sm"
@@ -108,7 +108,7 @@ export default function HostelLostFoundPage() {
                         </Button>
                       ) : (
                         <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-[10px]">
-                          Available for Claim
+                          Available
                         </Badge>
                       )
                     ) : item.status === "Claim Pending Verification" || item.status === "Ready for Pickup" ? (
