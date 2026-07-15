@@ -378,7 +378,7 @@ export const getPrepopulatedFoundItems = (): any[] => [
     dateFound: "2026-07-05",
     timeFound: "09:00",
     additionalNotes: "Keyring has a small leather strap.",
-    status: "Available for Claim",
+    status: "Available",
     portal: "society",
     createdAt: "2026-07-05T09:00:00Z"
   },

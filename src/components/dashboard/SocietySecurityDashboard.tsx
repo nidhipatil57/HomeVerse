@@ -121,7 +121,7 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
   const [collectedBy, setCollectedBy] = useState("");
   const [verifiedBySecurity, setVerifiedBySecurity] = useState(security?.name || "Security");
   const [resolving, setResolving] = useState(false);
-  const [lostFoundSubTab, setLostFoundSubTab] = useState("pending");
+  const [lostFoundSubTab, setLostFoundSubTab] = useState("lost-items");
 
   // Incident creation state
   const [newIncident, setNewIncident] = useState({
@@ -165,11 +165,11 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
   const activeEmergencies = emergencies.filter(e => e.status !== "resolved");
 
   // Lost & Found counters
-  const activeLostReportsCount = lostReports.filter(r => r.status === "Searching" || r.status === "Possible Match Found").length;
-  const activeFoundItemsCount = lostFoundItems.filter(item => item.portal === "society" && item.status === "Available for Claim").length;
+  const activeLostReportsCount = lostReports.filter(r => r.portal === "society" && r.status !== "Returned" && r.status !== "Closed").length;
+  const activeFoundItemsCount = lostFoundItems.filter(item => item.portal === "society" && item.status === "Available").length;
   const possibleMatchesCount = itemMatches.filter(m => m.status === "Suggested").length;
   const itemsReturnedCount = lostFoundItems.filter(item => item.portal === "society" && item.status === "Returned").length + itemMatches.filter(m => m.status === "Confirmed" && m.collectionDate).length;
-  const unmatchedReportsCount = lostReports.filter(r => r.status === "Searching").length;
+  const unmatchedReportsCount = lostReports.filter(r => r.portal === "society" && r.status === "Searching").length;
 
 
   // Service Plumbers / Electricians (assigned complaints)
@@ -1043,13 +1043,12 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
                 
                 {/* Sub tabs list */}
                 <div className="flex gap-1.5 mt-3 bg-secondary/30 p-1 rounded-lg w-fit">
-                  {["pending", "claims", "pickup", "history"].map(tab => {
+                  {["lost-items", "found-items", "history"].map(tab => {
                     const filteredList = lostFoundItems.filter(item => item.portal === "society");
                     let count = 0;
-                    if (tab === "pending") count = filteredList.filter(item => item.status === "Pending Verification").length;
-                    else if (tab === "claims") count = filteredList.filter(item => item.status === "Claim Pending Verification").length;
-                    else if (tab === "pickup") count = filteredList.filter(item => item.status === "Ready for Pickup").length;
-                    else if (tab === "history") count = filteredList.filter(item => item.status === "Returned" || item.status === "Rejected" || item.status === "Available for Claim").length;
+                    if (tab === "lost-items") count = lostReports.filter(r => r.portal === "society" && r.status !== "Returned" && r.status !== "Closed").length;
+                    else if (tab === "found-items") count = filteredList.filter(item => item.status !== "Returned" && item.status !== "Rejected").length;
+                    else if (tab === "history") count = itemMatches.filter(m => m.status === "Confirmed" && m.collectionDate).length;
 
                     return (
                       <button
@@ -1060,136 +1059,119 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
                           lostFoundSubTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:bg-secondary/40"
                         }`}
                       >
-                        <span className="capitalize">{tab}</span> ({count})
+                        <span className="capitalize">{tab.replace("-", " ")}</span> ({count})
                       </button>
                     );
                   })}
                 </div>
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto p-4 space-y-3">
-                {/* Pending Verification */}
-                {lostFoundSubTab === "pending" && (
+                {/* Lost Items Tab */}
+                {lostFoundSubTab === "lost-items" && (
                   (() => {
-                    const items = lostFoundItems.filter(item => item.portal === "society" && item.status === "Pending Verification");
-                    if (items.length === 0) return <div className="text-center py-20 text-muted-foreground text-xs">No pending verification reports.</div>;
+                    const items = lostReports.filter(r => r.portal === "society" && r.status !== "Returned" && r.status !== "Closed");
+                    if (items.length === 0) return <div className="text-center py-20 text-muted-foreground text-xs">No active lost reports.</div>;
+                    return items.map(report => {
+                      const activeMatch = itemMatches.find(m => m.lostReportId === report.id && m.status === "Suggested");
+                      return (
+                        <div key={report.id} className="p-3.5 rounded-xl border border-border bg-card hover:bg-secondary/5 transition-colors text-xs space-y-2 flex justify-between items-center gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-foreground">{report.itemName}</span>
+                              <Badge className={`text-[8px] px-1.5 h-4 font-bold ${
+                                report.status === "Searching" ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" :
+                                report.status === "Belonging Suggested" ? "bg-indigo-500/10 text-indigo-500 border border-indigo-500/20" :
+                                report.status === "Claim Confirmed" ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
+                                "bg-secondary text-foreground"
+                              }`}>
+                                {report.status}
+                              </Badge>
+                            </div>
+                            <div className="text-muted-foreground text-[10px]">{report.description}</div>
+                            <div className="text-[9px] text-muted-foreground">Reporter: {report.residentName} (Flat {report.flatNumber})</div>
+                          </div>
+                          <div className="shrink-0 flex gap-2">
+                            {report.status === "Claim Confirmed" && activeMatch ? (
+                              <Button 
+                                size="sm" 
+                                onClick={() => window.location.href = "/society/security-lost-found"} 
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg h-8 text-[10px] font-semibold border-0"
+                              >
+                                Hand Over Item
+                              </Button>
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => window.location.href = "/society/security-lost-found"} 
+                                className="text-indigo-600 border-indigo-500/20 hover:bg-indigo-500/10 rounded-lg h-8 text-[10px] font-semibold"
+                              >
+                                {report.status === "Belonging Suggested" ? "Suggested" : "Send Found Item"}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()
+                )}
+
+                {/* Found Items Tab */}
+                {lostFoundSubTab === "found-items" && (
+                  (() => {
+                    const items = lostFoundItems.filter(item => item.portal === "society" && item.status !== "Returned" && item.status !== "Rejected");
+                    if (items.length === 0) return <div className="text-center py-20 text-muted-foreground text-xs">No active found items.</div>;
                     return items.map(item => (
                       <div key={item.id} className="p-3.5 rounded-xl border border-border bg-card hover:bg-secondary/5 transition-colors text-xs space-y-2 flex justify-between items-center gap-4">
                         <div className="space-y-1">
-                          <div className="font-bold text-foreground">{item.category}</div>
-                          <div className="text-muted-foreground text-[11px]">{item.description}</div>
-                          <div className="text-[10px] text-muted-foreground">Reporter: {item.reporterName} | Location: {item.foundLocation}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-foreground">{item.description.split(" - ")[0]}</span>
+                            <Badge className={`text-[8px] px-1.5 h-4 font-bold ${
+                              item.status === "Pending Verification" ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" :
+                              item.status === "Available" ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
+                              item.status === "Suggested To Resident" ? "bg-indigo-500/10 text-indigo-500 border border-indigo-500/20" :
+                              item.status === "Claim Confirmed" ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
+                              "bg-secondary text-foreground"
+                            }`}>
+                              {item.status === "Pending Verification" ? "Pending Verification" : item.status === "Suggested To Resident" ? "Suggested" : item.status}
+                            </Badge>
+                          </div>
+                          <div className="text-muted-foreground text-[10px]">{item.description.split(" - ").slice(1).join(" - ")}</div>
+                          <div className="text-[9px] text-muted-foreground">Found Location: {item.foundLocation} | Reporter: {item.reporterName}</div>
                         </div>
-                        <div className="flex gap-2 shrink-0">
-                          <Button size="sm" onClick={() => verifyFoundItem(item.id)} className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8 text-[10px] font-semibold border-0">
-                            Verify Received
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => rejectFoundItem(item.id)} className="text-red-500 border-red-500/20 hover:bg-red-500/10 rounded-lg h-8 text-[10px] font-semibold">
-                            Reject
-                          </Button>
-                        </div>
+                        {item.status === "Pending Verification" && (
+                          <div className="shrink-0 flex gap-2">
+                            <Button size="sm" onClick={() => verifyFoundItem(item.id)} className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8 text-[10px] font-semibold border-0">
+                              Verify Received
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ));
                   })()
                 )}
 
-                {/* Active Claims */}
-                {lostFoundSubTab === "claims" && (
-                  (() => {
-                    const items = lostFoundItems.filter(item => item.portal === "society" && item.status === "Claim Pending Verification");
-                    if (items.length === 0) return <div className="text-center py-20 text-muted-foreground text-xs">No active claims awaiting verification.</div>;
-                    return items.map(item => {
-                      const pendingClaims = item.claims?.filter(c => c.status === "Claim Pending Verification") || [];
-                      return (
-                        <div key={item.id} className="p-3.5 rounded-xl border border-border bg-card space-y-2.5 text-xs">
-                          <div className="border-b pb-2 flex justify-between items-center">
-                            <div>
-                              <span className="font-bold text-foreground">{item.category}</span>
-                              <span className="text-[10px] text-muted-foreground block">{item.description}</span>
-                            </div>
-                            <span className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">Ref: {item.id}</span>
-                          </div>
-                          <div className="space-y-2">
-                            {pendingClaims.map(claim => (
-                              <div key={claim.id} className="p-2.5 rounded-lg border border-border bg-secondary/10 flex justify-between items-center gap-4">
-                                <div className="space-y-1">
-                                  <div className="font-bold text-foreground">Claimant: {claim.residentName}</div>
-                                  <div className="text-muted-foreground text-[10px]">Reason: &quot;{claim.claimReason}&quot;</div>
-                                  {claim.contactNumber && <div className="text-[10px] text-primary">Phone: {claim.contactNumber}</div>}
-                                </div>
-                                <div className="flex gap-2 shrink-0">
-                                  <Button size="sm" onClick={() => approveClaim(claim.id)} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg h-7 text-[9px] font-bold border-0">
-                                    Approve
-                                  </Button>
-                                  <Button size="sm" variant="outline" onClick={() => rejectClaim(claim.id)} className="text-red-500 border-red-500/20 hover:bg-red-500/10 rounded-lg h-7 text-[9px] font-bold">
-                                    Reject
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()
-                )}
-
-                {/* Ready for Handover */}
-                {lostFoundSubTab === "pickup" && (
-                  (() => {
-                    const items = lostFoundItems.filter(item => item.portal === "society" && item.status === "Ready for Pickup");
-                    if (items.length === 0) return <div className="text-center py-20 text-muted-foreground text-xs">No items waiting for collection.</div>;
-                    return items.map(item => {
-                      const approvedClaim = item.claims?.find(c => c.status === "Ready for Pickup");
-                      if (!approvedClaim) return null;
-                      return (
-                        <div key={item.id} className="p-3.5 rounded-xl border border-border bg-card hover:bg-secondary/5 transition-colors text-xs space-y-2 flex justify-between items-center gap-4">
-                          <div className="space-y-1">
-                            <div className="font-bold text-foreground">{item.category}</div>
-                            <div className="text-muted-foreground text-[11px]">{item.description}</div>
-                            <div className="text-[10px] text-indigo-500 font-bold">Claimant: {approvedClaim.residentName} (Ready for Pickup)</div>
-                          </div>
-                          <div className="shrink-0">
-                            <Button size="sm" onClick={() => {
-                              setSelectedClaimForHandover({ claim: approvedClaim, item });
-                              setCollectedBy(approvedClaim.residentName);
-                              setShowHandoverDialog(true);
-                            }} className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8 text-[10px] font-semibold border-0">
-                              Mark Returned
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()
-                )}
-
-                {/* Registry History */}
+                {/* History Tab */}
                 {lostFoundSubTab === "history" && (
                   (() => {
-                    const items = lostFoundItems.filter(item => item.portal === "society" && (item.status === "Returned" || item.status === "Rejected" || item.status === "Available for Claim"));
-                    if (items.length === 0) return <div className="text-center py-20 text-muted-foreground text-xs">History is empty.</div>;
-                    return items.map(item => (
-                      <div key={item.id} className="p-3 rounded-xl border border-border bg-card hover:bg-secondary/5 transition-colors text-xs flex justify-between items-center gap-4">
+                    const matches = itemMatches.filter(m => m.status === "Confirmed" && m.collectionDate);
+                    if (matches.length === 0) return <div className="text-center py-20 text-muted-foreground text-xs">History is empty.</div>;
+                    return matches.map(match => (
+                      <div key={match.id} className="p-3 rounded-xl border border-border bg-card hover:bg-secondary/5 transition-colors text-xs flex justify-between items-center gap-4">
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold">{item.category}</span>
-                            <Badge className={`text-[8px] px-1 h-4 font-bold ${
-                              item.status === "Returned" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
-                              item.status === "Rejected" ? "bg-red-500/10 text-red-500 border-red-500/20" :
-                              "bg-secondary text-foreground"
-                            }`}>
-                              {item.status}
+                            <span className="font-bold">{match.lostReport?.itemName || match.foundItem?.description.split(" - ")[0]}</span>
+                            <Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[8px] px-1 h-4 font-bold">
+                              Returned
                             </Badge>
                           </div>
-                          <div className="text-muted-foreground text-[10px] mt-0.5">{item.description}</div>
-                          <div className="text-[9px] text-muted-foreground mt-0.5">Reporter: {item.reporterName} | Date: {item.dateFound}</div>
-                        </div>
-                        {item.status === "Returned" && (
-                          <div className="text-[9px] text-muted-foreground text-right">
-                            <div className="font-bold text-emerald-600">Returned</div>
-                            <div>Recipient: {item.claims?.find(c => c.status === "Returned")?.collectedBy}</div>
+                          <div className="text-muted-foreground text-[10px] mt-0.5">
+                            Returned to {match.lostReport?.residentName || "Resident"} by {match.verifiedBy || "Security"}
                           </div>
-                        )}
+                          <div className="text-[9px] text-muted-foreground mt-0.5">
+                            Returned Date: {match.collectionDate?.split("T")[0]} at {match.collectionTime}
+                          </div>
+                        </div>
                       </div>
                     ));
                   })()

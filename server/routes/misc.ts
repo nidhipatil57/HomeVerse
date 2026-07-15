@@ -1594,7 +1594,7 @@ router.put("/lostfound/:id/verify", authenticateToken, async (req: any, res) => 
 
     const updated = await prisma.foundItem.update({
       where: { id },
-      data: { status: "Available for Claim" },
+      data: { status: "Available" },
       include: { claims: true }
     });
 
@@ -1614,7 +1614,6 @@ router.put("/lostfound/:id/verify", authenticateToken, async (req: any, res) => 
     );
 
     broadcastUpdate("lostfound:update", updated);
-    triggerSmartMatching({ type: "found", id });
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: "Failed to verify item" });
@@ -1971,8 +1970,6 @@ router.post("/lostfound/lost", authenticateToken, async (req: any, res) => {
       flatNumber: dbUser?.unit || "N/A"
     });
 
-    triggerSmartMatching({ type: "lost", id });
-
     res.status(201).json(newReport);
   } catch (error) {
     console.error(error);
@@ -2147,6 +2144,232 @@ router.post("/lostfound/matches/:matchId/reject", authenticateToken, async (req:
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to reject match" });
+  }
+});
+
+router.post("/lostfound/suggest", authenticateToken, async (req: any, res) => {
+  const { lostReportId, foundItemId, securityNote, additionalPhoto } = req.body;
+  if (!lostReportId || !foundItemId) {
+    return res.status(400).json({ error: "Required fields lostReportId and foundItemId are missing" });
+  }
+  try {
+    const lostReport = await prisma.lostReport.findUnique({
+      where: { id: lostReportId },
+      include: { resident: true }
+    });
+    const foundItem = await prisma.foundItem.findUnique({
+      where: { id: foundItemId }
+    });
+
+    if (!lostReport || !foundItem) {
+      return res.status(404).json({ error: "Lost report or found item not found" });
+    }
+
+    const mId = `MT-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+    const newMatch = await prisma.itemMatch.create({
+      data: {
+        id: mId,
+        lostReportId,
+        foundItemId,
+        status: "Suggested",
+        securityNote: securityNote || "",
+        additionalPhoto: additionalPhoto || "",
+        verifiedBy: req.user.name || "Security",
+        verificationDate: new Date()
+      },
+      include: {
+        lostReport: {
+          include: { resident: true }
+        },
+        foundItem: {
+          include: { reporter: true }
+        }
+      }
+    });
+
+    const updatedLost = await prisma.lostReport.update({
+      where: { id: lostReportId },
+      data: { status: "Belonging Suggested" }
+    });
+
+    const updatedFound = await prisma.foundItem.update({
+      where: { id: foundItemId },
+      data: { status: "Suggested To Resident" }
+    });
+
+    // Notify resident
+    await sendInAppNotification(
+      lostReport.residentId,
+      "Belonging Suggested",
+      `A possible belonging has been sent to you by Security. Please review it.`,
+      "info"
+    );
+
+    const formatted = {
+      ...newMatch,
+      lostReport: {
+        ...newMatch.lostReport,
+        residentName: newMatch.lostReport.resident.name,
+        flatNumber: newMatch.lostReport.resident.unit || "N/A",
+        resident: undefined
+      },
+      foundItem: {
+        ...newMatch.foundItem,
+        reporterName: newMatch.foundItem.reporter.name,
+        reporter: undefined
+      }
+    };
+
+    broadcastUpdate("lostreport:update", {
+      ...updatedLost,
+      residentName: lostReport.resident.name,
+      flatNumber: lostReport.resident.unit || "N/A"
+    });
+    broadcastUpdate("lostfound:update", updatedFound);
+    broadcastUpdate("itemmatch:update", formatted);
+
+    res.status(201).json(formatted);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to suggest match" });
+  }
+});
+
+router.post("/lostfound/matches/:matchId/claim", authenticateToken, async (req: any, res) => {
+  const { matchId } = req.params;
+  try {
+    const match = await prisma.itemMatch.findUnique({
+      where: { id: matchId },
+      include: {
+        lostReport: {
+          include: { resident: true }
+        },
+        foundItem: true
+      }
+    });
+
+    if (!match) {
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    // Update lost report status to "Claim Confirmed"
+    const updatedLost = await prisma.lostReport.update({
+      where: { id: match.lostReportId },
+      data: { status: "Claim Confirmed" }
+    });
+
+    // Update found item status to "Claim Confirmed"
+    const updatedFound = await prisma.foundItem.update({
+      where: { id: match.foundItemId },
+      data: { status: "Claim Confirmed" }
+    });
+
+    const residentName = match.lostReport.resident.name;
+    const portal = match.lostReport.portal;
+    const securityRole = portal === "society" ? "security" : "warden";
+
+    // Notify all security guards
+    const secUsers = await prisma.user.findMany({
+      where: { portal, role: securityRole }
+    });
+    for (const sec of secUsers) {
+      await sendInAppNotification(
+        sec.id,
+        "Proposed Belonging Confirmed",
+        `${residentName} confirmed that the suggested item belongs to her.`,
+        "success"
+      );
+    }
+
+    broadcastUpdate("lostreport:update", {
+      ...updatedLost,
+      residentName,
+      flatNumber: match.lostReport.resident.unit || "N/A"
+    });
+    broadcastUpdate("lostfound:update", updatedFound);
+
+    res.json({ success: true, lostReport: updatedLost, foundItem: updatedFound });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to claim match" });
+  }
+});
+
+router.post("/lostfound/matches/:matchId/reject-match", authenticateToken, async (req: any, res) => {
+  const { matchId } = req.params;
+  try {
+    const match = await prisma.itemMatch.findUnique({
+      where: { id: matchId },
+      include: {
+        lostReport: {
+          include: { resident: true }
+        },
+        foundItem: true
+      }
+    });
+
+    if (!match) {
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    // Update match status to Rejected
+    const updatedMatch = await prisma.itemMatch.update({
+      where: { id: matchId },
+      data: { status: "Rejected" }
+    });
+
+    // Update lost report status back to Searching
+    const updatedLost = await prisma.lostReport.update({
+      where: { id: match.lostReportId },
+      data: { status: "Searching" }
+    });
+
+    // Update found item status back to Available
+    const updatedFound = await prisma.foundItem.update({
+      where: { id: match.foundItemId },
+      data: { status: "Available" }
+    });
+
+    const residentName = match.lostReport.resident.name;
+    const portal = match.lostReport.portal;
+    const securityRole = portal === "society" ? "security" : "warden";
+
+    // Notify all security guards
+    const secUsers = await prisma.user.findMany({
+      where: { portal, role: securityRole }
+    });
+    for (const sec of secUsers) {
+      await sendInAppNotification(
+        sec.id,
+        "Proposed Belonging Rejected",
+        `${residentName} rejected the proposed belonging (Match Ref: ${matchId}).`,
+        "error"
+      );
+    }
+
+    broadcastUpdate("lostreport:update", {
+      ...updatedLost,
+      residentName,
+      flatNumber: match.lostReport.resident.unit || "N/A"
+    });
+    broadcastUpdate("lostfound:update", updatedFound);
+    
+    // Broadcast match status update
+    broadcastUpdate("itemmatch:update", {
+      ...updatedMatch,
+      lostReport: {
+        ...match.lostReport,
+        residentName,
+        flatNumber: match.lostReport.resident.unit || "N/A",
+        resident: undefined
+      },
+      foundItem: updatedFound
+    });
+
+    res.json({ success: true, match: updatedMatch, lostReport: updatedLost, foundItem: updatedFound });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to reject match suggestion" });
   }
 });
 
