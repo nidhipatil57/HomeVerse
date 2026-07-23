@@ -95,8 +95,8 @@ export default function LoginPage() {
       } else {
         setError("Invalid credentials");
       }
-    } catch (err) {
-      setError("Failed to sign in");
+    } catch (err: any) {
+      setError(err?.message || "Failed to sign in");
     } finally {
       setLoading(false);
     }
