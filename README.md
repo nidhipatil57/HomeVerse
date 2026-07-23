@@ -21,146 +21,34 @@ Whether it's managing visitors, tracking maintenance, booking trusted services, 
 
 # ✨ Features
 
-## 🛡️ Smart Visitor Management
-- Pre-approved visitor entries
-- QR-based verification
-- Digital gate passes
-- Entry & exit history
-- Real-time visitor notifications
+## 🏢 Society Management
+
+- 🤖 **AI Community Assistant** – Ask about maintenance, complaints, visitors, payments, and community services in natural language.
+- 🛡️ **Smart Visitor & Parcel Management** – Digital visitor approvals, OTP-based parcel collection, and real-time security notifications.
+- 🔧 **Intelligent Complaint Management** – Raise, track, and communicate with assigned workers through a centralized complaint workflow.
+- 👷 **Verified Local Help Network** – Find trusted maids, cooks, plumbers, electricians, and other service providers based on skills and community reviews.
+- 🏘️ **Community Hub** – Events, lost & found, maintenance payments, daily helper attendance, resident directory, marketplace, and emergency assistance.
 
 ---
 
-## 💰 Rent & Maintenance
+## 🎓 Hostel Management
 
-- Online rent payments
-- Maintenance fee collection
-- Automated reminders
-- Digital payment receipts
-- Expense tracking
-
----
-
-## 📝 Complaint Management
-
-- Raise maintenance requests
-- Track complaint status
-- AI-powered issue categorization
-- Resolution history
+- 🏠 **Dedicated Student & Warden Portals** – Role-based dashboards with synchronized requests, complaints, and hostel operations.
+- 🍽️ **Smart Hostel Services** – Mess menu, laundry booking, parcel tracking, attendance, and digital leave requests.
+- 🛏️ **Room & Occupancy Management** – Room allocation, occupancy tracking, and complete hostel administration.
+- 📢 **Hostel Community Hub** – Notices, announcements, events, and AI-powered assistance for everyday hostel life.
 
 ---
+## 👥 Role-Based Portals
 
-## ⚡ Utility Monitoring
+| Society | Hostel |
+|---------|--------|
+| 👤 Resident | 🎓 Student |
+| 🛡️ Security | 👨‍🏫 Warden |
+| 👷 Worker | — |
+| 🏢 Secretary | — |
 
-- Water consumption tracking
-- Electricity usage monitoring
-- Monthly usage analytics
-- High consumption alerts
-
----
-
-## 🔧 Trusted Service Booking
-
-Book verified professionals including:
-
-- Electricians
-- Plumbers
-- Cleaners
-- Carpenters
-- Laundry Services
-- Appliance Repair
-
----
-
-## 🤝 Trusted Worker Network
-
-A community-driven trust system for domestic workers.
-
-Instead of relying on random listings, HomeVerse recommends workers based on:
-
-- Society recommendations
-- Verified residents
-- Work history
-- AI-generated trust score
-- Community reviews
-- Reliability insights
-
----
-
-## 🛍️ Community Marketplace
-
-Buy, sell, rent or exchange:
-
-- Books
-- Furniture
-- Electronics
-- Hostel essentials
-- Home appliances
-
----
-
-## 🎉 Community Engagement
-
-- Society announcements
-- Digital notice board
-- Event management
-- Polls & voting
-- RSVP support
-
----
-
-## 🚨 Emergency & Safety
-
-- One-tap SOS
-- Emergency contacts
-- Security alerts
-- Incident reporting
-
----
-
-## 🤖 AI Community Assistant
-
-Ask questions naturally:
-
-> "When is my maintenance due?"
-
-> "Who is the best-rated electrician?"
-
-> "What's the status of my complaint?"
-
-> "What events are happening this weekend?"
-
----
-
-# 🎯 Target Users
-
-- 🏢 Apartment Societies
-- 🛏️ Hostels
-- 🏠 PG Accommodations
-- 🏡 Co-Living Spaces
-- 🏘️ Gated Communities
-- 🎓 Student Housing
-
----
-
-# 💡 Why HomeVerse?
-
-✔ Replace WhatsApp groups
-
-✔ Eliminate manual registers
-
-✔ Centralize community management
-
-✔ Improve security
-
-✔ Increase transparency
-
-✔ Build trusted local networks
-
-✔ Enhance community engagement
-
-✔ AI-powered automation
-
----
+Each role has a dedicated dashboard with tailored features, permissions, and real-time synchronization powered by a shared Neon PostgreSQL backend.
 
 
 # 🔄 Workflow
@@ -197,6 +85,7 @@ Management    Maintenance      & Support       & Services      Events
                       │ Notifications & Updates │
                       └─────────────────────────┘
 ```
+
 # 🛠️ Tech Stack
 
 | Category | Technology |
@@ -210,6 +99,83 @@ Management    Maintenance      & Support       & Services      Events
 | Payments | Razorpay / Stripe |
 | Notifications | Firebase Cloud Messaging |
 | Maps | Google Maps API |
+
+--- 
+## 📁 Project Structure
+
+```text
+homeverse/
+├── client/
+│   ├── public/
+│   └── src/
+│       ├── assets/
+│       ├── components/
+│       ├── pages/
+│       ├── layouts/
+│       ├── hooks/
+│       ├── context/
+│       ├── services/
+│       ├── utils/
+│       ├── types/
+│       └── App.tsx
+│
+├── server/
+│   ├── config/
+│   ├── controllers/
+│   ├── middleware/
+│   ├── models/
+│   ├── routes/
+│   ├── services/
+│   ├── utils/
+│   └── index.ts
+│
+├── prisma/
+│   ├── schema.prisma
+│   └── migrations/
+│
+├── .env.example
+├── package.json
+├── README.md
+└── vite.config.ts
+```
+
+
+
+## ⚙️ Local Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/homeverse.git
+
+# Navigate to the project
+cd homeverse
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+
+Visit **http://localhost:5173** in your browser.
+
+# 💡 Why HomeVerse?
+
+✔ Replace WhatsApp groups
+
+✔ Eliminate manual registers
+
+✔ Centralize community management
+
+✔ Improve security
+
+✔ Increase transparency
+
+✔ Build trusted local networks
+
+✔ Enhance community engagement
+
+✔ AI-powered automation
 
 ---
 
