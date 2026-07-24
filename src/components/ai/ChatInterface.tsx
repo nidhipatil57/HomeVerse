@@ -2,12 +2,16 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Send, Bot, User, Sparkles, Lightbulb } from "lucide-react";
+import { Send, Bot, User, Sparkles, Lightbulb, Star, ShieldCheck, CalendarRange, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import type { ChatMessage } from "@/types";
 import { useAuth } from "@/lib/store/useAuth";
+import { useCommunityStore } from "@/lib/store/useCommunityStore";
+import { useShallow } from "zustand/react/shallow";
 
 interface AIChatProps {
   portalType: "society" | "hostel";
@@ -16,152 +20,120 @@ interface AIChatProps {
 const suggestionsByRole: Record<string, string[]> = {
   // Society Portal
   "society-resident": [
+    "I need a plumber tomorrow morning.",
+    "Show me an electrician available now.",
+    "Is there a maid recommended in my society?",
     "What is my maintenance bill?",
-    "When is the next society meeting?",
-    "Where is my parcel?",
-    "Has my complaint been resolved?",
-    "When is garbage collection?",
+    "Where is my parcel?"
   ],
   "society-secretary": [
     "Generate billing report",
     "Summarize pending complaints",
     "Review today's budget",
-    "Who is the plumber on shift today?",
+    "Who is the plumber on shift today?"
   ],
   "society-security": [
     "Verify guest OTP code",
     "Look up incident log",
     "Show active visitors",
-    "Emergency gate procedure",
+    "Emergency gate procedure"
   ],
   "society-worker": [
     "Show today's tasks",
     "Get route instructions",
     "What tools do I need?",
-    "Safety protocols",
-  ],
-  // Hostel Portal
-  "hostel-student": [
-    "What's today's dinner?",
-    "When is laundry available?",
-    "Where is my parcel?",
-    "What are my hostel dues?",
-  ],
-  "hostel-warden": [
-    "Review pending leaves",
-    "Check laundry machine status",
-    "Show student check-in list",
-    "Mess demand analytics",
+    "Safety protocols"
   ]
 };
 
-function getAIResponseByRole(message: string, portalType: "society" | "hostel", role: string): string {
+function getAIResponseByRole(message: string, portalType: "society" | "hostel"): string {
   const lower = message.toLowerCase();
 
-  if (portalType === "society") {
-    // --- SECRETARY REPLIES ---
-    if (role === "secretary") {
-      if (lower.includes("report") || lower.includes("billing"))
-        return "💰 **July 2026 Invoicing & Collections Audit**:\n\n• **Total Invoiced**: ₹5,40,000\n• **Collected**: ₹4,12,000 (76%)\n• **Outstanding**: ₹1,28,000 (12 households)\n• **Expenses logged**: ₹84,500\n• **Net reserves balance**: ₹3,27,500\n\nWould you like to send automated push reminders to outstanding flats?";
-      if (lower.includes("complaint") || lower.includes("summar"))
-        return "📋 **Active Tickets Summary**:\n\n• **Plumbing**: 2 pending (A-301 tap, Tower B corridor leak)\n• **Electrical**: 1 pending (B-402 regulator sparking)\n• **Lift Elevator**: 0 pending (resolved)\n\n💡 **AI Priority Recommendation**: Assign the Tower B leak to Ramesh (Plumber) immediately as it is worsening.";
-      if (lower.includes("budget"))
-        return "📊 **Monthly Budget Allocation**:\n\n• Security Salaries: ₹90,000\n• Utility Bills (Power/Water): ₹45,000\n• Emergency Reserve: ₹50,000\n• Repairs Contract: ₹35,000\n\nAll logs match bank statements. No anomalies flagged.";
-      if (lower.includes("plumber") || lower.includes("worker") || lower.includes("electrician"))
-        return "🛠️ **On-Duty Contractors Today**:\n\n• Ramesh (Plumbing) - Shift: 9 AM - 6 PM\n• Shankar (Electrical) - Shift: 10 AM - 7 PM\n• Mahesh (Gardening) - Shift: 8 AM - 12 PM\n\nAll verified. Tap on 'Helpers & Trades' in your dashboard to modify details.";
-    }
-
-    // --- SECURITY REPLIES ---
-    if (role === "security") {
-      if (lower.includes("otp") || lower.includes("verify"))
-        return "🔑 **Verification Desk**:\n\nTo verify, enter the 4-digit code presented by the guest. Pre-approved entries will be matched automatically. For walk-ins, tap 'Log Walk-In Visitor' to register name and flat details.";
-      if (lower.includes("incident") || lower.includes("log"))
-        return "🚨 **Security Incident Log - Today**:\n\n1. **Parking Blockage (Tower C)**: Resolved by issuing fine.\n2. **Basement leakage**: Notified maintenance supervisor.\n3. **Lost Keys found**: Returned to Flat B-102.\n\nDo you want to file a new incident log?";
-      if (lower.includes("visitor") || lower.includes("active"))
-        return "👥 **Gated Entry Traffic**:\n\n• **Checked-In (Inside)**: 8 guests\n• **Pre-Approved Expected**: 4 guests\n• **Checked-Out**: 12 guests\n• **Denied Access**: 1 guest\n\nAll registers synchronized with the Central database.";
-      if (lower.includes("emergency") || lower.includes("procedure"))
-        return "🆘 **Emergency Gated Response Protocol**:\n\n• **Medical SOS**: Direct warden/guards to Flat location immediately. Intercom hotline: **#009**.\n• **Fire Hazard**: Sound master siren, isolate gas valves, call **+91-100-2940**.";
-    }
-
-    // --- WORKER REPLIES ---
-    if (role === "worker") {
-      if (lower.includes("task") || lower.includes("job"))
-        return "🛠️ **Today's Assigned Jobs**:\n\n1. **AC Regulator Sparking (Flat B-402)** - Category: Electrical\n2. **Kitchen Tap Leak (Flat A-301)** - Category: Plumbing\n\n💡 **AI Route Recommendation**: Start at A-301 first, then move to B-402 to minimize climbing elevations.";
-      if (lower.includes("route"))
-        return "📍 **Walking Route Guidance**:\n\nYour optimal walking path: **Workshop → Tower A (Flat 301) → Tower B (Flat 402)**. Estimated walking time: 6 mins. You save 12 floors of elevator transfers today!";
-      if (lower.includes("tool") || lower.includes("inventory"))
-        return "🔧 **Required Tool Slip Suggestions**:\n\n• **Plumbing Job (A-301)**: Teflon tape, Adjustable spanner, 1/2\" pipe.\n• **Electrical Job (B-402)**: Insulated tester screwdriver, PVC black tape.\n\nAll marked as 'Acquired' or 'Ready' in your inventory panel.";
-      if (lower.includes("safety"))
-        return "⚠️ **Workplace Safety Guidelines**:\n\n1. Isolate main electricity breaker before checking sockets/wires.\n2. Wear rubber-grip safety gloves and safety harness if working on elevators/heights.";
-    }
-
-    // --- RESIDENT REPLIES (DEFAULT SOCIETY) ---
-    if (lower.includes("maintenance") || lower.includes("bill"))
-      return "Your maintenance bill for July 2026 is **₹4,500**. Breakdown:\n\n• Base Charges: ₹2,500\n• Sinking Fund: ₹500\n• Parking space: ₹800\n• Water Tariff: ₹400\n• Common Electricity: ₹300\n\n📅 **Due Date**: July 10, 2026. Settle online from the Maintenance page.";
-    if (lower.includes("meeting"))
-      return "The next **Annual General Meeting (AGM)** is scheduled for:\n\n📅 **July 15, 2026** at **6:00 PM**\n📍 **Clubhouse Lounge, Ground Floor**\n\nAgenda items: Financial Audit, Garden renovation, and Gym upgrades.";
-    if (lower.includes("parcel") || lower.includes("package"))
-      return "📦 **Parcel Delivery Alert**:\n\n1 parcel from **Amazon** is awaiting gate pickup at Gate 1 Locker.\nOTP for release: **4821**.";
-    if (lower.includes("water") || lower.includes("consumption"))
-      return "💧 **Water Consumption log for July 2026**:\n\n• **Total**: 12.4 KL (kiloliters)\n• **Trend**: **Down 5%** compared to last month average.\n• You saved approximately ₹180 this month!";
-    if (lower.includes("complaint"))
-      return "📋 **My Complaint Status**:\n\n• **Kitchen Tap Leaking (A-301)**: 🟡 Submitted (July 2). Assigned to Plumber Ramesh. Estimated arrival: 3:00 PM.\n• Tap 'Complaints' to view timeline.";
-    if (lower.includes("garbage"))
-      return "🗑️ **Garbage Disposal Schedule (Tower A)**:\n\n• **Wet Waste**: Daily (7:00 AM - 8:00 AM)\n• **Dry Waste**: Monday, Wednesday, Friday\n• Please keep segregated bins ready by 6:45 AM.";
-
-  } else {
-    // --- HOSTEL WARDEN REPLIES ---
-    if (role === "warden") {
-      if (lower.includes("leave") || lower.includes("pending"))
-        return "📝 **Curfew Leaves - Pending warden review**:\n\n• **Aarav Mehta** (Room 204) - Outstation weekend visit (Reason: Parent drop-off)\n• **Rohan Das** (Room 201) - Medical curfew extension\n\nTap 'Leave Requests' in sidebar to approve/reject.";
-      if (lower.includes("laundry") || lower.includes("machine"))
-        return "👕 **Laundry Machinery Logs**:\n\n• Washing Machine #1: Active\n• Washing Machine #2: Active\n• Dryer #1: Active\n• Dryer #2: **Under maintenance** (Health: 45%). Technician dispatched.";
-      if (lower.includes("check-in") || lower.includes("attendance"))
-        return "📋 **Hostel Attendance Roll-Call**:\n\n• Present: 322/340 students\n• Approved Outings: 12\n• Missing Check-ins: 6 students (Tower B Block)\n\n curate SMS reminders?";
-      if (lower.includes("demand") || lower.includes("mess"))
-        return "🍽️ **Mess Demand Analytics**:\n\nEstimated lunch volume: **285 students**.\nFood wastage rating is 3.8 ★ (Dinner has highest engagement). Kitchen stock warning: Milk reserves low.";
-    }
-
-    // --- STUDENT REPLIES (DEFAULT HOSTEL) ---
-    if (lower.includes("dinner") || lower.includes("menu") || lower.includes("today"))
-      return "🍽️ **Today's Dinner Menu (Wednesday)**:\n\n• Palak Paneer 🟢\n• Egg Curry 🔴\n• Roti & Rice\n• Kheer (Dessert) 🍮\n\n⏰ Time: 7:30 PM - 9:30 PM\n👥 **Crowd Prediction**: High peak at 8:00 PM. Best to eat at 7:40 PM or 9:00 PM.";
-    if (lower.includes("laundry"))
-      return "👕 **Laundry Booking slots**:\n\n• Washer Machine #1: Available\n• Washer Machine #2: In use (free in 25 mins)\n\nReserve a slot from the Laundry page before curfew.";
-    if (lower.includes("parcel"))
-      return "📦 **Parcel Locker**:\n\n1 Flipkart Package has arrived at Warden Locker Room.\nOTP for retrieval: **4821**.";
-    if (lower.includes("due") || lower.includes("fee"))
-      return "💰 **Hostel Dues Status**:\n\n• Monthly rent (July): ₹3,000\n• Mess bill: ₹1,200\n• Laundry bill: ₹300\n\n**Total Dues: ₹4,500**. Due date: July 10, 2026.";
-    if (lower.includes("study") || lower.includes("room"))
-      return "📖 **Study Room occupancy**:\n\n• Reading Room A (Floor 1): 12 seats free.\n• Reading Room B (Floor 3): Full.\n• Tap booking from settings to reserve study spaces.";
-    if (lower.includes("inspection"))
-      return "📅 **Next Hostel Room Inspection**:\n\n• Monday, July 8 at 10:00 AM.\n• Checklist: Cleanliness, electrical appliances check, furniture hygiene.";
+  // Plumber check
+  if (lower.includes("plumber") || lower.includes("leak") || lower.includes("tap") || lower.includes("pipe")) {
+    return "I found an experienced plumber available in Sunshine Complex today!\n\n**Amit Kumar (Plumber)**\n⭐ 4.7 (18 reviews) · 4 years exp\nVisit Charge: ₹120\n🟢 Available Now\n\nYou can book Amit directly using the interactive recommendation card below:\n\n[RECOMMENDED_WORKER:user-worker-2]";
   }
 
-  return "I am your role-specific AI assistant! I can help you with:\n\n• 📊 Status lookups\n• 📝 Complaint timeline trackers\n• 👥 Visitor verification logs\n• 💵 Outstanding dues audits\n\nAsk me a specific question!";
+  // Electrician check
+  if (lower.includes("electrician") || lower.includes("wire") || lower.includes("spark") || lower.includes("fan") || lower.includes("mcb") || lower.includes("switch")) {
+    return "I found a highly-rated electrician available on shift today:\n\n**Ramesh Kumar (Electrician)**\n⭐ 4.8 (24 reviews) · 5 years exp\nVisit Charge: ₹150\n🟢 Available Now\n\nYou can schedule an appointment immediately:\n\n[RECOMMENDED_WORKER:user-worker-1]";
+  }
+
+  // Maid check
+  if (lower.includes("maid") || lower.includes("clean") || lower.includes("housekeep") || lower.includes("utensil")) {
+    return "Here is a trusted, verified maid highly recommended by residents in your society:\n\n**Meena Sharma (Maid)**\n⭐ 4.8 (42 reviews) · 6 years exp\nVisit Charge: ₹80\n🟢 Available Now\n\nBook Meena directly from this card:\n\n[RECOMMENDED_WORKER:user-worker-3]";
+  }
+
+  // Carpenter check
+  if (lower.includes("carpenter") || lower.includes("furniture") || lower.includes("wood") || lower.includes("door") || lower.includes("lock")) {
+    return "I located a verified carpenter rostered in your gate logs today:\n\n**Sanjay Dutt (Carpenter)**\n⭐ 4.5 (12 reviews) · 7 years exp\nVisit Charge: ₹200\n🟢 Available Now\n\nBook Sanjay for any custom woodwork or lock repairs:\n\n[RECOMMENDED_WORKER:user-worker-4]";
+  }
+
+  // Gardener check
+  if (lower.includes("gardener") || lower.includes("lawn") || lower.includes("plant") || lower.includes("garden") || lower.includes("weed")) {
+    return "Here is a professional gardener active in Sunshine Complex today:\n\n**Ram Lal (Gardener)**\n⭐ 4.7 (30 reviews) · 10 years exp\nVisit Charge: ₹100\n🟢 Available Now\n\nBook Ram Lal for lawn pruning and planting:\n\n[RECOMMENDED_WORKER:user-worker-6]";
+  }
+
+  // Fallbacks
+  if (lower.includes("maintenance") || lower.includes("bill")) {
+    return "Your maintenance bill for July 2026 is **₹4,500**. Breakdown:\n\n• Base Charges: ₹2,500\n• Sinking Fund: ₹500\n• Parking space: ₹800\n• Water Tariff: ₹400\n• Common Electricity: ₹300\n\n📅 **Due Date**: July 10, 2026. Settle online from the Maintenance page.";
+  }
+  if (lower.includes("meeting")) {
+    return "The next **Annual General Meeting (AGM)** is scheduled for:\n\n📅 **July 15, 2026** at **6:00 PM**\n📍 **Clubhouse Lounge, Ground Floor**\n\nAgenda items: Financial Audit, Garden renovation, and Gym upgrades.";
+  }
+  if (lower.includes("parcel") || lower.includes("package")) {
+    return "📦 **Parcel Delivery Alert**:\n\n1 parcel from **Amazon** is awaiting gate pickup at Gate 1 Locker.\nOTP for release: **4821**.";
+  }
+
+  return "I am your community assistant! I can help you find available plumbers, electricians, maids, gardeners, or carpenters, as well as check your bills and parcels. Try asking: 'I need a plumber tomorrow.'";
 }
 
 export function AIChat({ portalType }: AIChatProps) {
   const { user, initialize } = useAuth();
+  const {
+    workerProfiles,
+    createBooking,
+    initializeDb
+  } = useCommunityStore(
+    useShallow((state) => ({
+      workerProfiles: state.workerProfiles || [],
+      createBooking: state.createBooking,
+      initializeDb: state.initializeDb
+    }))
+  );
+
   const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    initialize();
-    setMounted(true);
-  }, [initialize]);
-
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const userRole = mounted && user ? user.role : "resident";
+  // Booking Modal
+  const [bookingWorker, setBookingWorker] = useState<any>(null);
+  const [bookingDate, setBookingDate] = useState("");
+  const [bookingTime, setBookingTime] = useState("10:00 AM");
+  const [bookingNotes, setBookingNotes] = useState("");
+  const [bookingAddress, setBookingAddress] = useState("");
+  const [bookingLoading, setBookingLoading] = useState(false);
 
-  // Derive suggestion key
+  useEffect(() => {
+    initialize();
+    initializeDb();
+    setMounted(true);
+  }, [initialize, initializeDb]);
+
+  useEffect(() => {
+    if (user) {
+      setBookingAddress(`${user.building || "A Wing"}, Flat ${user.unit || "204"}`);
+    }
+  }, [user]);
+
+  const userRole = mounted && user ? user.role : "resident";
   const suggestionKey = `${portalType}-${userRole}`;
   const suggestions = suggestionsByRole[suggestionKey] || suggestionsByRole[`${portalType}-resident`] || [];
 
-  // Initialize welcome message once mounted
+  // Welcome Message
   useEffect(() => {
     if (!mounted) return;
     
@@ -174,14 +146,10 @@ export function AIChat({ portalType }: AIChatProps) {
       } else if (userRole === "worker") {
         welcomeText = "Service Assistant Online. 🛠️ Let me fetch your walking routes, tool slips, or workplace safety instructions.";
       } else {
-        welcomeText = "Hi! 👋 I'm your **AI Resident Assistant**. Ask me about your bills, parcels, expected guests, or utility logs.";
+        welcomeText = "Hi! 👋 I'm your **AI Community Assistant**. Ask me to search and book plumbers, electricians, maids, or ask about bills and parcels.";
       }
     } else {
-      if (userRole === "warden") {
-        welcomeText = "Warden Console Assistant Online. 🎓 Ask me about curfew logs, leave requests, mess demand forecasting, or laundry machine status.";
-      } else {
-        welcomeText = "Hey! 👋 I'm your **AI Student Assistant**. Ask me about today's mess menu, laundry availability, or packages.";
-      }
+      welcomeText = "Hey! 👋 I'm your **AI Hostel Assistant**. Ask me about today's mess menu, laundry slots, or packages.";
     }
 
     setMessages([
@@ -189,7 +157,7 @@ export function AIChat({ portalType }: AIChatProps) {
         id: "welcome",
         role: "assistant",
         content: welcomeText,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       }
     ]);
   }, [mounted, portalType, userRole]);
@@ -206,24 +174,69 @@ export function AIChat({ portalType }: AIChatProps) {
       id: Date.now().toString(),
       role: "user",
       content: messageText,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response
     setTimeout(() => {
       const response: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: getAIResponseByRole(messageText, portalType, userRole),
-        timestamp: new Date().toISOString(),
+        content: getAIResponseByRole(messageText, portalType),
+        timestamp: new Date().toISOString()
       };
       setMessages((prev) => [...prev, response]);
       setIsTyping(false);
     }, 800 + Math.random() * 800);
+  };
+
+  const handleBookingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bookingDate || !bookingTime || !bookingWorker) return;
+
+    setBookingLoading(true);
+    try {
+      await createBooking({
+        workerId: bookingWorker.id,
+        category: bookingWorker.workerCategory,
+        bookingDate,
+        bookingTime,
+        address: bookingAddress,
+        notes: bookingNotes
+      });
+      alert(`Successfully booked ${bookingWorker.name}! Booking request sent.`);
+      setBookingWorker(null);
+      setBookingNotes("");
+      
+      // Add confirmation message to chat
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: `✅ I have successfully scheduled a booking request with **${bookingWorker.name}** for **${bookingDate} at ${bookingTime}**. They have been notified!`,
+          timestamp: new Date().toISOString()
+        }
+      ]);
+    } catch (e) {
+      alert("Failed to create booking");
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const parseMessageContent = (content: string) => {
+    const workerRegex = /\[RECOMMENDED_WORKER:(.+)\]/;
+    const match = content.match(workerRegex);
+    if (match) {
+      const workerId = match[1];
+      const cleanText = content.replace(workerRegex, "").trim();
+      return { text: cleanText, workerId };
+    }
+    return { text: content, workerId: null };
   };
 
   if (!mounted) return null;
@@ -232,7 +245,7 @@ export function AIChat({ portalType }: AIChatProps) {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Chat Header */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center shadow-lg">
+        <div className="w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/10">
           <Bot className="w-6 h-6 text-white" />
         </div>
         <div>
@@ -241,55 +254,98 @@ export function AIChat({ portalType }: AIChatProps) {
           </h1>
           <p className="text-sm text-muted-foreground flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            Active · Adapting to {userRole.charAt(0).toUpperCase() + userRole.slice(1)} role
+            Active · Ready to recommend and book local workers
           </p>
         </div>
       </div>
 
-      {/* Messages */}
-      <Card className="flex-1 border-border/50 overflow-hidden">
-        <CardContent className="p-0 h-full flex flex-col">
+      {/* Messages Card */}
+      <Card className="flex-1 border-border/50 overflow-hidden bg-card shadow-sm">
+        <CardContent className="p-0 h-full flex flex-col justify-between">
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <AnimatePresence>
-              {messages.map((msg) => (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-                >
-                  <Avatar className="w-8 h-8 shrink-0">
-                    <AvatarFallback className={`text-xs ${msg.role === "assistant" ? "gradient-primary text-white" : "bg-secondary"}`}>
-                      {msg.role === "assistant" ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div
-                    className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                      msg.role === "user"
-                        ? "gradient-primary text-white rounded-br-md"
-                        : "bg-secondary/50 rounded-bl-md"
-                    }`}
+              {messages.map((msg) => {
+                const isUser = msg.role === "user";
+                const { text, workerId } = parseMessageContent(msg.content);
+                const worker = workerId ? workerProfiles.find(w => w.id === workerId) : null;
+
+                return (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}
                   >
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
-                  </div>
-                </motion.div>
-              ))}
+                    <Avatar className="w-8 h-8 shrink-0">
+                      <AvatarFallback className={`text-xs ${!isUser ? "gradient-primary text-white border-0" : "bg-secondary"}`}>
+                        {!isUser ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                      </AvatarFallback>
+                    </Avatar>
+                    
+                    <div className="max-w-[75%] space-y-3">
+                      <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                        isUser
+                          ? "gradient-primary text-white rounded-br-none"
+                          : "bg-secondary/40 text-foreground border border-border/20 rounded-bl-none shadow-sm"
+                      }`}>
+                        {text}
+                      </div>
+
+                      {/* Interactive Worker Card */}
+                      {worker && (
+                        <div className="border border-border/60 bg-card rounded-2xl p-4 space-y-3.5 shadow-sm max-w-sm">
+                          <div className="flex gap-3 items-center">
+                            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
+                              {worker.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                            </div>
+                            <div className="min-w-0 flex-1 text-xs">
+                              <div className="flex items-center gap-1">
+                                <span className="font-bold text-foreground truncate block">{worker.name}</span>
+                                {worker.workerProfile?.isVerified && (
+                                  <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                                )}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground block uppercase font-semibold">{worker.workerCategory}</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-[10px] bg-secondary/15 rounded-xl p-2">
+                            <div>
+                              <span className="text-muted-foreground block">Charge</span>
+                              <strong className="text-primary font-bold">₹{worker.workerProfile?.visitCharge || "120"}</strong>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block">Rating</span>
+                              <strong className="text-foreground font-bold flex items-center gap-0.5">
+                                <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500 shrink-0" />
+                                {worker.rating?.toFixed(1) || "4.8"}
+                              </strong>
+                            </div>
+                          </div>
+
+                          <Button
+                            onClick={() => setBookingWorker(worker)}
+                            className="w-full rounded-xl h-9 text-xs font-bold gradient-primary text-white border-0 shadow-md shadow-primary/10 flex items-center gap-1.5"
+                          >
+                            <CalendarRange className="w-3.5 h-3.5" />
+                            Book Amit Directly
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
 
             {/* Typing indicator */}
             {isTyping && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex gap-3"
-              >
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
                 <Avatar className="w-8 h-8 shrink-0">
-                  <AvatarFallback className="gradient-primary text-white text-xs">
-                    <Bot className="w-4 h-4" />
-                  </AvatarFallback>
+                  <AvatarFallback className="gradient-primary text-white text-xs border-0"><Bot className="w-4 h-4" /></AvatarFallback>
                 </Avatar>
-                <div className="bg-secondary/50 rounded-2xl rounded-bl-md px-4 py-3 flex gap-1.5">
+                <div className="bg-secondary/40 border border-border/20 rounded-2xl rounded-bl-none px-4 py-3 flex gap-1.5 shadow-sm">
                   <motion.div className="w-2 h-2 rounded-full bg-muted-foreground/40" animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0 }} />
                   <motion.div className="w-2 h-2 rounded-full bg-muted-foreground/40" animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }} />
                   <motion.div className="w-2 h-2 rounded-full bg-muted-foreground/40" animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }} />
@@ -304,7 +360,7 @@ export function AIChat({ portalType }: AIChatProps) {
           {messages.length <= 1 && suggestions.length > 0 && (
             <div className="px-4 pb-3">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-                <Lightbulb className="w-3 h-3" />
+                <Lightbulb className="w-3 h-3 text-amber-500" />
                 Try asking:
               </div>
               <div className="flex flex-wrap gap-2">
@@ -312,7 +368,7 @@ export function AIChat({ portalType }: AIChatProps) {
                   <button
                     key={s}
                     onClick={() => handleSend(s)}
-                    className="text-xs px-3 py-1.5 rounded-full bg-secondary/50 hover:bg-primary/10 hover:text-primary transition-colors border border-border/50"
+                    className="text-xs px-3 py-1.5 rounded-full bg-secondary/30 hover:bg-primary/10 hover:text-primary transition-colors border border-border/50 text-foreground"
                   >
                     {s}
                   </button>
@@ -321,27 +377,21 @@ export function AIChat({ portalType }: AIChatProps) {
             </div>
           )}
 
-          {/* Input */}
-          <div className="p-4 border-t border-border/50">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSend();
-              }}
-              className="flex gap-2"
-            >
-              <input
+          {/* Input Form */}
+          <div className="p-4 border-t border-border/10 bg-card">
+            <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="flex gap-2">
+              <Input
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask me anything..."
-                className="flex-1 h-11 px-4 rounded-xl bg-secondary/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
+                placeholder="Ask AI to find a plumber, check bills..."
+                className="flex-1 h-11 px-4 rounded-xl bg-secondary/10 border border-border/50 text-sm focus-visible:ring-primary focus:outline-none"
               />
               <Button
                 type="submit"
                 size="icon"
-                className="rounded-xl h-11 w-11 gradient-primary text-white border-0 shadow-lg shadow-primary/25"
                 disabled={!input.trim()}
+                className="rounded-xl h-11 w-11 gradient-primary text-white border-0 shadow-md"
               >
                 <Send className="w-4 h-4" />
               </Button>
@@ -349,6 +399,84 @@ export function AIChat({ portalType }: AIChatProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* BOOKING DIALOG FROM RECOMMENDATION */}
+      <Dialog open={!!bookingWorker} onOpenChange={(open) => !open && setBookingWorker(null)}>
+        {bookingWorker && (
+          <DialogContent className="sm:max-w-md rounded-3xl p-6 bg-card border border-border/50">
+            <DialogHeader className="pb-3 border-b border-border/10">
+              <DialogTitle className="font-extrabold text-foreground font-[family-name:var(--font-heading)]">Confirm AI-Assisted Booking</DialogTitle>
+              <DialogDescription className="text-xs">Scheduling a service visit with <strong>{bookingWorker.name}</strong></DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleBookingSubmit} className="space-y-4 pt-2 text-xs">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="font-bold text-foreground">Preferred Date</label>
+                  <Input
+                    type="date"
+                    required
+                    value={bookingDate}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setBookingDate(e.target.value)}
+                    className="h-10 rounded-xl bg-secondary/10 border-border/50 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-foreground">Preferred Time</label>
+                  <select
+                    value={bookingTime}
+                    onChange={(e) => setBookingTime(e.target.value)}
+                    className="h-10 w-full rounded-xl bg-background border border-border/50 px-3 text-xs outline-none"
+                  >
+                    <option value="09:00 AM">09:00 AM</option>
+                    <option value="10:00 AM">10:00 AM</option>
+                    <option value="11:00 AM">11:00 AM</option>
+                    <option value="12:00 PM">12:00 PM</option>
+                    <option value="02:00 PM">02:00 PM</option>
+                    <option value="03:00 PM">03:00 PM</option>
+                    <option value="04:00 PM">04:00 PM</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-foreground">Service Address</label>
+                <Input
+                  required
+                  value={bookingAddress}
+                  onChange={(e) => setBookingAddress(e.target.value)}
+                  className="h-10 rounded-xl bg-secondary/10 border-border/50 text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-foreground">Brief problem description</label>
+                <textarea
+                  placeholder="Notes for the technician..."
+                  value={bookingNotes}
+                  onChange={(e) => setBookingNotes(e.target.value)}
+                  className="h-20 w-full p-3 rounded-xl bg-secondary/10 border border-border/50 text-xs resize-none outline-none"
+                />
+              </div>
+
+              <div className="bg-primary/5 rounded-2xl p-3 border border-primary/10 flex justify-between items-center text-[11px] font-medium text-foreground">
+                <span>Total Visit Charge:</span>
+                <span className="font-extrabold text-primary">₹{bookingWorker.workerProfile?.visitCharge || "120"}</span>
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <Button type="button" variant="outline" onClick={() => setBookingWorker(null)} className="flex-1 rounded-xl h-10 border-border/50 font-bold">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={bookingLoading} className="flex-1 rounded-xl h-10 text-xs font-bold gradient-primary text-white border-0 shadow-md">
+                  {bookingLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Confirm & Send"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 }

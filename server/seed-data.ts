@@ -1620,6 +1620,279 @@ export const getPrepopulatedFlatAttendance = (): any[] => {
   ];
 };
 
+export const getPrepopulatedCategories = (): any[] => [
+  { name: "Maid", parentGroup: "Home Services", icon: "🧹" },
+  { name: "Housekeeping", parentGroup: "Home Services", icon: "🧹" },
+  { name: "Cook", parentGroup: "Home Services", icon: "🍳" },
+  { name: "Cleaner", parentGroup: "Home Services", icon: "🧹" },
+  { name: "Electrician", parentGroup: "Repairs", icon: "⚡" },
+  { name: "Plumber", parentGroup: "Repairs", icon: "💧" },
+  { name: "Carpenter", parentGroup: "Repairs", icon: "🔨" },
+  { name: "Painter", parentGroup: "Repairs", icon: "🎨" },
+  { name: "Maintenance", parentGroup: "Repairs", icon: "🔧" },
+  { name: "Gardener", parentGroup: "Repairs", icon: "🌿" },
+  { name: "AC Technician", parentGroup: "Repairs", icon: "❄️" },
+  { name: "Appliance Repair", parentGroup: "Repairs", icon: "⚙️" },
+  { name: "TV Repair", parentGroup: "Repairs", icon: "📺" },
+  { name: "Tutor", parentGroup: "Other Services", icon: "📚" },
+  { name: "Driver", parentGroup: "Other Services", icon: "🚗" },
+  { name: "Pet Care", parentGroup: "Other Services", icon: "🐾" },
+  { name: "Packers & Movers", parentGroup: "Other Services", icon: "📦" }
+];
+
+export const getPrepopulatedWorkerProfiles = (): any[] => [
+  {
+    workerId: "user-worker-1", // Ramesh Kumar (Electrician)
+    about: "Professional residential electrician with 5+ years of experience in apartment complexes. Expert in short circuits, wiring, and appliance installation.",
+    experienceYears: 5,
+    visitCharge: 150.0,
+    workingHoursStart: "09:00",
+    workingHoursEnd: "17:00",
+    languages: ["English", "Hindi", "Marathi"],
+    certifications: ["Certified Wireman License", "Industrial Safety Certificate"],
+    portfolio: ["https://images.unsplash.com/photo-1621905251189-08b45d6a269e", "https://images.unsplash.com/photo-1581092921461-eab62e97a780"],
+    beforeAfter: ["https://images.unsplash.com/photo-1544724569-5f546fd6f2b5", "https://images.unsplash.com/photo-1504307651254-35680f356dfd"],
+    isVerified: true,
+    isSocietyVerified: true,
+    isPoliceVerified: true,
+    repeatCustomers: 24,
+    societyRecommend: true
+  },
+  {
+    workerId: "user-worker-2", // Amit Kumar (Plumber)
+    about: "Experienced plumber specializing in leakage repair, bathroom remodel, pipe installation, and emergency water blockage removal.",
+    experienceYears: 4,
+    visitCharge: 120.0,
+    workingHoursStart: "10:00",
+    workingHoursEnd: "18:00",
+    languages: ["Hindi", "Punjabi"],
+    certifications: ["Plumbing Trade Certification"],
+    portfolio: ["https://images.unsplash.com/photo-1504307651254-35680f356dfd"],
+    beforeAfter: [],
+    isVerified: true,
+    isSocietyVerified: true,
+    isPoliceVerified: false,
+    repeatCustomers: 18,
+    societyRecommend: true
+  },
+  {
+    workerId: "user-worker-3", // Meena Sharma (Maid)
+    about: "Trustworthy and quick housekeeper/maid serving Sunshine Complex since 2024. Punctual, meticulous, and expert in general cleaning.",
+    experienceYears: 6,
+    visitCharge: 80.0,
+    workingHoursStart: "07:00",
+    workingHoursEnd: "13:00",
+    languages: ["Hindi", "Marathi"],
+    certifications: [],
+    portfolio: [],
+    beforeAfter: [],
+    isVerified: true,
+    isSocietyVerified: true,
+    isPoliceVerified: true,
+    repeatCustomers: 42,
+    societyRecommend: true
+  },
+  {
+    workerId: "user-worker-4", // Sanjay Dutt (Carpenter)
+    about: "Expert carpenter for custom furniture design, modular kitchen cabinets repair, door lock installation, and general woodwork.",
+    experienceYears: 7,
+    visitCharge: 200.0,
+    workingHoursStart: "12:00",
+    workingHoursEnd: "20:00",
+    languages: ["Hindi", "Marathi", "Gujarati"],
+    certifications: ["Woodworking Guild Master Certificate"],
+    portfolio: [],
+    beforeAfter: [],
+    isVerified: true,
+    isSocietyVerified: false,
+    isPoliceVerified: true,
+    repeatCustomers: 12,
+    societyRecommend: false
+  },
+  {
+    workerId: "user-worker-5", // Pooja Sharma (Housekeeping)
+    about: "Detail-oriented housekeeping professional with a focus on deep cleaning, organizing, and eco-friendly cleaning methods.",
+    experienceYears: 3,
+    visitCharge: 90.0,
+    workingHoursStart: "08:00",
+    workingHoursEnd: "16:00",
+    languages: ["English", "Hindi"],
+    certifications: ["Hospitality & Cleanliness Certification"],
+    portfolio: [],
+    beforeAfter: [],
+    isVerified: true,
+    isSocietyVerified: true,
+    isPoliceVerified: true,
+    repeatCustomers: 15,
+    societyRecommend: false
+  },
+  {
+    workerId: "user-worker-6", // Ram Lal (Gardener)
+    about: "Passionate gardener with a green thumb. Expertise in lawn design, organic fertilizers, weeding, and plant health maintenance.",
+    experienceYears: 10,
+    visitCharge: 100.0,
+    workingHoursStart: "08:00",
+    workingHoursEnd: "16:00",
+    languages: ["Hindi"],
+    certifications: ["Nursery Management Diploma"],
+    portfolio: [],
+    beforeAfter: [],
+    isVerified: true,
+    isSocietyVerified: true,
+    isPoliceVerified: false,
+    repeatCustomers: 30,
+    societyRecommend: true
+  }
+];
+
+export const getPrepopulatedWorkerAvailability = (): any[] => [
+  {
+    workerId: "user-worker-1",
+    workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    startTime: "09:00",
+    endTime: "17:00",
+    holidays: ["Sunday"],
+    blockedDate: [],
+    busyHours: ["11:00 AM - 12:00 PM"]
+  },
+  {
+    workerId: "user-worker-2",
+    workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    startTime: "10:00",
+    endTime: "18:00",
+    holidays: ["Sunday"],
+    blockedDate: ["2026-07-28"],
+    busyHours: []
+  },
+  {
+    workerId: "user-worker-3",
+    workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    startTime: "07:00",
+    endTime: "13:00",
+    holidays: [],
+    blockedDate: [],
+    busyHours: ["08:00 AM - 09:30 AM"]
+  },
+  {
+    workerId: "user-worker-4",
+    workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+    startTime: "12:00",
+    endTime: "20:00",
+    holidays: ["Saturday", "Sunday"],
+    blockedDate: [],
+    busyHours: []
+  },
+  {
+    workerId: "user-worker-5",
+    workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    startTime: "08:00",
+    endTime: "16:00",
+    holidays: ["Sunday"],
+    blockedDate: [],
+    busyHours: []
+  },
+  {
+    workerId: "user-worker-6",
+    workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    startTime: "08:00",
+    endTime: "16:00",
+    holidays: ["Sunday"],
+    blockedDate: [],
+    busyHours: []
+  }
+];
+
+export const getPrepopulatedWorkerSkills = (): any[] => [
+  { workerId: "user-worker-1", skill: "Wiring" },
+  { workerId: "user-worker-1", skill: "Appliance Repair" },
+  { workerId: "user-worker-1", skill: "Switch Repair" },
+  { workerId: "user-worker-1", skill: "AC regulator" },
+  { workerId: "user-worker-2", skill: "Leakage Repair" },
+  { workerId: "user-worker-2", skill: "Tap Installation" },
+  { workerId: "user-worker-2", skill: "Bathroom Fitting" },
+  { workerId: "user-worker-3", skill: "Cleaning" },
+  { workerId: "user-worker-3", skill: "Utensils" },
+  { workerId: "user-worker-3", skill: "Ironing" },
+  { workerId: "user-worker-4", skill: "Furniture Repair" },
+  { workerId: "user-worker-4", skill: "Locksmith" },
+  { workerId: "user-worker-5", skill: "Deep Cleaning" },
+  { workerId: "user-worker-5", skill: "Dusting" },
+  { workerId: "user-worker-6", skill: "Lawn Mowing" },
+  { workerId: "user-worker-6", skill: "Pruning" }
+];
+
+export const getPrepopulatedBookings = (): any[] => [
+  {
+    id: "SBK-001",
+    residentId: "user-resident-1", // Sara Shah
+    workerId: "user-worker-1", // Ramesh Kumar (Electrician)
+    category: "Electrician",
+    bookingDate: new Date(Date.now() - 48 * 3600 * 1000).toISOString().split("T")[0], // 2 days ago
+    bookingTime: "10:00 AM",
+    address: "A Wing, Flat 204",
+    notes: "Living room fan is humming loudly and not spinning.",
+    price: 150.0,
+    status: "Completed"
+  },
+  {
+    id: "SBK-002",
+    residentId: "user-resident-2", // Nidhi Kumar
+    workerId: "user-worker-2", // Amit Kumar (Plumber)
+    category: "Plumber",
+    bookingDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString().split("T")[0], // Tomorrow
+    bookingTime: "02:30 PM",
+    address: "A Wing, Flat 301",
+    notes: "Kitchen sink water drainage is very slow.",
+    price: 120.0,
+    status: "Pending"
+  },
+  {
+    id: "SBK-003",
+    residentId: "user-resident-1", // Sara Shah
+    workerId: "user-worker-3", // Meena Sharma (Maid)
+    category: "Maid",
+    bookingDate: new Date(Date.now() - 24 * 3600 * 1000).toISOString().split("T")[0], // Yesterday
+    bookingTime: "08:30 AM",
+    address: "A Wing, Flat 204",
+    notes: "Regular floor cleaning and utensil washing.",
+    price: 80.0,
+    status: "Accepted"
+  }
+];
+
+export const getPrepopulatedReviews = (): any[] => [
+  {
+    id: "SRV-001",
+    bookingId: "SBK-001",
+    residentId: "user-resident-1",
+    workerId: "user-worker-1",
+    rating: 5,
+    reviewText: "Ramesh was extremely prompt and fixed the fan regulator in 15 minutes! Very professional.",
+    photos: ["https://images.unsplash.com/photo-1621905251189-08b45d6a269e"]
+  }
+];
+
+export const getPrepopulatedMessages = (): any[] => [
+  {
+    id: "MSG-001",
+    senderId: "user-resident-1",
+    receiverId: "user-worker-1",
+    message: "Hi Ramesh, are you available for a quick fan repair tomorrow morning?",
+    timestamp: new Date(Date.now() - 50 * 3600 * 1000),
+    isRead: true,
+    status: "read"
+  },
+  {
+    id: "MSG-002",
+    senderId: "user-worker-1",
+    receiverId: "user-resident-1",
+    message: "Yes Sara, I can visit around 10:00 AM. Please create a booking request.",
+    timestamp: new Date(Date.now() - 49 * 3600 * 1000),
+    isRead: true,
+    status: "read"
+  }
+];
+
 export const getInitialDb = () => ({
   users: getPrepopulatedUsers(),
   complaints: getPrepopulatedComplaints(),
@@ -1647,5 +1920,13 @@ export const getInitialDb = () => ({
   flats: getPrepopulatedFlats(),
   rentRecords: getPrepopulatedRentRecords(),
   attendance: getPrepopulatedHelpersAttendance(),
-  flatAttendance: getPrepopulatedFlatAttendance()
+  flatAttendance: getPrepopulatedFlatAttendance(),
+  categories: getPrepopulatedCategories(),
+  workerProfiles: getPrepopulatedWorkerProfiles(),
+  workerSkills: getPrepopulatedWorkerSkills(),
+  workerAvailability: getPrepopulatedWorkerAvailability(),
+  bookings: getPrepopulatedBookings(),
+  reviews: getPrepopulatedReviews(),
+  messages: getPrepopulatedMessages()
 });
+

@@ -350,6 +350,24 @@ interface CommunityState {
   flatAttendance: any[];
   payments: any[];
   collections: any[];
+  serviceCategories: any[];
+  workerProfiles: any[];
+  workerSkills: any[];
+  workerAvailability: any[];
+  serviceBookings: any[];
+  serviceReviews: any[];
+  favoriteWorkers: any[];
+  chatMessages: any[];
+
+  createBooking: (bookingData: any) => Promise<any>;
+  updateBookingStatus: (id: string, status: string) => Promise<any>;
+  submitReview: (reviewData: any) => Promise<any>;
+  toggleFavorite: (workerId: string) => Promise<any>;
+  updateAvailability: (availabilityData: any) => Promise<any>;
+  sendChatMessage: (messageData: any) => Promise<any>;
+  fetchChatMessages: (userId: string) => Promise<any>;
+  verifyWorker: (workerId: string, data: any) => Promise<any>;
+  fetchWorkerStats: () => Promise<any>;
 
   initializeDb: () => void;
   saveDb: () => void;
@@ -535,6 +553,14 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   flatAttendance: [],
   payments: [],
   collections: [],
+  serviceCategories: [],
+  workerProfiles: [],
+  workerSkills: [],
+  workerAvailability: [],
+  serviceBookings: [],
+  serviceReviews: [],
+  favoriteWorkers: [],
+  chatMessages: [],
 
   initializeDb: () => {
     if (typeof window === "undefined") return;
@@ -571,7 +597,11 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           { key: "expenses", path: "/api/expenses" },
           { key: "users", path: "/api/users" },
           { key: "payments", path: "/api/payments" },
-          { key: "collections", path: "/api/payments/collections" }
+          { key: "collections", path: "/api/payments/collections" },
+          { key: "serviceCategories", path: "/api/community-services/categories" },
+          { key: "workerProfiles", path: "/api/community-services/workers" },
+          { key: "serviceBookings", path: "/api/community-services/bookings" },
+          { key: "favoriteWorkers", path: "/api/community-services/favorites" }
         ];
 
         const promises = endpoints.map(async ({ key, path }) => {
@@ -1001,6 +1031,66 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       } else {
         set({ users: [updated, ...current] });
       }
+    });
+
+    socket.on("booking:update", (updated: any) => {
+      const current = get().serviceBookings || [];
+      const index = current.findIndex(b => b.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ serviceBookings: next });
+      } else {
+        set({ serviceBookings: [updated, ...current] });
+      }
+    });
+
+    socket.on("message:new", (newMsg: any) => {
+      const current = get().chatMessages || [];
+      const index = current.findIndex(m => m.id === newMsg.id);
+      if (index === -1) {
+        set({ chatMessages: [...current, newMsg] });
+      }
+    });
+
+    socket.on("review:update", (newReview: any) => {
+      const current = get().serviceReviews || [];
+      const index = current.findIndex(r => r.id === newReview.id);
+      if (index === -1) {
+        set({ serviceReviews: [newReview, ...current] });
+      }
+      fetch("/api/community-services/workers")
+        .then(res => res.json())
+        .then(data => set({ workerProfiles: data }))
+        .catch(() => {});
+    });
+
+    socket.on("favorite:update", () => {
+      fetch("/api/community-services/favorites")
+        .then(res => res.json())
+        .then(data => set({ favoriteWorkers: data }))
+        .catch(() => {});
+    });
+
+    socket.on("worker:update", (updated: any) => {
+      if (updated.deleted) {
+        set({ workerProfiles: get().workerProfiles.filter(w => w.id !== updated.id) });
+        return;
+      }
+      const current = get().workerProfiles || [];
+      const index = current.findIndex(w => w.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = { ...next[index], ...updated };
+        set({ workerProfiles: next });
+      }
+    });
+
+    socket.on("availability:update", () => {
+      fetch("/api/community-services/workers")
+        .then(res => res.json())
+        .then(data => set({ workerProfiles: data }))
+        .catch(() => {});
     });
   },
 
@@ -1779,5 +1869,115 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     await fetch(`/api/payments/${id}/remind`, {
       method: "POST"
     });
+  },
+
+  createBooking: async (bookingData: any) => {
+    const res = await fetch("/api/community-services/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bookingData)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+    throw new Error("Failed to create booking");
+  },
+
+  updateBookingStatus: async (id: string, status: string) => {
+    const res = await fetch(`/api/community-services/bookings/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+    throw new Error("Failed to update booking status");
+  },
+
+  submitReview: async (reviewData: any) => {
+    const res = await fetch("/api/community-services/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reviewData)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+    throw new Error("Failed to submit review");
+  },
+
+  toggleFavorite: async (workerId: string) => {
+    const res = await fetch("/api/community-services/favorites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workerId })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+    throw new Error("Failed to toggle favorite");
+  },
+
+  updateAvailability: async (availabilityData: any) => {
+    const res = await fetch("/api/community-services/availability", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(availabilityData)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+    throw new Error("Failed to update availability");
+  },
+
+  sendChatMessage: async (messageData: any) => {
+    const res = await fetch("/api/community-services/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(messageData)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+    throw new Error("Failed to send message");
+  },
+
+  fetchChatMessages: async (userId: string) => {
+    const res = await fetch(`/api/community-services/messages/${userId}`);
+    if (res.ok) {
+      const data = await res.json();
+      set({ chatMessages: data });
+      return data;
+    }
+    throw new Error("Failed to fetch messages");
+  },
+
+  verifyWorker: async (workerId: string, data: any) => {
+    const res = await fetch(`/api/community-services/workers/${workerId}/verify`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      const result = await res.json();
+      return result;
+    }
+    throw new Error("Failed to verify worker");
+  },
+
+  fetchWorkerStats: async () => {
+    const res = await fetch("/api/community-services/stats");
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+    throw new Error("Failed to fetch stats");
   }
 }));
