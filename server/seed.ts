@@ -18,6 +18,14 @@ async function main() {
   await prisma.roommatePreference.deleteMany();
   await prisma.facilityBooking.deleteMany();
   await prisma.gatePass.deleteMany();
+  await prisma.serviceReview.deleteMany();
+  await prisma.serviceBooking.deleteMany();
+  await prisma.favoriteWorker.deleteMany();
+  await prisma.workerProfile.deleteMany();
+  await prisma.workerSkill.deleteMany();
+  await prisma.workerAvailability.deleteMany();
+  await prisma.chatMessage.deleteMany();
+  await prisma.serviceCategory.deleteMany();
   await prisma.residentWorkerAssignment.deleteMany();
   await prisma.user.deleteMany();
   
@@ -602,6 +610,63 @@ async function main() {
         duration: flatAtt.duration || null,
         servicePerformed: flatAtt.servicePerformed,
         status: flatAtt.status
+      }
+    });
+  }
+
+  console.log("🗂️ Seeding Service Categories...");
+  for (const cat of db.categories) {
+    await prisma.serviceCategory.create({
+      data: cat
+    });
+  }
+
+  console.log("👤 Seeding Worker Profiles...");
+  for (const prof of db.workerProfiles) {
+    await prisma.workerProfile.create({
+      data: prof
+    });
+  }
+
+  console.log("🛠️ Seeding Worker Skills...");
+  for (const sk of db.workerSkills) {
+    await prisma.workerSkill.create({
+      data: sk
+    });
+  }
+
+  console.log("⏰ Seeding Worker Availability...");
+  for (const av of db.workerAvailability) {
+    await prisma.workerAvailability.create({
+      data: av
+    });
+  }
+
+  console.log("📅 Seeding Service Bookings...");
+  for (const bk of db.bookings) {
+    await prisma.serviceBooking.create({
+      data: bk
+    });
+  }
+
+  console.log("⭐ Seeding Service Reviews...");
+  for (const rv of db.reviews) {
+    await prisma.serviceReview.create({
+      data: rv
+    });
+  }
+
+  console.log("💬 Seeding Chat Messages...");
+  for (const msg of db.messages) {
+    await prisma.chatMessage.create({
+      data: {
+        id: msg.id,
+        senderId: msg.senderId,
+        receiverId: msg.receiverId,
+        message: msg.message,
+        timestamp: new Date(msg.timestamp),
+        isRead: msg.isRead,
+        status: msg.status
       }
     });
   }

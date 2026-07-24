@@ -68,6 +68,19 @@ model User {
   foundItems       FoundItem[]           @relation("ReporterUser")
   claims           Claim[]               @relation("ResidentClaims")
   lostReports      LostReport[]          @relation("ResidentLostReports")
+
+  // Worker Profile & Marketplace relations
+  workerProfile        WorkerProfile?        @relation("UserToProfile")
+  workerSkills         WorkerSkill[]         @relation("UserToSkills")
+  sentChatMessages     ChatMessage[]         @relation("SentMessages")
+  receivedChatMessages ChatMessage[]         @relation("ReceivedMessages")
+  residentBookings     ServiceBooking[]      @relation("ResidentBookings")
+  workerBookings       ServiceBooking[]      @relation("WorkerBookings")
+  residentReviews      ServiceReview[]       @relation("ResidentReviews")
+  workerReviews        ServiceReview[]       @relation("WorkerReviews")
+  residentFavorites    FavoriteWorker[]      @relation("ResidentFavorites")
+  workerFavorites      FavoriteWorker[]      @relation("WorkerFavorites")
+  workerAvailability   WorkerAvailability?   @relation("WorkerAvailability")
 }
 
 model Complaint {
@@ -811,3 +824,127 @@ model ResidentPayment {
   @@index([unit])
   @@index([paymentType])
 }
+
+model WorkerProfile {
+  id                String   @id @default(uuid())
+  workerId          String   @unique
+  about             String?
+  experienceYears   Int      @default(0)
+  visitCharge       Float    @default(0.0)
+  workingHoursStart String   @default("09:00")
+  workingHoursEnd   String   @default("18:00")
+  languages         String[]
+  certifications    String[]
+  portfolio         String[] // Array of URLs
+  beforeAfter       String[] // Array of URLs
+  isVerified        Boolean  @default(true)
+  isSocietyVerified Boolean  @default(false)
+  isPoliceVerified  Boolean  @default(false)
+  repeatCustomers   Int      @default(0)
+  societyRecommend  Boolean  @default(false)
+
+  worker            User     @relation("UserToProfile", fields: [workerId], references: [id], onDelete: Cascade)
+}
+
+model WorkerSkill {
+  id       String @id @default(uuid())
+  workerId String
+  skill    String
+  worker   User   @relation("UserToSkills", fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([workerId])
+}
+
+model ServiceCategory {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  icon        String?
+  parentGroup String  // "Home Services", "Repairs", "Other Services"
+}
+
+model ChatMessage {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  message    String
+  imageUrl   String?
+  timestamp  DateTime @default(now())
+  isRead     Boolean  @default(false)
+  status     String   @default("sent") // "sent", "read"
+
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+model ServiceBooking {
+  id          String   @id @default(uuid())
+  residentId  String
+  workerId    String
+  category    String
+  bookingDate String
+  bookingTime String
+  address     String
+  notes       String?
+  price       Float    @default(0.0)
+  status      String   @default("Pending") // "Pending", "Accepted", "Rejected", "Completed", "Cancelled"
+  rating      Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  resident    User     @relation("ResidentBookings", fields: [residentId], references: [id], onDelete: Cascade)
+  worker      User     @relation("WorkerBookings", fields: [workerId], references: [id], onDelete: Cascade)
+  reviews     ServiceReview[]
+
+  @@index([residentId])
+  @@index([workerId])
+}
+
+model ServiceReview {
+  id         String   @id @default(uuid())
+  bookingId  String   @unique
+  residentId String
+  workerId   String
+  rating     Int      // 1 to 5
+  reviewText String?
+  photos     String[]
+  createdAt  DateTime @default(now())
+
+  booking    ServiceBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  resident   User     @relation("ResidentReviews", fields: [residentId], references: [id], onDelete: Cascade)
+  worker     User     @relation("WorkerReviews", fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([residentId])
+  @@index([workerId])
+}
+
+model FavoriteWorker {
+  id         String   @id @default(uuid())
+  residentId String
+  workerId   String
+  createdAt  DateTime @default(now())
+
+  resident   User     @relation("ResidentFavorites", fields: [residentId], references: [id], onDelete: Cascade)
+  worker     User     @relation("WorkerFavorites", fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([residentId, workerId])
+  @@index([residentId])
+  @@index([workerId])
+}
+
+model WorkerAvailability {
+  id          String   @id @default(uuid())
+  workerId    String   @unique
+  workingDays String[]
+  startTime   String   @default("09:00")
+  endTime     String   @default("18:00")
+  holidays    String[]
+  blockedDate String[]
+  busyHours   String[]
+
+  worker      User     @relation("WorkerAvailability", fields: [workerId], references: [id], onDelete: Cascade)
+}
+

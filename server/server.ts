@@ -8,6 +8,7 @@ import { initSocket } from "./socket/index.js";
 import authRouter from "./routes/auth.js";
 import complaintsRouter from "./routes/complaints.js";
 import visitorsRouter from "./routes/visitors.js";
+import communityServicesRouter from "./routes/communityServices.js";
 import miscRouter from "./routes/misc.js";
 
 const app = express();
@@ -31,6 +32,7 @@ const io = initSocket(server);
 app.use("/api/auth", authRouter);
 app.use("/api/complaints", complaintsRouter);
 app.use("/api/visitors", visitorsRouter);
+app.use("/api/community-services", communityServicesRouter);
 // Miscellaneous sub-features are routed under `/api` directly in miscRouter
 app.use("/api", miscRouter);
 

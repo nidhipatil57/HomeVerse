@@ -75,7 +75,7 @@ export const SOCIETY_SIDEBAR_ITEMS = [
   { label: 'Utility Usage', href: '/society/utility-usage', icon: 'Zap' },
   { label: 'Events', href: '/society/events', icon: 'Calendar' },
   { label: 'Lost & Found', href: '/society/lost-found', icon: 'Search' },
-  { label: 'Find Local Help', href: '/society/find-local-help', icon: 'Wrench' },
+  { label: 'Community Services', href: '/society/find-local-help', icon: 'Briefcase' },
   { label: 'Buy & Sell', href: '/society/buy-sell', icon: 'Tag' },
   { label: 'Local Businesses', href: '/society/local-businesses', icon: 'Store' },
   { label: 'Resident Directory', href: '/society/resident-directory', icon: 'UserCheck' },
