@@ -22,6 +22,7 @@ import { staggerContainer, fadeInUp } from "@/lib/animations";
 export default function CommunityServiceMarketplace() {
   const { user, initialize } = useAuth();
   const {
+    users,
     workerProfiles,
     serviceCategories,
     serviceBookings,
@@ -36,6 +37,7 @@ export default function CommunityServiceMarketplace() {
     initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
+      users: state.users || [],
       workerProfiles: state.workerProfiles || [],
       serviceCategories: state.serviceCategories || [],
       serviceBookings: state.serviceBookings || [],
@@ -62,7 +64,8 @@ export default function CommunityServiceMarketplace() {
   // Modals & Panels State
   const [activeWorkerProfile, setActiveWorkerProfile] = useState<any>(null);
   const [bookingWorker, setBookingWorker] = useState<any>(null);
-  const [chattingWorker, setChattingWorker] = useState<any>(null);
+  const [chattingRecipient, setChattingRecipient] = useState<any>(null);
+  const [showChatOptionModal, setShowChatOptionModal] = useState(false);
   const [reviewBooking, setReviewBooking] = useState<any>(null);
 
   // Form states
@@ -99,14 +102,14 @@ export default function CommunityServiceMarketplace() {
   // Fetch messages in real-time when chatting
   useEffect(() => {
     let interval: any;
-    if (chattingWorker) {
-      fetchChatMessages(chattingWorker.id);
+    if (chattingRecipient) {
+      fetchChatMessages(chattingRecipient.id);
       interval = setInterval(() => {
-        fetchChatMessages(chattingWorker.id);
+        fetchChatMessages(chattingRecipient.id);
       }, 3000);
     }
     return () => clearInterval(interval);
-  }, [chattingWorker, fetchChatMessages]);
+  }, [chattingRecipient, fetchChatMessages]);
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -183,16 +186,16 @@ export default function CommunityServiceMarketplace() {
   // Chat message sending
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim() || !chattingWorker) return;
+    if (!chatInput.trim() || !chattingRecipient) return;
 
     setSendingMessage(true);
     try {
       await sendChatMessage({
-        receiverId: chattingWorker.id,
+        receiverId: chattingRecipient.id,
         message: chatInput
       });
       setChatInput("");
-      fetchChatMessages(chattingWorker.id);
+      fetchChatMessages(chattingRecipient.id);
     } catch (e) {
       alert("Failed to send message");
     } finally {
@@ -524,9 +527,9 @@ export default function CommunityServiceMarketplace() {
                         </Button>
                         <Button
                           variant="outline"
-                          onClick={() => setChattingWorker(worker)}
+                          onClick={() => setShowChatOptionModal(true)}
                           className="rounded-xl h-9.5 px-3 border-border/50 hover:bg-secondary/40 text-foreground"
-                          title="Message Worker"
+                          title="Message Office"
                         >
                           <MessageSquare className="w-4 h-4" />
                         </Button>
@@ -590,6 +593,16 @@ export default function CommunityServiceMarketplace() {
                           Notes: "{bk.notes}"
                         </p>
                       )}
+                      {bk.adminNotes && (
+                        <p className="text-[10px] text-indigo-600 bg-indigo-500/5 rounded-lg p-2 max-w-md border-l-2 border-indigo-500">
+                          Secretary Validation: "{bk.adminNotes}"
+                        </p>
+                      )}
+                      {bk.operationalNotes && (
+                        <p className="text-[10px] text-emerald-600 bg-emerald-500/5 rounded-lg p-2 max-w-md border-l-2 border-emerald-500">
+                          Manager Coordination: "{bk.operationalNotes}"
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex flex-row md:flex-col items-end gap-3 w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-0 border-border/10 justify-between md:justify-end">
@@ -601,8 +614,9 @@ export default function CommunityServiceMarketplace() {
                       <div className="flex items-center gap-2">
                         {/* Status Badge */}
                         <Badge className={`px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider ${
-                          bk.status === "Pending" ? "bg-amber-500/15 text-amber-500 border border-amber-500/20" :
-                          bk.status === "Accepted" ? "bg-blue-500/15 text-blue-500 border border-blue-500/20" :
+                          bk.status === "Pending" || bk.status === "Pending Secretary Review" ? "bg-amber-500/15 text-amber-500 border border-amber-500/20" :
+                          bk.status === "Forwarded to Manager" ? "bg-blue-500/15 text-blue-500 border border-blue-500/20" :
+                          bk.status === "Scheduled" ? "bg-indigo-500/15 text-indigo-500 border border-indigo-500/20 animate-pulse" :
                           bk.status === "Completed" ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/20" :
                           "bg-rose-500/15 text-rose-500 border border-rose-500/20"
                         }`}>
@@ -733,7 +747,7 @@ export default function CommunityServiceMarketplace() {
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => setChattingWorker(worker)}
+                        onClick={() => setShowChatOptionModal(true)}
                         className="rounded-xl h-9.5 px-3 border-border/50 text-foreground"
                       >
                         <MessageSquare className="w-4 h-4" />
@@ -953,7 +967,7 @@ export default function CommunityServiceMarketplace() {
                   variant="outline"
                   onClick={() => {
                     setActiveWorkerProfile(null);
-                    setChattingWorker(activeWorkerProfile);
+                    setShowChatOptionModal(true);
                   }}
                   className="rounded-xl h-10.5 border-border/50 font-bold px-4"
                 >
@@ -1127,18 +1141,74 @@ export default function CommunityServiceMarketplace() {
         )}
       </Dialog>
 
+      {/* CHAT OPTION SELECTION DIALOG */}
+      <Dialog open={showChatOptionModal} onOpenChange={setShowChatOptionModal}>
+        <DialogContent className="sm:max-w-md rounded-3xl p-6 bg-card border border-border/50">
+          <DialogHeader className="pb-3 border-b border-border/10">
+            <DialogTitle className="font-extrabold text-foreground font-[family-name:var(--font-heading)]">Message Society Office</DialogTitle>
+            <DialogDescription className="text-xs">Select who you want to message regarding your request</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 pt-4 text-xs">
+            <button
+              className="w-full text-left p-4 rounded-2xl border border-border/50 hover:bg-secondary/40 flex items-center gap-3 bg-transparent text-foreground transition-colors"
+              onClick={() => {
+                const managerAccount = users.find(u => u.role === "manager");
+                if (managerAccount) {
+                  setChattingRecipient(managerAccount);
+                  setShowChatOptionModal(false);
+                } else {
+                  alert("Operations Manager not registered in the system.");
+                }
+              }}
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary shrink-0 text-sm">
+                VM
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-sm">Vikram Malhotra</p>
+                <p className="text-[10px] text-muted-foreground">Operations Manager · Coordination & Schedule Updates</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
+
+            <button
+              className="w-full text-left p-4 rounded-2xl border border-border/50 hover:bg-secondary/40 flex items-center gap-3 bg-transparent text-foreground transition-colors"
+              onClick={() => {
+                const secretaryAccount = users.find(u => u.role === "secretary");
+                if (secretaryAccount) {
+                  setChattingRecipient(secretaryAccount);
+                  setShowChatOptionModal(false);
+                } else {
+                  alert("Society Secretary not registered in the system.");
+                }
+              }}
+            >
+              <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center font-bold text-indigo-500 shrink-0 text-sm">
+                RV
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-sm">Rahul Verma</p>
+                <p className="text-[10px] text-muted-foreground">Society Secretary · Administrative Verification & Policies</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-indigo-500 shrink-0" />
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* MESSAGING SYSTEM DRAWER (SHEET) */}
-      <Sheet open={!!chattingWorker} onOpenChange={(open) => !open && setChattingWorker(null)}>
-        {chattingWorker && (
+      <Sheet open={!!chattingRecipient} onOpenChange={(open) => !open && setChattingRecipient(null)}>
+        {chattingRecipient && (
           <SheetContent className="w-full sm:max-w-md p-0 flex flex-col h-full bg-card border-l border-border/50">
             <SheetHeader className="p-4 border-b border-border/10 flex flex-row items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary shrink-0">
-                {chattingWorker.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                {chattingRecipient.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
               </div>
               <div className="flex-1 text-left min-w-0 pr-8">
-                <SheetTitle className="font-bold text-sm text-foreground truncate">{chattingWorker.name}</SheetTitle>
+                <SheetTitle className="font-bold text-sm text-foreground truncate">{chattingRecipient.name}</SheetTitle>
                 <SheetDescription className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">
-                  {chattingWorker.workerCategory} · Online
+                  {chattingRecipient.role === "manager" ? "Operations Manager" : "Society Secretary"} · Online
                 </SheetDescription>
               </div>
             </SheetHeader>
@@ -1169,7 +1239,7 @@ export default function CommunityServiceMarketplace() {
             <div className="p-4 border-t border-border/10 bg-card">
               <form onSubmit={handleSendMessage} className="flex gap-2">
                 <Input
-                  placeholder="Ask about availability, rates..."
+                  placeholder="Type a message..."
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   className="h-10 rounded-xl bg-secondary/10 border-border/50 text-xs"

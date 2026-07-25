@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { SOCIETY_SIDEBAR_ITEMS, WORKER_SIDEBAR_ITEMS, SECURITY_SIDEBAR_ITEMS, SECRETARY_SIDEBAR_ITEMS } from "@/lib/constants";
+import { SOCIETY_SIDEBAR_ITEMS, MANAGER_SIDEBAR_ITEMS, SECURITY_SIDEBAR_ITEMS, SECRETARY_SIDEBAR_ITEMS } from "@/lib/constants";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 
@@ -30,16 +30,12 @@ const getAllowedPaths = (role: string): string[] => {
         "/society/notifications",
         "/society/settings"
       ];
-    case "worker":
+    case "manager":
       return [
         "/society/dashboard",
+        "/society/ai-assistant",
         "/society/complaints",
-        "/society/route",
-        "/society/emergency",
-        "/society/inventory",
-        "/society/performance",
-        "/society/services",
-        "/society/availability",
+        "/society/daily-checkins",
         "/society/notifications",
         "/society/settings"
       ];
@@ -145,16 +141,16 @@ export default function SocietyLayout({
     return null;
   }
 
-  const items = user.role === "worker" 
-    ? WORKER_SIDEBAR_ITEMS 
+  const items = user.role === "manager" 
+    ? MANAGER_SIDEBAR_ITEMS 
     : user.role === "security" 
       ? SECURITY_SIDEBAR_ITEMS 
       : user.role === "secretary"
         ? SECRETARY_SIDEBAR_ITEMS
         : SOCIETY_SIDEBAR_ITEMS;
 
-  const portalName = user.role === "worker" 
-    ? "Worker Portal" 
+  const portalName = user.role === "manager" 
+    ? "Manager Portal" 
     : user.role === "security" 
       ? "Security Portal" 
       : user.role === "secretary"

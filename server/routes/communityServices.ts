@@ -138,9 +138,8 @@ router.get("/bookings", authenticateToken, async (req: any, res) => {
     const { id, role } = req.user;
     let bookings;
 
-    if (role === "worker") {
+    if (role === "secretary" || role === "manager" || role === "warden") {
       bookings = await prisma.serviceBooking.findMany({
-        where: { workerId: id },
         include: {
           resident: { select: { id: true, name: true, phone: true, unit: true, building: true } },
           worker: { select: { id: true, name: true, phone: true, workerCategory: true } },
@@ -168,7 +167,7 @@ router.get("/bookings", authenticateToken, async (req: any, res) => {
 
 router.put("/bookings/:id/status", authenticateToken, async (req: any, res) => {
   const { id } = req.params;
-  const { status } = req.body; // Accepted, Rejected, Completed, Cancelled
+  const { status, adminNotes, operationalNotes, forwardedToManager } = req.body;
 
   if (!status) {
     return res.status(400).json({ error: "Status is required" });
@@ -189,48 +188,47 @@ router.put("/bookings/:id/status", authenticateToken, async (req: any, res) => {
 
     const updatedBooking = await prisma.serviceBooking.update({
       where: { id },
-      data: { status },
+      data: {
+        status,
+        adminNotes: adminNotes !== undefined ? adminNotes : undefined,
+        operationalNotes: operationalNotes !== undefined ? operationalNotes : undefined,
+        forwardedToManager: forwardedToManager !== undefined ? forwardedToManager : undefined
+      },
       include: {
         resident: { select: { id: true, name: true, phone: true, unit: true, building: true } },
         worker: { select: { id: true, name: true, phone: true, workerCategory: true } }
       }
     });
 
-    // Notify resident or worker
-    const targetUserId = req.user.role === "worker" ? booking.residentId : booking.workerId;
-    const notificationTitle = `Booking Status: ${status}`;
-    const notificationMessage = req.user.role === "worker"
-      ? `Worker ${booking.worker.name} has updated your booking status to ${status}.`
-      : `Resident ${booking.resident.name} has ${status.toLowerCase()} the booking scheduled for ${booking.bookingDate}.`;
-
+    // Notify resident
     const notifId = `NTF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
     await prisma.notification.create({
       data: {
         id: notifId,
-        userId: targetUserId,
-        title: notificationTitle,
-        message: notificationMessage,
-        type: `booking_${status.toLowerCase()}`
+        userId: booking.residentId,
+        title: `Service Request Status: ${status}`,
+        message: `Your service request for ${booking.category} has been updated to "${status}". ${adminNotes || operationalNotes || ""}`,
+        type: `booking_${status.toLowerCase().replace(/ /g, "_")}`
       }
     });
 
-    // Also update worker availability status if status is Accepted or Completed/Cancelled
-    if (status === "Accepted") {
-      await prisma.user.update({
-        where: { id: booking.workerId },
-        data: { availability: "Busy" }
-      });
-    } else if (status === "Completed" || status === "Cancelled" || status === "Rejected") {
+    // Also update worker availability status in static directory if status is Completed/Cancelled
+    if (status === "Completed" || status === "Cancelled" || status === "Rejected by Secretary") {
       await prisma.user.update({
         where: { id: booking.workerId },
         data: { availability: "Available" }
+      });
+    } else if (status === "Scheduled") {
+      await prisma.user.update({
+        where: { id: booking.workerId },
+        data: { availability: "Busy" }
       });
     }
 
     // Broadcast updates
     broadcastUpdate("booking:update", updatedBooking);
-    broadcastUpdate("worker:update", { id: booking.workerId, availability: status === "Accepted" ? "Busy" : "Available" });
-    broadcastUpdate("notification:update", { userId: targetUserId });
+    broadcastUpdate("worker:update", { id: booking.workerId, availability: status === "Scheduled" ? "Busy" : "Available" });
+    broadcastUpdate("notification:update", { userId: booking.residentId });
 
     res.json(updatedBooking);
   } catch (error: any) {
@@ -537,7 +535,7 @@ router.put("/workers/:id/verify", authenticateToken, async (req: any, res) => {
 
 router.get("/stats", authenticateToken, async (req: any, res) => {
   try {
-    if (req.user.role !== "secretary") {
+    if (req.user.role !== "secretary" && req.user.role !== "manager") {
       return res.status(403).json({ error: "Access denied" });
     }
 
@@ -564,6 +562,138 @@ router.get("/stats", authenticateToken, async (req: any, res) => {
     });
   } catch (error: any) {
     res.status(500).json({ error: "Failed to fetch stats: " + error.message });
+  }
+});
+
+// POST /workers - Add a new static worker record
+router.post("/workers", authenticateToken, async (req: any, res) => {
+  try {
+    if (req.user.role !== "manager" && req.user.role !== "secretary") {
+      return res.status(403).json({ error: "Access denied. Operational role required." });
+    }
+
+    const {
+      name, email, phone, workerCategory, experience, specializations,
+      visitCharge, workingHoursStart, workingHoursEnd, isVerified, isSocietyVerified, isPoliceVerified
+    } = req.body;
+
+    if (!name || !email || !phone || !workerCategory) {
+      return res.status(400).json({ error: "Name, email, phone, and category are required." });
+    }
+
+    // Generate unique ID
+    const workerId = `user-worker-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+    
+    // Hash dummy password since static workers don't log in
+    const bcrypt = await import("bcryptjs");
+    const hashedPassword = bcrypt.default.hashSync("Worker@123", 10);
+
+    const newWorker = await prisma.user.create({
+      data: {
+        id: workerId,
+        name,
+        email: email.trim().toLowerCase(),
+        phone,
+        password: hashedPassword,
+        role: "worker",
+        portal: "society",
+        status: "approved",
+        workerCategory,
+        experience: experience || "1 year",
+        specializations: specializations || [],
+        availability: "Available",
+        rating: 5.0,
+        joinedAt: new Date().toISOString().split("T")[0],
+        workerProfile: {
+          create: {
+            visitCharge: parseFloat(visitCharge || 100),
+            workingHoursStart: workingHoursStart || "09:00",
+            workingHoursEnd: workingHoursEnd || "18:00",
+            isVerified: isVerified !== undefined ? isVerified : true,
+            isSocietyVerified: isSocietyVerified || false,
+            isPoliceVerified: isPoliceVerified || false
+          }
+        }
+      },
+      include: {
+        workerProfile: true
+      }
+    });
+
+    broadcastUpdate("worker:update", newWorker);
+    res.status(201).json(newWorker);
+  } catch (error: any) {
+    console.error("Error creating static worker:", error);
+    res.status(500).json({ error: "Failed to create worker: " + error.message });
+  }
+});
+
+// PUT /workers/:id - Update worker record
+router.put("/workers/:id", authenticateToken, async (req: any, res) => {
+  try {
+    if (req.user.role !== "manager" && req.user.role !== "secretary") {
+      return res.status(403).json({ error: "Access denied. Operational role required." });
+    }
+
+    const { id } = req.params;
+    const {
+      name, email, phone, workerCategory, experience, specializations,
+      visitCharge, workingHoursStart, workingHoursEnd, isVerified, isSocietyVerified, isPoliceVerified, availability
+    } = req.body;
+
+    const updatedWorker = await prisma.user.update({
+      where: { id },
+      data: {
+        name: name || undefined,
+        email: email ? email.trim().toLowerCase() : undefined,
+        phone: phone || undefined,
+        workerCategory: workerCategory || undefined,
+        experience: experience || undefined,
+        specializations: specializations || undefined,
+        availability: availability || undefined,
+        workerProfile: {
+          update: {
+            visitCharge: visitCharge !== undefined ? parseFloat(visitCharge) : undefined,
+            workingHoursStart: workingHoursStart || undefined,
+            workingHoursEnd: workingHoursEnd || undefined,
+            isVerified: isVerified !== undefined ? isVerified : undefined,
+            isSocietyVerified: isSocietyVerified !== undefined ? isSocietyVerified : undefined,
+            isPoliceVerified: isPoliceVerified !== undefined ? isPoliceVerified : undefined
+          }
+        }
+      },
+      include: {
+        workerProfile: true
+      }
+    });
+
+    broadcastUpdate("worker:update", updatedWorker);
+    res.json(updatedWorker);
+  } catch (error: any) {
+    console.error("Error updating static worker:", error);
+    res.status(500).json({ error: "Failed to update worker: " + error.message });
+  }
+});
+
+// DELETE /workers/:id - Remove worker
+router.delete("/workers/:id", authenticateToken, async (req: any, res) => {
+  try {
+    if (req.user.role !== "manager" && req.user.role !== "secretary") {
+      return res.status(403).json({ error: "Access denied. Operational role required." });
+    }
+
+    const { id } = req.params;
+
+    // Delete user (cascade will handle workerProfile)
+    await prisma.user.delete({
+      where: { id }
+    });
+
+    broadcastUpdate("worker:delete", { id });
+    res.json({ success: true, message: "Worker removed successfully" });
+  } catch (error: any) {
+    console.error("Error deleting static worker:", error);
+    res.status(500).json({ error: "Failed to delete worker: " + error.message });
   }
 });
 

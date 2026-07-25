@@ -32,7 +32,7 @@ router.get("/", authenticateToken, async (req: any, res) => {
       }
     } else {
       // society
-      if (role === "secretary") {
+      if (role === "secretary" || role === "manager") {
         complaints = await prisma.complaint.findMany({
           where: { portal: "society" },
           include: { chat: true, timeline: true, subscribers: true }
@@ -452,6 +452,125 @@ router.delete("/:id", authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error("Error deleting complaint:", error);
     res.status(500).json({ error: "Failed to delete complaint" });
+  }
+});
+
+// PUT secretary review
+router.put("/:id/secretary-review", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const { status, priority, category, department, adminNotes, rejectReason } = req.body;
+
+  try {
+    if (req.user.role !== "secretary" && req.user.role !== "warden") {
+      return res.status(403).json({ error: "Access denied. Administrative role required." });
+    }
+
+    const complaint = await prisma.complaint.findUnique({ where: { id } });
+    if (!complaint) {
+      return res.status(404).json({ error: "Complaint not found" });
+    }
+
+    const actualStatus = status || (rejectReason ? "Rejected" : "Verified");
+
+    const updated = await prisma.complaint.update({
+      where: { id },
+      data: {
+        status: actualStatus,
+        priority: priority || undefined,
+        category: category || undefined,
+        department: department || undefined,
+        adminNotes: adminNotes || rejectReason || undefined,
+        timeline: {
+          create: [
+            {
+              status: actualStatus,
+              note: rejectReason ? `Rejected by Secretary: ${rejectReason}` : `Verified & approved by Secretary. Priority: ${priority}. Assigned Department: ${department}.`,
+              by: req.user.name || "Secretary"
+            }
+          ]
+        }
+      },
+      include: { chat: true, timeline: true, subscribers: true }
+    });
+
+    // Create Notification for the resident who raised it
+    const notifId = `NTF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+    await prisma.notification.create({
+      data: {
+        id: notifId,
+        userId: complaint.raisedBy,
+        title: `Complaint Update: ${actualStatus}`,
+        message: rejectReason ? `Your complaint was rejected: ${rejectReason}` : `Your complaint has been verified and forwarded to the operations manager.`,
+        type: rejectReason ? "error" : "success"
+      }
+    });
+
+    broadcastUpdate("complaint:update", updated);
+    broadcastUpdate("notification:update", { userId: complaint.raisedBy });
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error("Error updating secretary review:", error);
+    res.status(500).json({ error: "Failed to update complaint: " + error.message });
+  }
+});
+
+// PUT manager action
+router.put("/:id/manager-action", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const { status, assignedTo, assignedToId, expectedArrival, operationalNotes } = req.body;
+
+  try {
+    if (req.user.role !== "manager" && req.user.role !== "warden") {
+      return res.status(403).json({ error: "Access denied. Operational role required." });
+    }
+
+    const complaint = await prisma.complaint.findUnique({ where: { id } });
+    if (!complaint) {
+      return res.status(404).json({ error: "Complaint not found" });
+    }
+
+    const updated = await prisma.complaint.update({
+      where: { id },
+      data: {
+        status: status || undefined,
+        assignedTo: assignedTo || undefined,
+        assignedToId: assignedToId || undefined,
+        expectedArrival: expectedArrival || undefined,
+        operationalNotes: operationalNotes || undefined,
+        resolvedAt: status === "Completed" ? new Date() : undefined,
+        timeline: {
+          create: [
+            {
+              status: status || "Worker Being Coordinated",
+              note: operationalNotes || `Manager updated progress. Worker: ${assignedTo || "Coordinated"}. Expected Arrival: ${expectedArrival || "N/A"}.`,
+              by: req.user.name || "Manager"
+            }
+          ]
+        }
+      },
+      include: { chat: true, timeline: true, subscribers: true }
+    });
+
+    // Create Notification for the resident
+    const notifId = `NTF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+    await prisma.notification.create({
+      data: {
+        id: notifId,
+        userId: complaint.raisedBy,
+        title: `Complaint Progress: ${status}`,
+        message: `Manager updated your complaint status to ${status}. Details: ${operationalNotes || "N/A"}`,
+        type: status === "Completed" ? "success" : "info"
+      }
+    });
+
+    broadcastUpdate("complaint:update", updated);
+    broadcastUpdate("notification:update", { userId: complaint.raisedBy });
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error("Error updating manager action:", error);
+    res.status(500).json({ error: "Failed to update complaint: " + error.message });
   }
 });
 

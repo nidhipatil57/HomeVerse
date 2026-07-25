@@ -3,7 +3,7 @@
 // ==========================================
 
 // --- Auth & Users ---
-export type UserRole = 'resident' | 'worker' | 'student' | 'warden' | 'admin' | 'security' | 'committee' | 'secretary';
+export type UserRole = 'resident' | 'worker' | 'student' | 'warden' | 'admin' | 'security' | 'committee' | 'secretary' | 'manager';
 export type PortalType = 'society' | 'hostel';
 
 export interface User {
@@ -54,7 +54,16 @@ export type ComplaintStatus =
   | 'completed'
   | 'resolved'
   | 'resident-verification'
-  | 'closed';
+  | 'closed'
+  | 'Under Secretary Review'
+  | 'Verified'
+  | 'Forwarded to Manager'
+  | 'Worker Being Coordinated'
+  | 'Scheduled'
+  | 'Work In Progress'
+  | 'Resident Feedback'
+  | 'Completed'
+  | 'Rejected';
 
 export type ComplaintPriority = 'critical' | 'high' | 'medium' | 'low' | 'emergency';
 
@@ -126,6 +135,10 @@ export interface Complaint {
   priorityScore?: number;
   estimatedResolution?: string;
   estimatedArrival?: string;
+  expectedArrival?: string;
+  department?: string;
+  adminNotes?: string;
+  operationalNotes?: string;
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string;

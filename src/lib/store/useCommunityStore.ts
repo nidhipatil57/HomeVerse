@@ -368,6 +368,14 @@ interface CommunityState {
   fetchChatMessages: (userId: string) => Promise<any>;
   verifyWorker: (workerId: string, data: any) => Promise<any>;
   fetchWorkerStats: () => Promise<any>;
+  forwardBooking: (id: string, adminNotes: string) => Promise<any>;
+  scheduleBooking: (id: string, operationalNotes: string) => Promise<any>;
+  completeBooking: (id: string, notes: string) => Promise<any>;
+  reviewComplaintSecretary: (id: string, data: any) => Promise<any>;
+  actionComplaintManager: (id: string, data: any) => Promise<any>;
+  addStaticWorker: (workerData: any) => Promise<any>;
+  updateStaticWorker: (id: string, workerData: any) => Promise<any>;
+  deleteStaticWorker: (id: string) => Promise<any>;
 
   initializeDb: () => void;
   saveDb: () => void;
@@ -1979,5 +1987,83 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       return data;
     }
     throw new Error("Failed to fetch stats");
+  },
+
+  forwardBooking: async (id, adminNotes) => {
+    const res = await fetch(`/api/community-services/bookings/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "Forwarded to Manager", adminNotes, forwardedToManager: true })
+    });
+    if (res.ok) return await res.json();
+    throw new Error("Failed to forward booking");
+  },
+
+  scheduleBooking: async (id, operationalNotes) => {
+    const res = await fetch(`/api/community-services/bookings/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "Scheduled", operationalNotes })
+    });
+    if (res.ok) return await res.json();
+    throw new Error("Failed to schedule booking");
+  },
+
+  completeBooking: async (id, notes) => {
+    const res = await fetch(`/api/community-services/bookings/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "Completed", operationalNotes: notes })
+    });
+    if (res.ok) return await res.json();
+    throw new Error("Failed to complete booking");
+  },
+
+  reviewComplaintSecretary: async (id, data) => {
+    const res = await fetch(`/api/complaints/${id}/secretary-review`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) return await res.json();
+    throw new Error("Failed to review complaint");
+  },
+
+  actionComplaintManager: async (id, data) => {
+    const res = await fetch(`/api/complaints/${id}/manager-action`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) return await res.json();
+    throw new Error("Failed to update complaint operations");
+  },
+
+  addStaticWorker: async (workerData) => {
+    const res = await fetch("/api/community-services/workers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workerData)
+    });
+    if (res.ok) return await res.json();
+    throw new Error("Failed to add worker");
+  },
+
+  updateStaticWorker: async (id, workerData) => {
+    const res = await fetch(`/api/community-services/workers/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workerData)
+    });
+    if (res.ok) return await res.json();
+    throw new Error("Failed to update worker");
+  },
+
+  deleteStaticWorker: async (id) => {
+    const res = await fetch(`/api/community-services/workers/${id}`, {
+      method: "DELETE"
+    });
+    if (res.ok) return await res.json();
+    throw new Error("Failed to delete worker");
   }
 }));
