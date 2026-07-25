@@ -38,11 +38,11 @@ const suggestionsByRole: Record<string, string[]> = {
     "Show active visitors",
     "Emergency gate procedure"
   ],
-  "society-worker": [
-    "Show today's tasks",
-    "Get route instructions",
-    "What tools do I need?",
-    "Safety protocols"
+  "society-manager": [
+    "Summarize pending complaints",
+    "Who are the plumbers active today?",
+    "Show active service bookings",
+    "View worker directory status"
   ]
 };
 
@@ -143,8 +143,8 @@ export function AIChat({ portalType }: AIChatProps) {
         welcomeText = "Greetings, Secretary. 💼 I am your **AI Administrative Assistant**. Ask me to generate billing reports, summarize pending complaints, or audit budget lists.";
       } else if (userRole === "security") {
         welcomeText = "Gated Entry Assistant Online. 🚨 I can verify visitor OTPs, retrieve incident registries, or outline emergency procedures.";
-      } else if (userRole === "worker") {
-        welcomeText = "Service Assistant Online. 🛠️ Let me fetch your walking routes, tool slips, or workplace safety instructions.";
+      } else if (userRole === "manager") {
+        welcomeText = "Operations Assistant Online. 🛠️ Let me help you coordinate workers, track escalations, schedule appointments, or audit directory rosters.";
       } else {
         welcomeText = "Hi! 👋 I'm your **AI Community Assistant**. Ask me to search and book plumbers, electricians, maids, or ask about bills and parcels.";
       }

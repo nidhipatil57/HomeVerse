@@ -26,6 +26,13 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
   const [activeTab, setActiveTab] = useState<"dashboard" | "resident">("dashboard");
   const [adminSubTab, setAdminSubTab] = useState<"approvals" | "residents" | "finance" | "operations" | "governance">("approvals");
 
+  // Local state for complaints and service bookings validation forms
+  const [reviewPriorities, setReviewPriorities] = useState<Record<string, string>>({});
+  const [reviewDepartments, setReviewDepartments] = useState<Record<string, string>>({});
+  const [reviewAdminNotes, setReviewAdminNotes] = useState<Record<string, string>>({});
+  const [reviewRejectReasons, setReviewRejectReasons] = useState<Record<string, string>>({});
+  const [bookingAdminNotes, setBookingAdminNotes] = useState<Record<string, string>>({});
+
   // Load state and actions from Central Store
   const {
     users,
@@ -43,6 +50,7 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
     expenses,
     flats,
     rentRecords,
+    serviceBookings,
 
     approveUser,
     rejectUser,
@@ -76,6 +84,7 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
       expenses: state.expenses || [],
       flats: state.flats || [],
       rentRecords: state.rentRecords || [],
+      serviceBookings: state.serviceBookings || [],
 
       approveUser: state.approveUser,
       rejectUser: state.rejectUser,
@@ -1225,145 +1234,191 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
               {/* TAB 4: OPERATIONS & WORKERS */}
               {adminSubTab === "operations" && (
                 <div className="grid lg:grid-cols-3 gap-6">
-                  {/* Workers and Dispatch Panel */}
+                  {/* Complaints Review Queue */}
                   <div className="lg:col-span-2 space-y-6">
                     <Card className="border-border/50 shadow-sm">
-                      <CardHeader className="pb-3 flex flex-col sm:flex-row justify-between gap-3">
-                        <div>
-                          <CardTitle className="text-base font-semibold">Society Maintenance Workers & Staff</CardTitle>
-                          <CardDescription className="text-xs">Assign jobs, check task progress and worker ratings</CardDescription>
-                        </div>
-                        <div className="relative w-full sm:w-64">
-                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Filter by category or name..."
-                            value={workerSearch}
-                            onChange={(e) => setWorkerSearch(e.target.value)}
-                            className="pl-9 h-9 text-xs rounded-xl"
-                          />
-                        </div>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base font-semibold">Complaints Review & Validation Queue</CardTitle>
+                        <CardDescription className="text-xs">
+                          Validate, prioritize, categorize and escalate complaints to the Operations Manager
+                        </CardDescription>
                       </CardHeader>
                       <CardContent className="p-0">
                         <div className="divide-y divide-border/50">
-                          {filteredWorkers.map((w) => {
-                            const pendingJobs = complaints.filter(c => c.assignedToId === w.id && c.status !== "resolved" && c.status !== "closed");
-                            return (
-                              <div key={w.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-secondary/20 text-xs">
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <h4 className="text-sm font-semibold">{w.name}</h4>
-                                    <Badge className="bg-primary/20 text-primary border-0 py-0.5 text-[9px]">{w.workerCategory}</Badge>
+                          {complaints.filter(c => c.portal === "society" && (c.status === "submitted" || c.status === "Under Secretary Review")).length === 0 ? (
+                            <div className="p-8 text-center text-muted-foreground text-xs">
+                              <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-500 mb-2 opacity-65" />
+                              No complaints awaiting Secretary verification!
+                            </div>
+                          ) : (
+                            complaints.filter(c => c.portal === "society" && (c.status === "submitted" || c.status === "Under Secretary Review")).map((c) => {
+                              const priority = reviewPriorities[c.id] || c.priority || "medium";
+                              const dept = reviewDepartments[c.id] || "Maintenance";
+                              const adminNotesValue = reviewAdminNotes[c.id] || "";
+                              const rejectReasonValue = reviewRejectReasons[c.id] || "";
+
+                              return (
+                                <div key={c.id} className="p-4 space-y-3 hover:bg-secondary/10 text-xs">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <h4 className="font-semibold text-sm">{c.title}</h4>
+                                      <p className="text-muted-foreground mt-0.5">
+                                        Raised by {c.raisedByName} (Flat {c.unit}, {c.building}) • Category: {c.category}
+                                      </p>
+                                    </div>
+                                    <Badge className="bg-amber-500/15 text-amber-500 border-0">{c.status}</Badge>
                                   </div>
-                                  <p className="text-muted-foreground mt-0.5">Mobile: {w.phone} | Shift: {w.workingShift || "Morning"}</p>
-                                  <p className="text-[10px] text-muted-foreground mt-1">Pending Assignments: <strong className="text-foreground">{pendingJobs.length} Jobs</strong></p>
+                                  <p className="text-muted-foreground bg-secondary/30 p-2.5 rounded-lg">{c.description}</p>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2.5">
+                                    <div className="space-y-1">
+                                      <label className="font-semibold text-muted-foreground block text-[10px]">Priority</label>
+                                      <select
+                                        value={priority}
+                                        onChange={(e) => setReviewPriorities(prev => ({ ...prev, [c.id]: e.target.value }))}
+                                        className="w-full p-2 rounded-lg border border-border bg-card text-xs"
+                                      >
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                        <option value="emergency">Emergency</option>
+                                      </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <label className="font-semibold text-muted-foreground block text-[10px]">Assign Department</label>
+                                      <select
+                                        value={dept}
+                                        onChange={(e) => setReviewDepartments(prev => ({ ...prev, [c.id]: e.target.value }))}
+                                        className="w-full p-2 rounded-lg border border-border bg-card text-xs"
+                                      >
+                                        <option value="Maintenance">Maintenance</option>
+                                        <option value="Electrical">Electrical</option>
+                                        <option value="Plumbing">Plumbing</option>
+                                        <option value="Security">Security</option>
+                                        <option value="Housekeeping">Housekeeping</option>
+                                      </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <label className="font-semibold text-muted-foreground block text-[10px]">Admin Notes</label>
+                                      <Input
+                                        placeholder="Verification details..."
+                                        value={adminNotesValue}
+                                        onChange={(e) => setReviewAdminNotes(prev => ({ ...prev, [c.id]: e.target.value }))}
+                                        className="h-8 rounded-lg text-xs"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex justify-between items-center gap-2 pt-2.5 border-t border-border/20">
+                                    <div className="flex gap-2 w-full">
+                                      <Input
+                                        placeholder="Rejection reason..."
+                                        value={rejectReasonValue}
+                                        onChange={(e) => setReviewRejectReasons(prev => ({ ...prev, [c.id]: e.target.value }))}
+                                        className="h-8 rounded-lg text-xs flex-1 max-w-[200px]"
+                                      />
+                                      {rejectReasonValue ? (
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          onClick={async () => {
+                                            await useCommunityStore.getState().reviewComplaintSecretary(c.id, {
+                                              rejectReason: rejectReasonValue
+                                            });
+                                            alert("Complaint marked as rejected.");
+                                          }}
+                                          className="h-8 rounded-lg text-xs"
+                                        >
+                                          Reject Request
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          onClick={async () => {
+                                            await useCommunityStore.getState().reviewComplaintSecretary(c.id, {
+                                              status: "Forwarded to Manager",
+                                              priority,
+                                              category: c.category,
+                                              department: dept,
+                                              adminNotes: adminNotesValue
+                                            });
+                                            alert("Complaint approved & forwarded to Manager.");
+                                          }}
+                                          className="h-8 rounded-lg text-xs gradient-primary text-white border-0"
+                                        >
+                                          Approve & Forward to Manager
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <Badge className="bg-amber-500/10 text-amber-500 border-0 text-[11px] font-bold">⭐ 4.8 / 5</Badge>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => {
-                                      const activeComplaints = complaints.filter(c => c.status === "submitted" || c.status === "assigned");
-                                      if (activeComplaints.length === 0) {
-                                        alert("No complaints awaiting worker assignment.");
-                                        return;
-                                      }
-                                      const selectCompId = activeComplaints[0].id;
-                                      assignComplaintWorker(selectCompId, w.name, w.id, "2 Hours");
-                                      alert(`Dispatched ${w.name} to Complaint ${selectCompId}`);
-                                    }}
-                                    className="h-8 rounded-lg text-xs gradient-primary text-white border-0"
-                                  >
-                                    Assign Job
-                                  </Button>
-                                </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })
+                          )}
                         </div>
                       </CardContent>
                     </Card>
+                  </div>
 
-                    {/* Complaint Management Panel */}
+                  {/* Service Request validation queue */}
+                  <div className="space-y-6">
                     <Card className="border-border/50 shadow-sm">
-                      <CardHeader className="pb-3 flex flex-col sm:flex-row justify-between gap-3">
-                        <div>
-                          <CardTitle className="text-base font-semibold">Complaints Overseer</CardTitle>
-                          <CardDescription className="text-xs">Reassign workers, change priorities and close tasks</CardDescription>
-                        </div>
-                        <select
-                          value={complaintFilter}
-                          onChange={(e) => setComplaintFilter(e.target.value)}
-                          className="h-9 px-2 rounded-xl border border-input bg-card text-xs font-semibold"
-                        >
-                          <option value="all">All Complaints</option>
-                          <option value="submitted">Submitted</option>
-                          <option value="assigned">Assigned</option>
-                          <option value="in-progress">In Progress</option>
-                          <option value="resolved">Resolved</option>
-                        </select>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base font-semibold">Service Request Validation</CardTitle>
+                        <CardDescription className="text-xs">
+                          Validate and forward community services bookings to Manager
+                        </CardDescription>
                       </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="divide-y divide-border/50">
-                          {filteredComplaints.map((c) => (
-                            <div key={c.id} className="p-4 space-y-2 hover:bg-secondary/20 text-xs">
-                              <div className="flex justify-between items-start gap-2">
-                                <div>
-                                  <h4 className="font-semibold text-sm">{c.title}</h4>
-                                  <p className="text-muted-foreground mt-0.5">Raised by {c.raisedByName} (Flat {c.unit}) • Category: {c.category}</p>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <Badge className="bg-primary/10 text-primary border-0 py-0.5 text-[9px]">{c.id}</Badge>
-                                  <Badge className={`border-0 py-0.5 text-[9px] ${
-                                    c.priority === "critical" ? "bg-red-500/10 text-red-500" : "bg-amber-500/10 text-amber-500"
-                                  }`}>{c.priority.toUpperCase()}</Badge>
-                                  <Badge className="bg-secondary text-muted-foreground border-0 py-0.5 text-[9px]">{c.status}</Badge>
-                                </div>
-                              </div>
-                              <p className="text-muted-foreground">{c.description}</p>
-                              {c.assignedTo && <p className="text-[10px]">Worker Assigned: <strong className="text-foreground">{c.assignedTo}</strong></p>}
-                              
-                              <div className="flex items-center gap-2 pt-1.5 border-t border-border/20 mt-1">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    const worker = users.find(u => u.role === "worker" && u.status === "approved");
-                                    if (worker) {
-                                      assignComplaintWorker(c.id, worker.name, worker.id, "4 Hours");
-                                      alert(`Dispatched Ramesh to Complaint ${c.id}`);
-                                    }
-                                  }}
-                                  className="h-7 text-[10px] rounded-md"
-                                >
-                                  Dispatch Ramesh
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    updateComplaintStatus(c.id, "resolved", { by: "Secretary", note: "Resolved after joint inspection." });
-                                    alert("Complaint status updated to resolved!");
-                                  }}
-                                  className="h-7 text-[10px] border-green-500/30 text-green-500 hover:bg-green-500/10 rounded-md"
-                                >
-                                  Resolve Job
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    useCommunityStore.setState(state => ({
-                                      complaints: state.complaints.map(item => item.id === c.id ? { ...item, priority: "critical" as const } : item)
-                                    }));
-                                    alert("Escalated to critical priority!");
-                                  }}
-                                  className="h-7 text-[10px] text-red-500 hover:bg-red-500/5 rounded-md"
-                                >
-                                  Escalate SOS
-                                </Button>
-                              </div>
+                      <CardContent className="p-0 max-h-[500px] overflow-y-auto">
+                        <div className="divide-y divide-border/50 text-xs">
+                          {serviceBookings.filter(b => b.status === "Pending" || b.status === "Pending Secretary Review").length === 0 ? (
+                            <div className="p-8 text-center text-muted-foreground">
+                              No service bookings awaiting validation.
                             </div>
-                          ))}
+                          ) : (
+                            serviceBookings.filter(b => b.status === "Pending" || b.status === "Pending Secretary Review").map((b) => {
+                              const notesVal = bookingAdminNotes[b.id] || "";
+                              return (
+                                <div key={b.id} className="p-3 hover:bg-secondary/15 space-y-2.5">
+                                  <div>
+                                    <span className="font-semibold text-foreground">Flat {b.address} • {b.category}</span>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                                      Requested Date: {b.bookingDate} at {b.bookingTime}
+                                    </p>
+                                  </div>
+                                  <Input
+                                    placeholder="Verify details / add note..."
+                                    value={notesVal}
+                                    onChange={(e) => setBookingAdminNotes(prev => ({ ...prev, [b.id]: e.target.value }))}
+                                    className="h-8 rounded-lg text-xs"
+                                  />
+                                  <div className="flex justify-end gap-1.5 pt-1">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-[10px] text-red-500 hover:bg-red-500/5 rounded-md"
+                                      onClick={async () => {
+                                        await useCommunityStore.getState().updateBookingStatus(b.id, "Rejected by Secretary");
+                                        alert("Service booking rejected.");
+                                      }}
+                                    >
+                                      Reject
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      className="h-7 text-[10px] rounded-md gradient-primary text-white border-0"
+                                      onClick={async () => {
+                                        await useCommunityStore.getState().forwardBooking(b.id, notesVal);
+                                        alert("Service request forwarded to Manager.");
+                                      }}
+                                    >
+                                      Forward to Manager
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
                         </div>
                       </CardContent>
                     </Card>

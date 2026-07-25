@@ -87,8 +87,8 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
 
   let portalName = initialPortalName;
   if (mounted && user) {
-    if (user.role === "worker") {
-      portalName = "Worker Portal";
+    if (user.role === "manager") {
+      portalName = "Manager Portal";
     } else if (user.role === "security") {
       portalName = "Security Portal";
     } else if (user.role === "warden") {
@@ -111,7 +111,7 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
       ? "from-amber-600 to-orange-600 bg-gradient-to-br" 
       : "from-emerald-600 to-teal-600 bg-gradient-to-br";
   } else if (activePortalType === "society") {
-    if (activeUserRole === "worker") {
+    if (activeUserRole === "manager") {
       gradientClass = "from-blue-600 to-indigo-600 bg-gradient-to-br";
     } else if (activeUserRole === "security") {
       gradientClass = "from-red-600 to-amber-600 bg-gradient-to-br";

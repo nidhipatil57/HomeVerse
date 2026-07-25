@@ -7,7 +7,7 @@ export const getPrepopulatedComplaints = (): any[] => [
     title: "Kitchen Pipe Water Leakage",
     description: "Water is dripping from the kitchen inlet line. Flooded cabinet under the kitchen counter.",
     category: "plumbing",
-    status: "in-progress",
+    status: "Forwarded to Manager",
     priority: "high",
     raisedBy: "user-resident-1",
     raisedByName: "Sara Shah",
@@ -18,11 +18,13 @@ export const getPrepopulatedComplaints = (): any[] => [
     updatedAt: "2026-07-03T10:30:00",
     assignedTo: "Amit Kumar (Plumber)",
     assignedToId: "user-worker-2",
-    priorityScore: 75,
+    department: "Maintenance",
+    adminNotes: "Valid plumber request. Verified with resident.",
     timeline: [
-      { status: "submitted", timestamp: "2026-07-03T10:00:00", note: "Complaint registered" },
-      { status: "assigned", timestamp: "2026-07-03T10:15:00", note: "Assigned to Plumber Team", by: "Secretary" },
-      { status: "in-progress", timestamp: "2026-07-03T10:30:00", note: "Amit Kumar is on the way.", by: "Amit Kumar" }
+      { status: "Submitted", timestamp: "2026-07-03T10:00:00", note: "Complaint registered" },
+      { status: "Under Secretary Review", timestamp: "2026-07-03T10:10:00", note: "Secretary is validating complaint details", by: "Secretary" },
+      { status: "Verified", timestamp: "2026-07-03T10:15:00", note: "Complaint details verified. High priority set.", by: "Secretary" },
+      { status: "Forwarded to Manager", timestamp: "2026-07-03T10:20:00", note: "Forwarded to operations manager for coordinator scheduling", by: "Secretary" }
     ]
   },
   {
@@ -30,7 +32,7 @@ export const getPrepopulatedComplaints = (): any[] => [
     title: "Living Room MCB Tripping",
     description: "MCB trips immediately when turning on the AC unit. Safety hazard near dining table.",
     category: "electrical",
-    status: "resolved",
+    status: "Completed",
     priority: "critical",
     raisedBy: "user-resident-2",
     raisedByName: "Nidhi Kumar",
@@ -42,12 +44,17 @@ export const getPrepopulatedComplaints = (): any[] => [
     resolvedAt: "2026-07-02T16:00:00",
     assignedTo: "Ramesh Kumar (Electrician)",
     assignedToId: "user-worker-1",
-    priorityScore: 90,
+    department: "Electrical",
+    adminNotes: "Emergency issue. Needs dispatcher check.",
     timeline: [
-      { status: "submitted", timestamp: "2026-07-02T14:00:00", note: "Complaint registered" },
-      { status: "assigned", timestamp: "2026-07-02T14:15:00", note: "Assigned to Ramesh Kumar", by: "Secretary" },
-      { status: "in-progress", timestamp: "2026-07-02T14:30:00", note: "Inspection started by electrician", by: "Ramesh Kumar" },
-      { status: "resolved", timestamp: "2026-07-02T16:00:00", note: "Fixed short circuit and replaced faulty wiring in AC point", by: "Ramesh Kumar" }
+      { status: "Submitted", timestamp: "2026-07-02T14:00:00", note: "Complaint registered" },
+      { status: "Under Secretary Review", timestamp: "2026-07-02T14:05:00", note: "Secretary reviewed and set critical priority", by: "Secretary" },
+      { status: "Verified", timestamp: "2026-07-02T14:10:00", note: "Complaint verified. Critical dispatch request.", by: "Secretary" },
+      { status: "Forwarded to Manager", timestamp: "2026-07-02T14:15:00", note: "Escalated to Manager for direct dispatch", by: "Secretary" },
+      { status: "Worker Being Coordinated", timestamp: "2026-07-02T14:20:00", note: "Contacted Ramesh Kumar (Electrician) offline", by: "Manager" },
+      { status: "Scheduled", timestamp: "2026-07-02T14:25:00", note: "Ramesh Kumar scheduled to arrive at 2:45 PM", by: "Manager" },
+      { status: "Work In Progress", timestamp: "2026-07-02T14:30:00", note: "Ramesh has arrived and is resolving short circuit", by: "Manager" },
+      { status: "Completed", timestamp: "2026-07-02T16:00:00", note: "Fixed short circuit and replaced faulty wiring in AC point", by: "Manager" }
     ]
   },
   {
@@ -55,7 +62,7 @@ export const getPrepopulatedComplaints = (): any[] => [
     title: "Ceiling Fan Making Loud Noise & Not Spinning",
     description: "Ceiling fan in room 204 makes a heavy humming noise but doesn't spin at speed.",
     category: "electrical",
-    status: "assigned",
+    status: "Under Secretary Review",
     priority: "medium",
     raisedBy: "user-student-1",
     raisedByName: "Aarav Mehta",
@@ -66,10 +73,9 @@ export const getPrepopulatedComplaints = (): any[] => [
     updatedAt: "2026-07-04T09:30:00",
     assignedTo: "Ramesh Kumar (Electrician)",
     assignedToId: "user-worker-1",
-    priorityScore: 60,
     timeline: [
-      { status: "submitted", timestamp: "2026-07-04T09:00:00", note: "Complaint registered" },
-      { status: "assigned", timestamp: "2026-07-04T09:30:00", note: "Assigned to Electrician Team", by: "Warden" }
+      { status: "Submitted", timestamp: "2026-07-04T09:00:00", note: "Complaint registered" },
+      { status: "Under Secretary Review", timestamp: "2026-07-04T09:15:00", note: "Pending administrator validation", by: "Warden" }
     ]
   },
   {
@@ -77,7 +83,7 @@ export const getPrepopulatedComplaints = (): any[] => [
     title: "No WiFi Internet Access in Wing B",
     description: "Cannot authenticate or load web pages on VESIT-Secure-WiFi from room B-102.",
     category: "wifi",
-    status: "resolved",
+    status: "Completed",
     priority: "high",
     raisedBy: "user-student-2",
     raisedByName: "Priya Sharma",
@@ -88,11 +94,11 @@ export const getPrepopulatedComplaints = (): any[] => [
     updatedAt: "2026-07-03T13:00:00",
     resolvedAt: "2026-07-03T13:00:00",
     assignedTo: "Hostel IT Admin",
-    priorityScore: 80,
     timeline: [
-      { status: "submitted", timestamp: "2026-07-03T11:00:00", note: "Complaint registered" },
-      { status: "assigned", timestamp: "2026-07-03T11:15:00", note: "Assigned to IT Support Group", by: "Warden" },
-      { status: "resolved", timestamp: "2026-07-03T13:00:00", note: "Router rebooted and IP allocation issue resolved.", by: "Hostel IT Admin" }
+      { status: "Submitted", timestamp: "2026-07-03T11:00:00", note: "Complaint registered" },
+      { status: "Under Secretary Review", timestamp: "2026-07-03T11:10:00", note: "Reviewed and prioritized", by: "Warden" },
+      { status: "Verified", timestamp: "2026-07-03T11:15:00", note: "Escalated to IT Support Group", by: "Warden" },
+      { status: "Completed", timestamp: "2026-07-03T13:00:00", note: "Router rebooted and IP allocation issue resolved.", by: "Hostel IT Admin" }
     ]
   }
 ];
@@ -798,6 +804,19 @@ export const getPrepopulatedNotifications = (): any[] => [
 ];
 
 export const getPrepopulatedUsers = (): any[] => [
+  // --- MANAGER ---
+  {
+    id: "user-manager-1",
+    name: "Vikram Malhotra",
+    email: "manager@sunshinecomplex.com",
+    phone: "+91 98765 22222",
+    role: "manager",
+    portal: "society",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    status: "approved",
+    password: "Manager@123"
+  },
   // --- SECRETARY ---
   {
     id: "user-secretary-1",

@@ -51,6 +51,15 @@ const statusIcons: Record<ComplaintStatus, React.ComponentType<{ className?: str
   resolved: CheckCircle2,
   "resident-verification": ShieldAlert,
   closed: CheckCircle2,
+  "Under Secretary Review": EyeIcon,
+  "Verified": CheckSquare,
+  "Forwarded to Manager": Truck,
+  "Worker Being Coordinated": Users,
+  "Scheduled": Calendar,
+  "Work In Progress": Zap,
+  "Resident Feedback": ShieldAlert,
+  "Completed": CheckCircle2,
+  "Rejected": XCircle
 };
 
 function EyeIcon({ className }: { className?: string }) { return <Eye className={className} />; }
@@ -71,6 +80,15 @@ const statusColors: Record<ComplaintStatus, string> = {
   resolved: "bg-green-500/10 text-green-600 border-green-500/20",
   "resident-verification": "bg-pink-500/10 text-pink-600 border-pink-500/20",
   closed: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+  "Under Secretary Review": "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  "Verified": "bg-teal-500/10 text-teal-600 border-teal-500/20",
+  "Forwarded to Manager": "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
+  "Worker Being Coordinated": "bg-blue-500/10 text-blue-600 border-blue-500/20",
+  "Scheduled": "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  "Work In Progress": "bg-orange-500/10 text-orange-600 border-orange-500/20 animate-pulse",
+  "Resident Feedback": "bg-pink-500/10 text-pink-600 border-pink-500/20",
+  "Completed": "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  "Rejected": "bg-red-500/10 text-red-600 border-red-500/20"
 };
 
 const categoryIconMap: Record<string, any> = {
@@ -1204,18 +1222,34 @@ export default function ComplaintsPage() {
                           <span className="font-bold text-foreground text-xs mt-0.5 block">{selected.assignedTo || "Under Review / Unassigned"}</span>
                         </div>
                         <div>
-                          <span className="text-[9px] text-muted-foreground uppercase font-bold block">Estimated Arrival (ETA)</span>
-                          <span className="font-bold text-foreground text-xs mt-0.5 block">{selected.estimatedArrival || "Pending Delegation"}</span>
+                          <span className="text-[9px] text-muted-foreground uppercase font-bold block">Expected Arrival (ETA)</span>
+                          <span className="font-bold text-foreground text-xs mt-0.5 block">{selected.expectedArrival || selected.estimatedArrival || "Pending Delegation"}</span>
                         </div>
                         <div>
-                          <span className="text-[9px] text-muted-foreground uppercase font-bold block">Expected Resolution</span>
-                          <span className="font-bold text-foreground text-xs mt-0.5 block">{selected.estimatedResolution || "Awaiting dispatch review"}</span>
+                          <span className="text-[9px] text-muted-foreground uppercase font-bold block">Department Category</span>
+                          <span className="font-bold text-foreground text-xs mt-0.5 block">{selected.department || "General"}</span>
                         </div>
                         <div>
                           <span className="text-[9px] text-muted-foreground uppercase font-bold block">Duplicate merge parent</span>
                           <span className="font-bold text-foreground text-xs mt-0.5 block">{selected.parentTicketId || "None"}</span>
                         </div>
                       </div>
+
+                      {/* Admin Notes from Secretary */}
+                      {selected.adminNotes && (
+                        <div className="p-3.5 bg-indigo-500/5 rounded-xl border border-indigo-500/10 space-y-1">
+                          <span className="font-bold text-indigo-500 uppercase tracking-wider text-[9px] block">Secretary Validation Notes</span>
+                          <p className="text-foreground text-xs font-semibold">{selected.adminNotes}</p>
+                        </div>
+                      )}
+
+                      {/* Operational Notes from Manager */}
+                      {selected.operationalNotes && (
+                        <div className="p-3.5 bg-emerald-500/5 rounded-xl border border-emerald-500/10 space-y-1">
+                          <span className="font-bold text-emerald-600 uppercase tracking-wider text-[9px] block">Manager Operational Notes</span>
+                          <p className="text-foreground text-xs font-semibold">{selected.operationalNotes}</p>
+                        </div>
+                      )}
 
                       {/* Internal Secretary Notes */}
                       {selected.secretaryNotes && (

@@ -19,8 +19,8 @@ const SocietyResidentDashboard = dynamic(
   }
 );
 
-const SocietyWorkerDashboard = dynamic(
-  () => import("@/components/dashboard/SocietyWorkerDashboard").then((m) => m.SocietyWorkerDashboard),
+const SocietyManagerDashboard = dynamic(
+  () => import("@/components/dashboard/SocietyManagerDashboard").then((m) => m.SocietyManagerDashboard),
   {
     ssr: false,
     loading: () => (
@@ -93,8 +93,8 @@ export default function SocietyDashboardPage() {
   }
 
   // Swap Dashboards dynamically based on role
-  if (user?.role === "worker") {
-    return <SocietyWorkerDashboard worker={user} />;
+  if (user?.role === "manager") {
+    return <SocietyManagerDashboard manager={user} />;
   }
 
   if (user?.role === "security") {

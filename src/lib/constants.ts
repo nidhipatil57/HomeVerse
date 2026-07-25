@@ -124,15 +124,11 @@ export const SECURITY_SIDEBAR_ITEMS = [
   { label: 'Settings', href: '/society/settings', icon: 'Settings' },
 ];
 
-export const WORKER_SIDEBAR_ITEMS = [
+export const MANAGER_SIDEBAR_ITEMS = [
   { label: 'Dashboard', href: '/society/dashboard', icon: 'LayoutDashboard' },
-  { label: 'Assigned Tasks', href: '/society/complaints', icon: 'MessageSquareWarning' },
-  { label: "Today's Route", href: '/society/route', icon: 'MapPin' },
-  { label: 'Emergency Tasks', href: '/society/emergency', icon: 'AlertTriangle' },
-  { label: 'Inventory Suggestions', href: '/society/inventory', icon: 'Wrench' },
-  { label: 'Performance', href: '/society/performance', icon: 'Star' },
-  { label: 'My Services', href: '/society/services', icon: 'Briefcase' },
-  { label: 'Availability', href: '/society/availability', icon: 'Clock' },
+  { label: 'AI Assistant', href: '/society/ai-assistant', icon: 'Bot' },
+  { label: 'Complaints', href: '/society/complaints', icon: 'MessageSquareWarning' },
+  { label: 'Daily Check-Ins', href: '/society/daily-checkins', icon: 'CalendarDays' },
   { label: 'Notifications', href: '/society/notifications', icon: 'Megaphone' },
   { label: 'Settings', href: '/society/settings', icon: 'Settings' },
 ];

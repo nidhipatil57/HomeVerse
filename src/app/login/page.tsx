@@ -60,9 +60,9 @@ export default function LoginPage() {
     if (role === "resident") {
       setEmail("sara@sunshinecomplex.com");
       setPassword("Sara@123");
-    } else if (role === "worker") {
-      setEmail("amit@sunshinecomplex.com");
-      setPassword("Amit@123");
+    } else if (role === "manager") {
+      setEmail("manager@sunshinecomplex.com");
+      setPassword("Manager@123");
     } else if (role === "security") {
       setEmail("raj@sunshinecomplex.com");
       setPassword("Raj@123");
@@ -127,7 +127,7 @@ export default function LoginPage() {
     if (selectedEcosystem === "society") {
       return [
         { id: "resident", label: "Resident", icon: Users, description: "Flat Owner or Tenant" },
-        { id: "worker", label: "Worker / Staff", icon: Briefcase, description: "Society Service Providers" },
+        { id: "manager", label: "Manager", icon: Briefcase, description: "Society Coordinator" },
         { id: "security", label: "Security", icon: Shield, description: "Society Guard & Gate Control" },
         { id: "secretary", label: "Secretary", icon: UserCheck, description: "Society Administrator" },
       ];
