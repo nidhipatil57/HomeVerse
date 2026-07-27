@@ -492,8 +492,8 @@ router.put("/workers/:id/verify", authenticateToken, async (req: any, res) => {
   const { isSocietyVerified, isPoliceVerified, approve, remove } = req.body;
 
   try {
-    if (req.user.role !== "secretary") {
-      return res.status(403).json({ error: "Only Secretary can verify workers" });
+    if (req.user.role !== "secretary" && req.user.role !== "manager" && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Access denied. Only Secretary/Manager can verify workers" });
     }
 
     if (remove) {

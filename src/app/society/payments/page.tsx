@@ -106,36 +106,36 @@ export default function PaymentsPage() {
   }, [collections]);
 
   const pendingPaymentsCount = useMemo(() => {
-    return myPayments.filter(p => p.status === "pending").length;
+    return myPayments.filter(p => p.status.toLowerCase() === "pending").length;
   }, [myPayments]);
 
   const totalOutstanding = useMemo(() => {
     return myPayments
-      .filter(p => p.status === "pending")
+      .filter(p => p.status.toLowerCase() === "pending")
       .reduce((sum, p) => sum + p.amount, 0);
   }, [myPayments]);
 
   const totalPaidThisYear = useMemo(() => {
     const currentYear = new Date().getFullYear();
     return myPayments
-      .filter(p => p.status === "Paid" && p.paidDate && new Date(p.paidDate).getFullYear() === currentYear)
+      .filter(p => p.status.toLowerCase() === "paid" && p.paidDate && new Date(p.paidDate).getFullYear() === currentYear)
       .reduce((sum, p) => sum + p.amount, 0);
   }, [myPayments]);
 
   const lastPayment = useMemo(() => {
-    const paid = myPayments.filter(p => p.status === "Paid" && p.paidDate);
+    const paid = myPayments.filter(p => p.status.toLowerCase() === "paid" && p.paidDate);
     if (paid.length === 0) return null;
     return paid.sort((a, b) => new Date(b.paidDate!).getTime() - new Date(a.paidDate!).getTime())[0];
   }, [myPayments]);
 
   // Section 1 - Maintenance
-  const currentMaintenanceBill = useMemo(() => {
-    return myPayments.find(p => p.paymentType === "Maintenance" && p.status === "pending");
+  const pendingMaintenanceBills = useMemo(() => {
+    return myPayments.filter(p => p.paymentType === "Maintenance" && p.status.toLowerCase() === "pending");
   }, [myPayments]);
 
   // Section 2 - Special Contributions
   const specialContributions = useMemo(() => {
-    return myPayments.filter(p => p.paymentType !== "Maintenance" && p.status === "pending");
+    return myPayments.filter(p => p.paymentType !== "Maintenance" && p.status.toLowerCase() === "pending");
   }, [myPayments]);
 
   // Payment History filtered list
@@ -155,8 +155,8 @@ export default function PaymentsPage() {
   // Secretary Stats
   const secretaryStats = useMemo(() => {
     const totalBills = payments.length;
-    const paid = payments.filter(p => p.status === "Paid");
-    const pending = payments.filter(p => p.status !== "Paid");
+    const paid = payments.filter(p => p.status.toLowerCase() === "paid");
+    const pending = payments.filter(p => p.status.toLowerCase() !== "paid");
     
     const collected = paid.reduce((sum, p) => sum + p.amount, 0);
     const outstanding = pending.reduce((sum, p) => sum + p.amount, 0);
@@ -269,7 +269,7 @@ export default function PaymentsPage() {
 
   // Statement download
   const handleDownloadStatement = () => {
-    let filtered = [...payments].filter(p => p.status === "Paid");
+    let filtered = [...payments].filter(p => p.status.toLowerCase() === "paid");
     
     if (user?.role !== "secretary") {
       filtered = filtered.filter(p => p.residentId === user?.id);
@@ -520,16 +520,16 @@ export default function PaymentsPage() {
                           <div>
                             <h4 className="font-bold">Flat {p.unit} ({p.residentName})</h4>
                             <p className="text-[10px] text-muted-foreground mt-0.5">Due date: {p.dueDate}</p>
-                            {p.status === "Paid" && p.paidDate && (
+                            {p.status.toLowerCase() === "paid" && p.paidDate && (
                               <p className="text-[9px] text-green-500 mt-0.5">Paid On: {p.paidDate} ({p.paymentMethod || "Card"})</p>
                             )}
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="font-bold">₹{p.amount}</span>
-                            <Badge variant={p.status === "Paid" ? "default" : "destructive"} className="text-[9px] font-bold">
+                            <Badge variant={p.status.toLowerCase() === "paid" ? "default" : "destructive"} className="text-[9px] font-bold">
                               {p.status}
                             </Badge>
-                            {p.status === "pending" && (
+                            {p.status.toLowerCase() === "pending" && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -810,8 +810,8 @@ export default function PaymentsPage() {
                   <div className="divide-y divide-border/30">
                     {activeCollections.map((c) => {
                       const collPayments = payments.filter(p => p.referenceId === c.id);
-                      const paid = collPayments.filter(p => p.status === "Paid");
-                      const pending = collPayments.filter(p => p.status === "pending");
+                      const paid = collPayments.filter(p => p.status.toLowerCase() === "paid");
+                      const pending = collPayments.filter(p => p.status.toLowerCase() === "pending");
 
                       const collectedAmount = paid.reduce((sum, p) => sum + p.amount, 0);
                       const expectedAmount = c.amount * collPayments.length;
@@ -1065,15 +1065,15 @@ export default function PaymentsPage() {
                         <div>
                           <div className="font-bold text-foreground">Flat {p.unit} • {p.residentName}</div>
                           <div className="text-[10px] text-muted-foreground mt-0.5">
-                            {p.status === "Paid" ? `Paid on ${p.paidDate} via ${p.paymentMethod || "Card"}` : `Dues pending since ${p.dueDate}`}
+                            {p.status.toLowerCase() === "paid" ? `Paid on ${p.paidDate} via ${p.paymentMethod || "Card"}` : `Dues pending since ${p.dueDate}`}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
                           <span className="font-bold">₹{p.amount}</span>
-                          <Badge variant={p.status === "Paid" ? "default" : "destructive"} className="text-[9px] font-bold">
+                          <Badge variant={p.status.toLowerCase() === "paid" ? "default" : "destructive"} className="text-[9px] font-bold">
                             {p.status}
                           </Badge>
-                          {p.status === "Paid" && (
+                          {p.status.toLowerCase() === "paid" && (
                             <Button
                               size="sm"
                               variant="ghost"
@@ -1150,35 +1150,38 @@ export default function PaymentsPage() {
               <CardTitle className="text-base font-bold">Monthly Maintenance Charges</CardTitle>
               <CardDescription>Current flat maintenance billing period</CardDescription>
             </CardHeader>
-            <CardContent className="p-4">
-              {currentMaintenanceBill ? (
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h4 className="font-bold text-sm text-foreground">Monthly Maintenance Bill</h4>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Due date: {currentMaintenanceBill.dueDate}</p>
-                    <div className="flex gap-2 mt-2">
-                      <Badge variant="outline" className="text-[9px] border-amber-500/20 text-amber-500 bg-amber-500/5 font-bold uppercase">
-                        Pending payment
-                      </Badge>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border/30">
+                {pendingMaintenanceBills.map((bill) => (
+                  <div key={bill.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <h4 className="font-bold text-sm text-foreground">Monthly Maintenance Bill</h4>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Due date: {bill.dueDate}</p>
+                      <div className="flex gap-2 mt-2">
+                        <Badge variant="outline" className="text-[9px] border-amber-500/20 text-amber-500 bg-amber-500/5 font-bold uppercase">
+                          Pending payment
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 shrink-0">
+                      <span className="text-lg font-bold text-foreground">₹{bill.amount.toLocaleString()}</span>
+                      <Button 
+                        onClick={() => setSelectedPayRequest(bill)}
+                        className="rounded-xl h-8 text-[10px] font-semibold gradient-primary text-white border-0"
+                      >
+                        <CreditCard className="w-3.5 h-3.5 mr-1" /> Pay Now
+                      </Button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-4 shrink-0">
-                    <span className="text-lg font-bold text-foreground">₹{currentMaintenanceBill.amount.toLocaleString()}</span>
-                    <Button 
-                      onClick={() => setSelectedPayRequest(currentMaintenanceBill)}
-                      className="rounded-xl h-8 text-[10px] font-semibold gradient-primary text-white border-0"
-                    >
-                      <CreditCard className="w-3.5 h-3.5 mr-1" /> Pay Now
-                    </Button>
+                ))}
+                {pendingMaintenanceBills.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-xs flex flex-col items-center justify-center gap-1.5 p-4">
+                    <CheckCircle2 className="w-8 h-8 text-green-500 bg-green-500/10 rounded-full p-1.5" />
+                    All paid! No pending monthly maintenance bills.
                   </div>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground text-xs flex flex-col items-center justify-center gap-1.5">
-                  <CheckCircle2 className="w-8 h-8 text-green-500 bg-green-500/10 rounded-full p-1.5" />
-                  All paid! No pending monthly maintenance bills.
-                </div>
-              )}
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -1232,7 +1235,7 @@ export default function PaymentsPage() {
         {/* Right Column: Dynamic Breakdown / Statements download */}
         <div className="lg:col-span-5 space-y-6">
           {/* Maintenance breakdown */}
-          {currentMaintenanceBill && (
+          {pendingMaintenanceBills.length > 0 && (
             <Card className="border-border/50 bg-card h-fit">
               <CardHeader>
                 <CardTitle className="text-base font-bold">Billing Cycle Breakdown</CardTitle>
@@ -1253,7 +1256,7 @@ export default function PaymentsPage() {
                   ))}
                   <div className="p-4 flex items-center justify-between font-bold bg-secondary/15 border-t">
                     <span>Total Calculated Dues</span>
-                    <span className="text-primary text-sm">₹{currentMaintenanceBill.amount.toLocaleString()}</span>
+                    <span className="text-primary text-sm">₹{pendingMaintenanceBills[0].amount.toLocaleString()}</span>
                   </div>
                 </div>
               </CardContent>
@@ -1351,7 +1354,7 @@ export default function PaymentsPage() {
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     ID: {p.id} • Due: {p.dueDate}
                   </p>
-                  {p.status === "Paid" && p.paidDate && (
+                  {p.status.toLowerCase() === "paid" && p.paidDate && (
                     <p className="text-[9px] text-emerald-500 mt-0.5">
                       Paid on: {p.paidDate} (${p.paymentMethod || "Card"}) • Txn ID: {p.transactionId}
                     </p>
@@ -1360,10 +1363,10 @@ export default function PaymentsPage() {
 
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-foreground">₹{p.amount.toLocaleString()}</span>
-                  <Badge variant={p.status === "Paid" ? "default" : "destructive"} className="text-[9px] font-bold">
+                  <Badge variant={p.status.toLowerCase() === "paid" ? "default" : "destructive"} className="text-[9px] font-bold">
                     {p.status}
                   </Badge>
-                  {p.status === "Paid" && (
+                  {p.status.toLowerCase() === "paid" && (
                     <Button
                       size="sm"
                       variant="outline"

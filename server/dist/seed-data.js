@@ -1,14 +1,14 @@
 "use strict";
 // Seed data file containing prepopulated records
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getInitialDb = exports.getPrepopulatedFlatAttendance = exports.getPrepopulatedHelpersAttendance = exports.getPrepopulatedRentRecords = exports.getPrepopulatedFlats = exports.getPrepopulatedExpenses = exports.getPrepopulatedAnnouncements = exports.getPrepopulatedIncidents = exports.getPrepopulatedVehicleLogs = exports.getPrepopulatedGatePasses = exports.getPrepopulatedEmergencies = exports.getPrepopulatedUsers = exports.getPrepopulatedNotifications = exports.getPrepopulatedCommunityEvents = exports.getPrepopulatedMaintenanceBills = exports.getPrepopulatedLostFoundItems = exports.getPrepopulatedMarketplaceItems = exports.getPrepopulatedParcels = exports.getPrepopulatedLaundrySlots = exports.getPrepopulatedVisitors = exports.getPrepopulatedLeaveRequests = exports.getPrepopulatedComplaints = void 0;
+exports.getInitialDb = exports.getPrepopulatedMessages = exports.getPrepopulatedReviews = exports.getPrepopulatedBookings = exports.getPrepopulatedWorkerSkills = exports.getPrepopulatedWorkerAvailability = exports.getPrepopulatedWorkerProfiles = exports.getPrepopulatedCategories = exports.getPrepopulatedFlatAttendance = exports.getPrepopulatedHelpersAttendance = exports.getPrepopulatedRentRecords = exports.getPrepopulatedFlats = exports.getPrepopulatedExpenses = exports.getPrepopulatedAnnouncements = exports.getPrepopulatedIncidents = exports.getPrepopulatedVehicleLogs = exports.getPrepopulatedGatePasses = exports.getPrepopulatedEmergencies = exports.getPrepopulatedUsers = exports.getPrepopulatedNotifications = exports.getPrepopulatedCommunityEvents = exports.getPrepopulatedMaintenanceBills = exports.getPrepopulatedItemMatches = exports.getPrepopulatedLostReports = exports.getPrepopulatedClaims = exports.getPrepopulatedFoundItems = exports.getPrepopulatedMarketplaceItems = exports.getPrepopulatedParcels = exports.getPrepopulatedLaundrySlots = exports.getPrepopulatedVisitors = exports.getPrepopulatedLeaveRequests = exports.getPrepopulatedComplaints = void 0;
 const getPrepopulatedComplaints = () => [
     {
         id: "CMP-001",
         title: "Kitchen Pipe Water Leakage",
         description: "Water is dripping from the kitchen inlet line. Flooded cabinet under the kitchen counter.",
         category: "plumbing",
-        status: "in-progress",
+        status: "Forwarded to Manager",
         priority: "high",
         raisedBy: "user-resident-1",
         raisedByName: "Sara Shah",
@@ -19,11 +19,13 @@ const getPrepopulatedComplaints = () => [
         updatedAt: "2026-07-03T10:30:00",
         assignedTo: "Amit Kumar (Plumber)",
         assignedToId: "user-worker-2",
-        priorityScore: 75,
+        department: "Maintenance",
+        adminNotes: "Valid plumber request. Verified with resident.",
         timeline: [
-            { status: "submitted", timestamp: "2026-07-03T10:00:00", note: "Complaint registered" },
-            { status: "assigned", timestamp: "2026-07-03T10:15:00", note: "Assigned to Plumber Team", by: "Secretary" },
-            { status: "in-progress", timestamp: "2026-07-03T10:30:00", note: "Amit Kumar is on the way.", by: "Amit Kumar" }
+            { status: "Submitted", timestamp: "2026-07-03T10:00:00", note: "Complaint registered" },
+            { status: "Under Secretary Review", timestamp: "2026-07-03T10:10:00", note: "Secretary is validating complaint details", by: "Secretary" },
+            { status: "Verified", timestamp: "2026-07-03T10:15:00", note: "Complaint details verified. High priority set.", by: "Secretary" },
+            { status: "Forwarded to Manager", timestamp: "2026-07-03T10:20:00", note: "Forwarded to operations manager for coordinator scheduling", by: "Secretary" }
         ]
     },
     {
@@ -31,7 +33,7 @@ const getPrepopulatedComplaints = () => [
         title: "Living Room MCB Tripping",
         description: "MCB trips immediately when turning on the AC unit. Safety hazard near dining table.",
         category: "electrical",
-        status: "resolved",
+        status: "Completed",
         priority: "critical",
         raisedBy: "user-resident-2",
         raisedByName: "Nidhi Kumar",
@@ -43,12 +45,17 @@ const getPrepopulatedComplaints = () => [
         resolvedAt: "2026-07-02T16:00:00",
         assignedTo: "Ramesh Kumar (Electrician)",
         assignedToId: "user-worker-1",
-        priorityScore: 90,
+        department: "Electrical",
+        adminNotes: "Emergency issue. Needs dispatcher check.",
         timeline: [
-            { status: "submitted", timestamp: "2026-07-02T14:00:00", note: "Complaint registered" },
-            { status: "assigned", timestamp: "2026-07-02T14:15:00", note: "Assigned to Ramesh Kumar", by: "Secretary" },
-            { status: "in-progress", timestamp: "2026-07-02T14:30:00", note: "Inspection started by electrician", by: "Ramesh Kumar" },
-            { status: "resolved", timestamp: "2026-07-02T16:00:00", note: "Fixed short circuit and replaced faulty wiring in AC point", by: "Ramesh Kumar" }
+            { status: "Submitted", timestamp: "2026-07-02T14:00:00", note: "Complaint registered" },
+            { status: "Under Secretary Review", timestamp: "2026-07-02T14:05:00", note: "Secretary reviewed and set critical priority", by: "Secretary" },
+            { status: "Verified", timestamp: "2026-07-02T14:10:00", note: "Complaint verified. Critical dispatch request.", by: "Secretary" },
+            { status: "Forwarded to Manager", timestamp: "2026-07-02T14:15:00", note: "Escalated to Manager for direct dispatch", by: "Secretary" },
+            { status: "Worker Being Coordinated", timestamp: "2026-07-02T14:20:00", note: "Contacted Ramesh Kumar (Electrician) offline", by: "Manager" },
+            { status: "Scheduled", timestamp: "2026-07-02T14:25:00", note: "Ramesh Kumar scheduled to arrive at 2:45 PM", by: "Manager" },
+            { status: "Work In Progress", timestamp: "2026-07-02T14:30:00", note: "Ramesh has arrived and is resolving short circuit", by: "Manager" },
+            { status: "Completed", timestamp: "2026-07-02T16:00:00", note: "Fixed short circuit and replaced faulty wiring in AC point", by: "Manager" }
         ]
     },
     {
@@ -56,7 +63,7 @@ const getPrepopulatedComplaints = () => [
         title: "Ceiling Fan Making Loud Noise & Not Spinning",
         description: "Ceiling fan in room 204 makes a heavy humming noise but doesn't spin at speed.",
         category: "electrical",
-        status: "assigned",
+        status: "Under Secretary Review",
         priority: "medium",
         raisedBy: "user-student-1",
         raisedByName: "Aarav Mehta",
@@ -67,10 +74,9 @@ const getPrepopulatedComplaints = () => [
         updatedAt: "2026-07-04T09:30:00",
         assignedTo: "Ramesh Kumar (Electrician)",
         assignedToId: "user-worker-1",
-        priorityScore: 60,
         timeline: [
-            { status: "submitted", timestamp: "2026-07-04T09:00:00", note: "Complaint registered" },
-            { status: "assigned", timestamp: "2026-07-04T09:30:00", note: "Assigned to Electrician Team", by: "Warden" }
+            { status: "Submitted", timestamp: "2026-07-04T09:00:00", note: "Complaint registered" },
+            { status: "Under Secretary Review", timestamp: "2026-07-04T09:15:00", note: "Pending administrator validation", by: "Warden" }
         ]
     },
     {
@@ -78,7 +84,7 @@ const getPrepopulatedComplaints = () => [
         title: "No WiFi Internet Access in Wing B",
         description: "Cannot authenticate or load web pages on VESIT-Secure-WiFi from room B-102.",
         category: "wifi",
-        status: "resolved",
+        status: "Completed",
         priority: "high",
         raisedBy: "user-student-2",
         raisedByName: "Priya Sharma",
@@ -89,11 +95,11 @@ const getPrepopulatedComplaints = () => [
         updatedAt: "2026-07-03T13:00:00",
         resolvedAt: "2026-07-03T13:00:00",
         assignedTo: "Hostel IT Admin",
-        priorityScore: 80,
         timeline: [
-            { status: "submitted", timestamp: "2026-07-03T11:00:00", note: "Complaint registered" },
-            { status: "assigned", timestamp: "2026-07-03T11:15:00", note: "Assigned to IT Support Group", by: "Warden" },
-            { status: "resolved", timestamp: "2026-07-03T13:00:00", note: "Router rebooted and IP allocation issue resolved.", by: "Hostel IT Admin" }
+            { status: "Submitted", timestamp: "2026-07-03T11:00:00", note: "Complaint registered" },
+            { status: "Under Secretary Review", timestamp: "2026-07-03T11:10:00", note: "Reviewed and prioritized", by: "Warden" },
+            { status: "Verified", timestamp: "2026-07-03T11:15:00", note: "Escalated to IT Support Group", by: "Warden" },
+            { status: "Completed", timestamp: "2026-07-03T13:00:00", note: "Router rebooted and IP allocation issue resolved.", by: "Hostel IT Admin" }
         ]
     }
 ];
@@ -346,51 +352,184 @@ const getPrepopulatedMarketplaceItems = () => [
     }
 ];
 exports.getPrepopulatedMarketplaceItems = getPrepopulatedMarketplaceItems;
-const getPrepopulatedLostFoundItems = () => [
+const getPrepopulatedFoundItems = () => [
     {
         id: "LF-001",
-        title: "Metal Blue Water Bottle",
-        description: "Milton steel water bottle found at the mess hall near water cooler.",
-        status: "reported",
-        reporterId: "user-student-1",
-        reporterName: "Aarav Mehta",
+        reporterId: "user-student-2",
+        reporterName: "Priya Sharma",
+        communityCode: "VESIT26",
+        category: "Other",
+        description: "Casio Scientific Calculator fx-991EX found in library study room 3.",
+        images: ["/images/found-calculator.jpg"],
+        foundLocation: "Library study room 3",
+        dateFound: "2026-07-04",
+        timeFound: "16:30",
+        additionalNotes: "Model fx-991EX, has some scratches.",
+        status: "Pending Verification",
         portal: "hostel",
-        createdAt: "2026-07-04T16:30:00"
+        createdAt: "2026-07-04T16:30:00Z"
     },
     {
         id: "LF-002",
-        title: "Bunch of Keys with Leather Keychain",
-        description: "Found on the floor near A Wing lift entrance. Has 3 keys attached.",
-        status: "reported",
         reporterId: "user-resident-2",
         reporterName: "Nidhi Kumar",
+        communityCode: "SUN123",
+        category: "Keys",
+        description: "Bunch of keys found on the floor near A Wing lift entrance. Has 3 keys attached.",
+        images: ["/images/found-keys.jpg"],
+        foundLocation: "Near A Wing lift entrance",
+        dateFound: "2026-07-05",
+        timeFound: "09:00",
+        additionalNotes: "Keyring has a small leather strap.",
+        status: "Available",
         portal: "society",
-        createdAt: "2026-07-05T09:00:00"
+        createdAt: "2026-07-05T09:00:00Z"
     },
     {
         id: "LF-003",
-        title: "Brown Leather Wallet",
-        description: "Found in Clubhouse lobby. Contains some cash and a transportation card.",
-        status: "claimed",
         reporterId: "user-security-1",
         reporterName: "Raj Singh",
-        claimantId: "user-resident-1",
-        claimantName: "Sara Shah",
+        communityCode: "SUN123",
+        category: "Wallet",
+        description: "Brown leather wallet found in Clubhouse lobby. Contains some cash and transportation card.",
+        images: ["/images/found-wallet.jpg"],
+        foundLocation: "Clubhouse lobby",
+        dateFound: "2026-07-02",
+        timeFound: "18:00",
+        additionalNotes: "Handed over to security desk immediately.",
+        status: "Returned",
         portal: "society",
-        createdAt: "2026-07-02T18:00:00"
+        createdAt: "2026-07-02T18:00:00Z"
     },
     {
         id: "LF-004",
-        title: "Casio Scientific Calculator",
-        description: "Found in library study room 3. Model fx-991EX.",
-        status: "reported",
-        reporterId: "user-student-2",
-        reporterName: "Priya Sharma",
-        portal: "hostel",
-        createdAt: "2026-07-05T14:30:00"
+        reporterId: "user-resident-1",
+        reporterName: "Sara Shah",
+        communityCode: "SUN123",
+        category: "Water Bottle",
+        description: "Milton steel water bottle found at the clubhouse table.",
+        images: ["/images/found-bottle.jpg"],
+        foundLocation: "Clubhouse table",
+        dateFound: "2026-07-06",
+        timeFound: "11:00",
+        additionalNotes: "Blue color, steel cap.",
+        status: "Claim Pending Verification",
+        portal: "society",
+        createdAt: "2026-07-06T11:00:00Z"
+    },
+    {
+        id: "LF-005",
+        reporterId: "user-resident-2",
+        reporterName: "Nidhi Kumar",
+        communityCode: "SUN123",
+        category: "Earbuds",
+        description: "White Bluetooth Earbuds found near gym treadmill.",
+        images: ["/images/found-earbuds.jpg"],
+        foundLocation: "Gym treadmill",
+        dateFound: "2026-07-07",
+        timeFound: "10:00",
+        additionalNotes: "Left case open.",
+        status: "Ready for Pickup",
+        portal: "society",
+        createdAt: "2026-07-07T10:00:00Z"
     }
 ];
-exports.getPrepopulatedLostFoundItems = getPrepopulatedLostFoundItems;
+exports.getPrepopulatedFoundItems = getPrepopulatedFoundItems;
+const getPrepopulatedClaims = () => [
+    {
+        id: "CLM-001",
+        itemId: "LF-003",
+        residentId: "user-resident-1",
+        residentName: "Sara Shah",
+        claimReason: "I lost my brown wallet in the clubhouse yesterday. It has my transportation card.",
+        itemDetails: "Casio transportation card, two banknotes, brown faux leather.",
+        proofImage: "",
+        contactNumber: "+91 98765 43210",
+        status: "Returned",
+        approvalDate: "2026-07-03T10:00:00.000Z",
+        collectionDate: "2026-07-03T10:30:00.000Z",
+        collectionTime: "10:30 AM",
+        collectedBy: "Sara Shah",
+        verifiedBySecurity: "Raj Singh"
+    },
+    {
+        id: "CLM-002",
+        itemId: "LF-004",
+        residentId: "user-resident-2",
+        residentName: "Nidhi Kumar",
+        claimReason: "My Milton blue bottle was left at the clubhouse table during the committee meeting.",
+        itemDetails: "Blue color, scratched bottom, has a yellow sticker.",
+        proofImage: "",
+        contactNumber: "+91 87654 32110",
+        status: "Claim Pending Verification"
+    },
+    {
+        id: "CLM-003",
+        itemId: "LF-005",
+        residentId: "user-resident-1",
+        residentName: "Sara Shah",
+        claimReason: "I forgot my white earbuds at the gym treadmill.",
+        itemDetails: "White case, has a small black mark on the side.",
+        proofImage: "",
+        contactNumber: "+91 98765 43210",
+        status: "Approved",
+        approvalDate: "2026-07-07T12:00:00.000Z"
+    }
+];
+exports.getPrepopulatedClaims = getPrepopulatedClaims;
+const getPrepopulatedLostReports = () => [
+    {
+        id: "LR-001",
+        residentId: "user-resident-1",
+        itemName: "Black Leather Wallet",
+        category: "Wallet",
+        brand: "Wildhorn",
+        colour: "Black",
+        description: "Lost my black leather wallet near the clubhouse gym entrance or parking area.",
+        distinguishingFeatures: "Contains a college ID and a driver's license for Sara Shah.",
+        dateLost: "2026-07-14",
+        timeLost: "18:00",
+        lastSeenLocation: "Clubhouse Gym Entrance",
+        status: "Searching",
+        images: [],
+        additionalNotes: "Reward if found.",
+        portal: "society",
+        communityCode: "SUN123",
+        createdAt: new Date().toISOString()
+    },
+    {
+        id: "LR-002",
+        residentId: "user-resident-2",
+        itemName: "Silver Ring",
+        category: "Jewellery",
+        brand: "Orra",
+        colour: "Silver",
+        description: "Lost a silver band ring in the common playground area.",
+        distinguishingFeatures: "Engraved with initials 'NK'.",
+        dateLost: "2026-07-13",
+        timeLost: "17:00",
+        lastSeenLocation: "Garden Playground",
+        status: "Possible Match Found",
+        images: [],
+        additionalNotes: "Very sentimental.",
+        portal: "society",
+        communityCode: "SUN123",
+        createdAt: new Date().toISOString()
+    }
+];
+exports.getPrepopulatedLostReports = getPrepopulatedLostReports;
+const getPrepopulatedItemMatches = () => [
+    {
+        id: "MT-001",
+        lostReportId: "LR-002",
+        foundItemId: "LF-002",
+        status: "Suggested",
+        verifiedBy: null,
+        verificationDate: null,
+        createdAt: new Date()
+    }
+];
+exports.getPrepopulatedItemMatches = getPrepopulatedItemMatches;
 const getPrepopulatedMaintenanceBills = () => [
     {
         id: "BILL-001",
@@ -662,6 +801,19 @@ const getPrepopulatedNotifications = () => [
 ];
 exports.getPrepopulatedNotifications = getPrepopulatedNotifications;
 const getPrepopulatedUsers = () => [
+    // --- MANAGER ---
+    {
+        id: "user-manager-1",
+        name: "Vikram Malhotra",
+        email: "manager@sunshinecomplex.com",
+        phone: "+91 98765 22222",
+        role: "manager",
+        portal: "society",
+        societyName: "Sunshine Complex",
+        communityCode: "SUN123",
+        status: "approved",
+        password: "Manager@123"
+    },
     // --- SECRETARY ---
     {
         id: "user-secretary-1",
@@ -1479,6 +1631,279 @@ const getPrepopulatedFlatAttendance = () => {
     ];
 };
 exports.getPrepopulatedFlatAttendance = getPrepopulatedFlatAttendance;
+const getPrepopulatedCategories = () => [
+    { name: "Maid", parentGroup: "Home Services", icon: "🧹" },
+    { name: "Housekeeping", parentGroup: "Home Services", icon: "🧹" },
+    { name: "Cook", parentGroup: "Home Services", icon: "🍳" },
+    { name: "Cleaner", parentGroup: "Home Services", icon: "🧹" },
+    { name: "Electrician", parentGroup: "Repairs", icon: "⚡" },
+    { name: "Plumber", parentGroup: "Repairs", icon: "💧" },
+    { name: "Carpenter", parentGroup: "Repairs", icon: "🔨" },
+    { name: "Painter", parentGroup: "Repairs", icon: "🎨" },
+    { name: "Maintenance", parentGroup: "Repairs", icon: "🔧" },
+    { name: "Gardener", parentGroup: "Repairs", icon: "🌿" },
+    { name: "AC Technician", parentGroup: "Repairs", icon: "❄️" },
+    { name: "Appliance Repair", parentGroup: "Repairs", icon: "⚙️" },
+    { name: "TV Repair", parentGroup: "Repairs", icon: "📺" },
+    { name: "Tutor", parentGroup: "Other Services", icon: "📚" },
+    { name: "Driver", parentGroup: "Other Services", icon: "🚗" },
+    { name: "Pet Care", parentGroup: "Other Services", icon: "🐾" },
+    { name: "Packers & Movers", parentGroup: "Other Services", icon: "📦" }
+];
+exports.getPrepopulatedCategories = getPrepopulatedCategories;
+const getPrepopulatedWorkerProfiles = () => [
+    {
+        workerId: "user-worker-1", // Ramesh Kumar (Electrician)
+        about: "Professional residential electrician with 5+ years of experience in apartment complexes. Expert in short circuits, wiring, and appliance installation.",
+        experienceYears: 5,
+        visitCharge: 150.0,
+        workingHoursStart: "09:00",
+        workingHoursEnd: "17:00",
+        languages: ["English", "Hindi", "Marathi"],
+        certifications: ["Certified Wireman License", "Industrial Safety Certificate"],
+        portfolio: ["https://images.unsplash.com/photo-1621905251189-08b45d6a269e", "https://images.unsplash.com/photo-1581092921461-eab62e97a780"],
+        beforeAfter: ["https://images.unsplash.com/photo-1544724569-5f546fd6f2b5", "https://images.unsplash.com/photo-1504307651254-35680f356dfd"],
+        isVerified: true,
+        isSocietyVerified: true,
+        isPoliceVerified: true,
+        repeatCustomers: 24,
+        societyRecommend: true
+    },
+    {
+        workerId: "user-worker-2", // Amit Kumar (Plumber)
+        about: "Experienced plumber specializing in leakage repair, bathroom remodel, pipe installation, and emergency water blockage removal.",
+        experienceYears: 4,
+        visitCharge: 120.0,
+        workingHoursStart: "10:00",
+        workingHoursEnd: "18:00",
+        languages: ["Hindi", "Punjabi"],
+        certifications: ["Plumbing Trade Certification"],
+        portfolio: ["https://images.unsplash.com/photo-1504307651254-35680f356dfd"],
+        beforeAfter: [],
+        isVerified: true,
+        isSocietyVerified: true,
+        isPoliceVerified: false,
+        repeatCustomers: 18,
+        societyRecommend: true
+    },
+    {
+        workerId: "user-worker-3", // Meena Sharma (Maid)
+        about: "Trustworthy and quick housekeeper/maid serving Sunshine Complex since 2024. Punctual, meticulous, and expert in general cleaning.",
+        experienceYears: 6,
+        visitCharge: 80.0,
+        workingHoursStart: "07:00",
+        workingHoursEnd: "13:00",
+        languages: ["Hindi", "Marathi"],
+        certifications: [],
+        portfolio: [],
+        beforeAfter: [],
+        isVerified: true,
+        isSocietyVerified: true,
+        isPoliceVerified: true,
+        repeatCustomers: 42,
+        societyRecommend: true
+    },
+    {
+        workerId: "user-worker-4", // Sanjay Dutt (Carpenter)
+        about: "Expert carpenter for custom furniture design, modular kitchen cabinets repair, door lock installation, and general woodwork.",
+        experienceYears: 7,
+        visitCharge: 200.0,
+        workingHoursStart: "12:00",
+        workingHoursEnd: "20:00",
+        languages: ["Hindi", "Marathi", "Gujarati"],
+        certifications: ["Woodworking Guild Master Certificate"],
+        portfolio: [],
+        beforeAfter: [],
+        isVerified: true,
+        isSocietyVerified: false,
+        isPoliceVerified: true,
+        repeatCustomers: 12,
+        societyRecommend: false
+    },
+    {
+        workerId: "user-worker-5", // Pooja Sharma (Housekeeping)
+        about: "Detail-oriented housekeeping professional with a focus on deep cleaning, organizing, and eco-friendly cleaning methods.",
+        experienceYears: 3,
+        visitCharge: 90.0,
+        workingHoursStart: "08:00",
+        workingHoursEnd: "16:00",
+        languages: ["English", "Hindi"],
+        certifications: ["Hospitality & Cleanliness Certification"],
+        portfolio: [],
+        beforeAfter: [],
+        isVerified: true,
+        isSocietyVerified: true,
+        isPoliceVerified: true,
+        repeatCustomers: 15,
+        societyRecommend: false
+    },
+    {
+        workerId: "user-worker-6", // Ram Lal (Gardener)
+        about: "Passionate gardener with a green thumb. Expertise in lawn design, organic fertilizers, weeding, and plant health maintenance.",
+        experienceYears: 10,
+        visitCharge: 100.0,
+        workingHoursStart: "08:00",
+        workingHoursEnd: "16:00",
+        languages: ["Hindi"],
+        certifications: ["Nursery Management Diploma"],
+        portfolio: [],
+        beforeAfter: [],
+        isVerified: true,
+        isSocietyVerified: true,
+        isPoliceVerified: false,
+        repeatCustomers: 30,
+        societyRecommend: true
+    }
+];
+exports.getPrepopulatedWorkerProfiles = getPrepopulatedWorkerProfiles;
+const getPrepopulatedWorkerAvailability = () => [
+    {
+        workerId: "user-worker-1",
+        workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        startTime: "09:00",
+        endTime: "17:00",
+        holidays: ["Sunday"],
+        blockedDate: [],
+        busyHours: ["11:00 AM - 12:00 PM"]
+    },
+    {
+        workerId: "user-worker-2",
+        workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        startTime: "10:00",
+        endTime: "18:00",
+        holidays: ["Sunday"],
+        blockedDate: ["2026-07-28"],
+        busyHours: []
+    },
+    {
+        workerId: "user-worker-3",
+        workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        startTime: "07:00",
+        endTime: "13:00",
+        holidays: [],
+        blockedDate: [],
+        busyHours: ["08:00 AM - 09:30 AM"]
+    },
+    {
+        workerId: "user-worker-4",
+        workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        startTime: "12:00",
+        endTime: "20:00",
+        holidays: ["Saturday", "Sunday"],
+        blockedDate: [],
+        busyHours: []
+    },
+    {
+        workerId: "user-worker-5",
+        workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        startTime: "08:00",
+        endTime: "16:00",
+        holidays: ["Sunday"],
+        blockedDate: [],
+        busyHours: []
+    },
+    {
+        workerId: "user-worker-6",
+        workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        startTime: "08:00",
+        endTime: "16:00",
+        holidays: ["Sunday"],
+        blockedDate: [],
+        busyHours: []
+    }
+];
+exports.getPrepopulatedWorkerAvailability = getPrepopulatedWorkerAvailability;
+const getPrepopulatedWorkerSkills = () => [
+    { workerId: "user-worker-1", skill: "Wiring" },
+    { workerId: "user-worker-1", skill: "Appliance Repair" },
+    { workerId: "user-worker-1", skill: "Switch Repair" },
+    { workerId: "user-worker-1", skill: "AC regulator" },
+    { workerId: "user-worker-2", skill: "Leakage Repair" },
+    { workerId: "user-worker-2", skill: "Tap Installation" },
+    { workerId: "user-worker-2", skill: "Bathroom Fitting" },
+    { workerId: "user-worker-3", skill: "Cleaning" },
+    { workerId: "user-worker-3", skill: "Utensils" },
+    { workerId: "user-worker-3", skill: "Ironing" },
+    { workerId: "user-worker-4", skill: "Furniture Repair" },
+    { workerId: "user-worker-4", skill: "Locksmith" },
+    { workerId: "user-worker-5", skill: "Deep Cleaning" },
+    { workerId: "user-worker-5", skill: "Dusting" },
+    { workerId: "user-worker-6", skill: "Lawn Mowing" },
+    { workerId: "user-worker-6", skill: "Pruning" }
+];
+exports.getPrepopulatedWorkerSkills = getPrepopulatedWorkerSkills;
+const getPrepopulatedBookings = () => [
+    {
+        id: "SBK-001",
+        residentId: "user-resident-1", // Sara Shah
+        workerId: "user-worker-1", // Ramesh Kumar (Electrician)
+        category: "Electrician",
+        bookingDate: new Date(Date.now() - 48 * 3600 * 1000).toISOString().split("T")[0], // 2 days ago
+        bookingTime: "10:00 AM",
+        address: "A Wing, Flat 204",
+        notes: "Living room fan is humming loudly and not spinning.",
+        price: 150.0,
+        status: "Completed"
+    },
+    {
+        id: "SBK-002",
+        residentId: "user-resident-2", // Nidhi Kumar
+        workerId: "user-worker-2", // Amit Kumar (Plumber)
+        category: "Plumber",
+        bookingDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString().split("T")[0], // Tomorrow
+        bookingTime: "02:30 PM",
+        address: "A Wing, Flat 301",
+        notes: "Kitchen sink water drainage is very slow.",
+        price: 120.0,
+        status: "Pending"
+    },
+    {
+        id: "SBK-003",
+        residentId: "user-resident-1", // Sara Shah
+        workerId: "user-worker-3", // Meena Sharma (Maid)
+        category: "Maid",
+        bookingDate: new Date(Date.now() - 24 * 3600 * 1000).toISOString().split("T")[0], // Yesterday
+        bookingTime: "08:30 AM",
+        address: "A Wing, Flat 204",
+        notes: "Regular floor cleaning and utensil washing.",
+        price: 80.0,
+        status: "Accepted"
+    }
+];
+exports.getPrepopulatedBookings = getPrepopulatedBookings;
+const getPrepopulatedReviews = () => [
+    {
+        id: "SRV-001",
+        bookingId: "SBK-001",
+        residentId: "user-resident-1",
+        workerId: "user-worker-1",
+        rating: 5,
+        reviewText: "Ramesh was extremely prompt and fixed the fan regulator in 15 minutes! Very professional.",
+        photos: ["https://images.unsplash.com/photo-1621905251189-08b45d6a269e"]
+    }
+];
+exports.getPrepopulatedReviews = getPrepopulatedReviews;
+const getPrepopulatedMessages = () => [
+    {
+        id: "MSG-001",
+        senderId: "user-resident-1",
+        receiverId: "user-worker-1",
+        message: "Hi Ramesh, are you available for a quick fan repair tomorrow morning?",
+        timestamp: new Date(Date.now() - 50 * 3600 * 1000),
+        isRead: true,
+        status: "read"
+    },
+    {
+        id: "MSG-002",
+        senderId: "user-worker-1",
+        receiverId: "user-resident-1",
+        message: "Yes Sara, I can visit around 10:00 AM. Please create a booking request.",
+        timestamp: new Date(Date.now() - 49 * 3600 * 1000),
+        isRead: true,
+        status: "read"
+    }
+];
+exports.getPrepopulatedMessages = getPrepopulatedMessages;
 const getInitialDb = () => ({
     users: (0, exports.getPrepopulatedUsers)(),
     complaints: (0, exports.getPrepopulatedComplaints)(),
@@ -1488,7 +1913,10 @@ const getInitialDb = () => ({
     parcels: (0, exports.getPrepopulatedParcels)(),
     facilityBookings: [],
     marketplaceItems: (0, exports.getPrepopulatedMarketplaceItems)(),
-    lostFoundItems: (0, exports.getPrepopulatedLostFoundItems)(),
+    foundItems: (0, exports.getPrepopulatedFoundItems)(),
+    claims: (0, exports.getPrepopulatedClaims)(),
+    lostReports: (0, exports.getPrepopulatedLostReports)(),
+    itemMatches: (0, exports.getPrepopulatedItemMatches)(),
     roomChangeRequests: [],
     maintenanceBills: (0, exports.getPrepopulatedMaintenanceBills)(),
     communityEvents: (0, exports.getPrepopulatedCommunityEvents)(),
@@ -1503,6 +1931,13 @@ const getInitialDb = () => ({
     flats: (0, exports.getPrepopulatedFlats)(),
     rentRecords: (0, exports.getPrepopulatedRentRecords)(),
     attendance: (0, exports.getPrepopulatedHelpersAttendance)(),
-    flatAttendance: (0, exports.getPrepopulatedFlatAttendance)()
+    flatAttendance: (0, exports.getPrepopulatedFlatAttendance)(),
+    categories: (0, exports.getPrepopulatedCategories)(),
+    workerProfiles: (0, exports.getPrepopulatedWorkerProfiles)(),
+    workerSkills: (0, exports.getPrepopulatedWorkerSkills)(),
+    workerAvailability: (0, exports.getPrepopulatedWorkerAvailability)(),
+    bookings: (0, exports.getPrepopulatedBookings)(),
+    reviews: (0, exports.getPrepopulatedReviews)(),
+    messages: (0, exports.getPrepopulatedMessages)()
 });
 exports.getInitialDb = getInitialDb;

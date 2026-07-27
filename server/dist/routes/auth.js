@@ -8,6 +8,7 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_js_1 = __importDefault(require("../config/db.js"));
 const auth_js_1 = require("../middleware/auth.js");
+const index_js_1 = require("../socket/index.js");
 const router = (0, express_1.Router)();
 const JWT_SECRET = process.env.JWT_SECRET || "homeverse-secret-key-12345";
 // Login endpoint
@@ -44,6 +45,7 @@ router.post("/login", async (req, res) => {
 });
 // Register endpoint
 router.post("/register", async (req, res) => {
+    console.log("📝 Registration request received:", req.body);
     const { id, email, password, name, phone, role, portal, unit, building, societyName, communityCode, ownerOrTenant } = req.body;
     if (!email || !password || !name) {
         return res.status(400).json({ error: "Name, email and password are required" });
@@ -55,6 +57,7 @@ router.post("/register", async (req, res) => {
         }
         const hashedPassword = bcryptjs_1.default.hashSync(password, 10);
         const generatedId = id || `user-${role}-${Math.floor(100 + Math.random() * 900)}`;
+        const userStatus = (role === "resident" || role === "worker") ? "pending" : "approved";
         const user = await db_js_1.default.user.create({
             data: {
                 id: generatedId,
@@ -68,6 +71,7 @@ router.post("/register", async (req, res) => {
                 societyName,
                 communityCode,
                 ownerOrTenant,
+                status: userStatus,
                 password: hashedPassword,
                 joinedAt: new Date().toISOString().split("T")[0]
             }
@@ -82,6 +86,7 @@ router.post("/register", async (req, res) => {
         const userProfile = { ...user };
         // @ts-ignore
         delete userProfile.password;
+        (0, index_js_1.broadcastUpdate)("user:update", userProfile);
         res.status(201).json({ token, user: userProfile });
     }
     catch (error) {

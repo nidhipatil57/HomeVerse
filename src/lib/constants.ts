@@ -126,9 +126,13 @@ export const SECURITY_SIDEBAR_ITEMS = [
 
 export const MANAGER_SIDEBAR_ITEMS = [
   { label: 'Dashboard', href: '/society/dashboard', icon: 'LayoutDashboard' },
-  { label: 'AI Assistant', href: '/society/ai-assistant', icon: 'Bot' },
-  { label: 'Complaints', href: '/society/complaints', icon: 'MessageSquareWarning' },
-  { label: 'Daily Check-Ins', href: '/society/daily-checkins', icon: 'CalendarDays' },
+  { label: 'Complaint Operations', href: '/society/complaints', icon: 'Wrench' },
+  { label: 'Service Requests', href: '/society/services', icon: 'Calendar' },
+  { label: 'Worker Directory', href: '/society/workers', icon: 'Users' },
+  { label: 'Schedules', href: '/society/schedules', icon: 'Clock' },
+  { label: 'Daily Operations', href: '/society/daily-operations', icon: 'Briefcase' },
+  { label: 'Emergency Requests', href: '/society/emergency', icon: 'AlertTriangle' },
+  { label: 'Reports & Analytics', href: '/society/analytics', icon: 'BarChart3' },
   { label: 'Notifications', href: '/society/notifications', icon: 'Megaphone' },
   { label: 'Settings', href: '/society/settings', icon: 'Settings' },
 ];

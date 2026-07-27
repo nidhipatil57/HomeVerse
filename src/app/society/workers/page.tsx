@@ -2,24 +2,29 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  Wrench, Search, Power, ShieldCheck, CheckCircle2, XCircle, Trash2,
-  Sliders, Star, Users, ClipboardCheck, BarChart3, AlertTriangle, ArrowRight
+  Wrench, Search, Power, ShieldCheck, CheckCircle2, XCircle, Trash2, Edit2, Plus,
+  Sliders, Star, Users, ClipboardCheck, BarChart3, AlertTriangle, ArrowRight,
+  Clock, DollarSign, Mail, Phone, Shield
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 
-export default function SecretaryWorkersPage() {
+export default function WorkersDirectoryPage() {
   const { user, initialize } = useAuth();
   const {
     users,
     workerProfiles,
     verifyWorker,
+    addStaticWorker,
+    updateStaticWorker,
+    deleteStaticWorker,
     fetchWorkerStats,
     initializeDb
   } = useCommunityStore(
@@ -27,6 +32,9 @@ export default function SecretaryWorkersPage() {
       users: state.users || [],
       workerProfiles: state.workerProfiles || [],
       verifyWorker: state.verifyWorker,
+      addStaticWorker: state.addStaticWorker,
+      updateStaticWorker: state.updateStaticWorker,
+      deleteStaticWorker: state.deleteStaticWorker,
       fetchWorkerStats: state.fetchWorkerStats,
       initializeDb: state.initializeDb
     }))
@@ -35,6 +43,24 @@ export default function SecretaryWorkersPage() {
   const [mounted, setMounted] = useState(false);
   const [workerSearch, setWorkerSearch] = useState("");
   const [stats, setStats] = useState<any>(null);
+
+  // Manager Modal states
+  const [showWorkerModal, setShowWorkerModal] = useState(false);
+  const [editingWorker, setEditingWorker] = useState<any | null>(null);
+  const [workerForm, setWorkerForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    workerCategory: "Electrician",
+    experience: "3 years",
+    visitCharge: "150",
+    workingHoursStart: "09:00",
+    workingHoursEnd: "18:00",
+    isVerified: true,
+    isSocietyVerified: true,
+    isPoliceVerified: true,
+    availability: "Available"
+  });
 
   useEffect(() => {
     initialize();
@@ -48,12 +74,14 @@ export default function SecretaryWorkersPage() {
     setMounted(true);
   }, [initialize, initializeDb, fetchWorkerStats]);
 
-  // Sync stats when database gets seeded / bookings change
   const reloadStats = () => {
     fetchWorkerStats()
       .then(data => setStats(data))
       .catch(() => {});
   };
+
+  const isManager = user?.role === "manager";
+  const isSecretary = user?.role === "secretary" || user?.role === "admin";
 
   // Approved workers list
   const approvedWorkers = useMemo(() => {
@@ -101,7 +129,7 @@ export default function SecretaryWorkersPage() {
     if (!confirm(`Are you sure you want to remove worker ${name} from the complex directory?`)) return;
 
     try {
-      await verifyWorker(workerId, { remove: true });
+      await deleteStaticWorker(workerId);
       alert("Worker removed successfully.");
       reloadStats();
     } catch (e) {
@@ -109,28 +137,91 @@ export default function SecretaryWorkersPage() {
     }
   };
 
+  const handleOpenAddModal = () => {
+    setEditingWorker(null);
+    setWorkerForm({
+      name: "",
+      email: "",
+      phone: "",
+      workerCategory: "Electrician",
+      experience: "3 years",
+      visitCharge: "150",
+      workingHoursStart: "09:00",
+      workingHoursEnd: "18:00",
+      isVerified: true,
+      isSocietyVerified: true,
+      isPoliceVerified: true,
+      availability: "Available"
+    });
+    setShowWorkerModal(true);
+  };
+
+  const handleOpenEditModal = (w: any) => {
+    const profile = workerProfiles.find(p => p.workerId === w.id);
+    setEditingWorker(w);
+    setWorkerForm({
+      name: w.name || "",
+      email: w.email || "",
+      phone: w.phone || "",
+      workerCategory: w.workerCategory || "Electrician",
+      experience: w.experience || "3 years",
+      visitCharge: w.visitCharge?.toString() || "150",
+      workingHoursStart: "09:00",
+      workingHoursEnd: "18:00",
+      isVerified: profile?.workerProfile?.isVerified ?? true,
+      isSocietyVerified: profile?.workerProfile?.isSocietyVerified ?? true,
+      isPoliceVerified: profile?.workerProfile?.isPoliceVerified ?? true,
+      availability: w.availability || "Available"
+    });
+    setShowWorkerModal(true);
+  };
+
+  const handleSaveWorkerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingWorker) {
+        await updateStaticWorker(editingWorker.id, workerForm);
+        alert("Worker details updated!");
+      } else {
+        await addStaticWorker(workerForm);
+        alert("Static worker added successfully!");
+      }
+      setShowWorkerModal(false);
+      reloadStats();
+    } catch (err: any) {
+      alert("Failed to save worker: " + err.message);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Community Workers Console 🛠️
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Review credentials, approve registrations, configure trust badges, and audit service analytics.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold font-[family-name:var(--font-heading)]">Worker Directory 🛠️</h1>
+          <p className="text-muted-foreground mt-1">
+            {isManager
+              ? "Maintain verified workers, configure availability, set charges, and upload verification records."
+              : "Review credentials, approve registrations, and audit service stats."}
+          </p>
+        </div>
+        {isManager && (
+          <Button onClick={handleOpenAddModal} className="gradient-primary text-white border-0 rounded-xl h-10 font-semibold text-xs flex items-center gap-1">
+            <Plus className="w-4 h-4" /> Add Verified Worker
+          </Button>
+        )}
       </div>
 
       <Tabs defaultValue="roster" className="w-full">
         <TabsList className="grid grid-cols-3 w-full md:w-[500px] h-12 bg-secondary/30 rounded-2xl p-1 mb-6">
           <TabsTrigger value="roster" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
-            Active Roster
+            Active Directory ({approvedWorkers.length})
           </TabsTrigger>
           <TabsTrigger value="pending" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
-            Pending ({pendingWorkers.length})
+            Pending Approval ({pendingWorkers.length})
           </TabsTrigger>
           <TabsTrigger value="stats" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
-            Reports & Analytics
+            Roster Analytics
           </TabsTrigger>
         </TabsList>
 
@@ -150,206 +241,329 @@ export default function SecretaryWorkersPage() {
           {/* Roster Cards List */}
           <Card className="border-border/50 bg-card rounded-2xl overflow-hidden shadow-sm">
             <CardHeader className="pb-3 border-b border-border/10">
-              <CardTitle className="text-base font-bold">Gated Complex Workers Roster</CardTitle>
-              <CardDescription>Verify checks and moderate credentials for complex security compliance</CardDescription>
+              <CardTitle className="text-base font-bold">Gated Complex Workers Directory</CardTitle>
+              <CardDescription>Verified helpers and vendor staff active in complex directory</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border/20">
-                {approvedWorkers.map((w) => {
-                  const profile = workerProfiles.find(p => p.id === w.id);
-                  const isSocietyVerified = profile?.workerProfile?.isSocietyVerified || false;
-                  const isPoliceVerified = profile?.workerProfile?.isPoliceVerified || false;
+                {approvedWorkers.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    No approved workers found.
+                  </div>
+                ) : (
+                  approvedWorkers.map((w) => {
+                    const profile = workerProfiles.find(p => p.workerId === w.id);
+                    const isSocietyVerified = profile?.isSocietyVerified || false;
+                    const isPoliceVerified = profile?.isPoliceVerified || false;
 
-                  return (
-                    <div key={w.id} className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-secondary/10 transition-all text-xs">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-sm text-foreground">{w.name}</h4>
-                          <Badge variant="outline" className="text-[8px] font-extrabold uppercase py-0 px-2 rounded-md bg-secondary/40 text-muted-foreground border-border/30">
-                            {w.workerCategory}
-                          </Badge>
+                    return (
+                      <div key={w.id} className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-secondary/10 transition-all text-xs">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-sm text-foreground">{w.name}</h4>
+                            <Badge variant="outline" className="text-[8px] font-extrabold uppercase py-0.5 px-2 rounded-md bg-secondary/40 text-muted-foreground border-border/30">
+                              {w.workerCategory}
+                            </Badge>
+                            <Badge className={w.availability === "Available" ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-500"}>
+                              {w.availability || "Available"}
+                            </Badge>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground flex items-center gap-3">
+                            <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {w.phone}</span>
+                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Exp: {w.experience || "3 yrs"}</span>
+                            <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> Visit: ₹{w.visitCharge || "150"}</span>
+                          </p>
+                          <div className="flex gap-2 pt-1.5">
+                            {isSocietyVerified && <Badge className="bg-blue-500/10 text-blue-600 text-[8px] px-1.5 py-0.5">🏢 Society Checked</Badge>}
+                            {isPoliceVerified && <Badge className="bg-teal-500/10 text-teal-600 text-[8px] px-1.5 py-0.5">👮 Police Verified</Badge>}
+                          </div>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">
-                          ID: <strong className="text-foreground">{w.employeeId}</strong> | Shift: {w.workingShift || "General"} | Phone: {w.phone}
-                        </p>
-                        <p className="text-[9px] text-muted-foreground">
-                          Specializations: {w.specializations?.join(", ") || "General utility"}
+
+                        {/* Actions */}
+                        <div className="flex flex-wrap items-center gap-4 pt-2 md:pt-0 w-full md:w-auto border-t md:border-0 border-border/15 justify-end">
+                          {/* Trust Checkboxes */}
+                          {(isSecretary || isManager) && (
+                            <div className="flex gap-4">
+                              <label className="flex items-center gap-2 font-bold text-foreground cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={isSocietyVerified}
+                                  onChange={() => handleVerifyToggle(w.id, "society", isSocietyVerified)}
+                                  className="rounded border-border/50 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                                />
+                                <span>🏢 Society Check</span>
+                              </label>
+
+                              <label className="flex items-center gap-2 font-bold text-foreground cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={isPoliceVerified}
+                                  onChange={() => handleVerifyToggle(w.id, "police", isPoliceVerified)}
+                                  className="rounded border-border/50 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                                />
+                                <span>👮 Police Check</span>
+                              </label>
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-1.5">
+                            {isManager && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenEditModal(w)}
+                                className="h-8 text-[10px] text-muted-foreground hover:text-foreground"
+                              >
+                                <Edit2 className="w-3 h-3 mr-1" /> Edit
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRemoveWorker(w.id, w.name)}
+                              className="h-8 text-[10px] text-red-500 hover:bg-red-500/5"
+                            >
+                              <Trash2 className="w-3 h-3 mr-1" /> Remove
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* PENDING APPROVAL TAB */}
+        <TabsContent value="pending" className="outline-none">
+          <Card className="border-border/50 bg-card rounded-2xl overflow-hidden shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base font-bold">Pending Registrations</CardTitle>
+              <CardDescription>Verify registration applications and add them to active roster</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border/20">
+                {pendingWorkers.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    No pending helper registrations at this time.
+                  </div>
+                ) : (
+                  pendingWorkers.map((w) => (
+                    <div key={w.id} className="p-5 flex justify-between items-center text-xs">
+                      <div>
+                        <h4 className="font-bold text-foreground">{w.name}</h4>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Category: <strong>{w.workerCategory}</strong> | Phone: {w.phone}
                         </p>
                       </div>
-
-                      {/* Verification Checks & Moderate Actions */}
-                      <div className="flex flex-wrap items-center gap-4 pt-2 md:pt-0 w-full md:w-auto border-t md:border-0 border-border/15 justify-between">
-                        {/* Trust Checkboxes */}
-                        <div className="flex gap-4">
-                          <label className="flex items-center gap-2 font-bold text-foreground cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={isSocietyVerified}
-                              onChange={() => handleVerifyToggle(w.id, "society", isSocietyVerified)}
-                              className="rounded border-border/50 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
-                            />
-                            <span>🏢 Society Check</span>
-                          </label>
-
-                          <label className="flex items-center gap-2 font-bold text-foreground cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={isPoliceVerified}
-                              onChange={() => handleVerifyToggle(w.id, "police", isPoliceVerified)}
-                              className="rounded border-border/50 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
-                            />
-                            <span>👮 Police Check</span>
-                          </label>
-                        </div>
-
-                        {/* Remove worker */}
+                      <div className="flex items-center gap-1.5">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleRemoveWorker(w.id, w.name)}
-                          className="h-8 text-[10px] font-bold border-rose-500/30 text-rose-500 hover:bg-rose-500/5 bg-background flex items-center gap-1"
+                          className="h-8 text-[10px] text-red-500"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Remove
+                          Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleApprove(w.id)}
+                          className="h-8 text-[10px] gradient-primary text-white border-0"
+                        >
+                          Approve & Roster
                         </Button>
                       </div>
                     </div>
-                  );
-                })}
-
-                {approvedWorkers.length === 0 && (
-                  <div className="text-center py-16 text-muted-foreground text-xs italic">
-                    No approved community workers match your query.
-                  </div>
+                  ))
                 )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* PENDING APPROVALS TAB */}
-        <TabsContent value="pending" className="space-y-6 outline-none">
-          <Card className="border-border/50 bg-card rounded-2xl overflow-hidden shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/10">
-              <CardTitle className="text-base font-bold">Pending Registrations ({pendingWorkers.length})</CardTitle>
-              <CardDescription>Approve or deny new workers requesting to register inside your society gate network</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border/20">
-                {pendingWorkers.map((w) => (
-                  <div key={w.id} className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-secondary/10 transition-all text-xs">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-sm text-foreground">{w.name}</h4>
-                        <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[8px] font-extrabold uppercase py-0.5">Pending</Badge>
+        {/* STATS & REPORTS TAB */}
+        <TabsContent value="stats" className="outline-none">
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base font-bold">Directory Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-xs font-semibold text-muted-foreground">
+                <div className="flex justify-between border-b border-border/35 pb-2">
+                  <span>Total Registered Staff</span>
+                  <span className="text-foreground font-bold">{stats?.totalWorkers || approvedWorkers.length}</span>
+                </div>
+                <div className="flex justify-between border-b border-border/35 pb-2">
+                  <span>Total Job Bookings</span>
+                  <span className="text-foreground font-bold">{stats?.totalBookings || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Completed Job Invoices</span>
+                  <span className="text-foreground font-bold">{stats?.completedBookings || 0}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-2 border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base font-bold">Recent Customer Feedback</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border/20 text-xs max-h-[300px] overflow-y-auto">
+                  {!stats?.recentReviews || stats.recentReviews.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground italic">
+                      No rating reviews logged in the database yet.
+                    </div>
+                  ) : (
+                    stats.recentReviews.map((r: any) => (
+                      <div key={r.id} className="p-3.5 space-y-1 hover:bg-secondary/5">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-foreground">Flat {r.booking?.address} • {r.booking?.resident?.name}</span>
+                          <span className="text-amber-500 font-bold flex items-center gap-0.5">
+                            <Star className="w-3 h-3 fill-amber-500" /> {r.rating}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground italic">"{r.comment || "No review written"}"</p>
                       </div>
-                      <p className="text-[10px] text-muted-foreground">
-                        Category: <strong className="text-foreground">{w.workerCategory}</strong> | Contact: {w.phone} | Email: {w.email}
-                      </p>
-                    </div>
-                    <div className="flex gap-2 w-full md:w-auto border-t md:border-0 border-border/10 pt-2 md:pt-0 justify-end">
-                      <Button
-                        size="sm"
-                        onClick={() => handleApprove(w.id)}
-                        className="h-8 px-4 text-[10px] font-bold bg-primary hover:bg-primary/95 text-white border-0 shadow-sm flex items-center gap-1"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRemoveWorker(w.id, w.name)}
-                        className="h-8 px-4 text-[10px] font-bold border-rose-500/30 text-rose-500 hover:bg-rose-500/5 bg-background flex items-center gap-1"
-                      >
-                        <XCircle className="w-3.5 h-3.5" /> Reject
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                {pendingWorkers.length === 0 && (
-                  <div className="text-center py-16 text-muted-foreground text-xs italic">
-                    No pending helper registrations waiting for secretary approval.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ANALYTICS & REPORTS TAB */}
-        <TabsContent value="stats" className="space-y-6 outline-none">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="border-border/50 rounded-2xl bg-card shadow-sm p-4 space-y-3">
-              <div className="flex justify-between items-center text-xs font-bold text-muted-foreground uppercase">
-                <span>Active Staff</span>
-                <Users className="w-4.5 h-4.5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-black text-foreground">{stats?.workerCount || approvedWorkers.length}</h2>
-            </Card>
-
-            <Card className="border-border/50 rounded-2xl bg-card shadow-sm p-4 space-y-3">
-              <div className="flex justify-between items-center text-xs font-bold text-muted-foreground uppercase">
-                <span>Total Bookings</span>
-                <ClipboardCheck className="w-4.5 h-4.5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-black text-foreground">{stats?.bookingCount || 0}</h2>
-            </Card>
-
-            <Card className="border-border/50 rounded-2xl bg-card shadow-sm p-4 space-y-3">
-              <div className="flex justify-between items-center text-xs font-bold text-muted-foreground uppercase">
-                <span>Completed Tickets</span>
-                <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500" />
-              </div>
-              <h2 className="text-2xl font-black text-emerald-500">{stats?.completedCount || 0}</h2>
-            </Card>
-
-            <Card className="border-border/50 rounded-2xl bg-card shadow-sm p-4 space-y-3">
-              <div className="flex justify-between items-center text-xs font-bold text-muted-foreground uppercase">
-                <span>Active Queue</span>
-                <AlertTriangle className="w-4.5 h-4.5 text-amber-500" />
-              </div>
-              <h2 className="text-2xl font-black text-amber-500">{stats?.pendingCount || 0}</h2>
+                    ))
+                  )}
+                </div>
+              </CardContent>
             </Card>
           </div>
-
-          {/* Recent Reviews Audit */}
-          <Card className="border-border/50 bg-card rounded-2xl shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/10">
-              <CardTitle className="text-base font-bold">Citizen Reviews Moderation Feed</CardTitle>
-              <CardDescription>Audit citizen reviews to ensure comments comply with complex community guidelines</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border/20">
-                {stats?.recentReviews?.map((rv: any) => (
-                  <div key={rv.id} className="p-5 flex justify-between items-start gap-4 hover:bg-secondary/10 transition-all text-xs">
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-foreground">{rv.resident?.name || "Resident"}</span>
-                        <ArrowRight className="w-3 h-3 text-muted-foreground" />
-                        <span className="font-semibold text-primary">{rv.worker?.name} ({rv.worker?.workerCategory})</span>
-                        <div className="flex gap-0.5 shrink-0 ml-2">
-                          {[...Array(rv.rating)].map((_, i) => (
-                            <Star key={i} className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-muted-foreground text-[11px] italic bg-secondary/10 p-3 rounded-xl border-l-2 border-primary">
-                        "{rv.reviewText || "No comment."}"
-                      </p>
-                      <span className="text-[9px] text-muted-foreground block pt-0.5">Logged: {new Date(rv.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                ))}
-                {(!stats?.recentReviews || stats.recentReviews.length === 0) && (
-                  <div className="text-center py-16 text-muted-foreground text-xs italic">
-                    No recent service reviews logged in complex feed.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Add / Edit Worker Dialog */}
+      <Dialog open={showWorkerModal} onOpenChange={setShowWorkerModal}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-[family-name:var(--font-heading)]">
+              {editingWorker ? "Edit Roster Details" : "Add Verified Static Worker"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveWorkerSubmit} className="space-y-4 mt-2 text-xs">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Full Name</label>
+                <Input
+                  value={workerForm.name}
+                  onChange={(e) => setWorkerForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="rounded-xl h-10"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Category</label>
+                <select
+                  value={workerForm.workerCategory}
+                  onChange={(e) => setWorkerForm(prev => ({ ...prev, workerCategory: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-card text-xs"
+                >
+                  <option value="Electrician">Electrician</option>
+                  <option value="Plumber">Plumber</option>
+                  <option value="Cleaner">Cleaner</option>
+                  <option value="Gardener">Gardener</option>
+                  <option value="Housekeeping">Housekeeping</option>
+                  <option value="Maid">Maid</option>
+                  <option value="Cook">Cook</option>
+                  <option value="Carpenter">Carpenter</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Phone Number</label>
+                <Input
+                  value={workerForm.phone}
+                  onChange={(e) => setWorkerForm(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="+91 XXXXX XXXXX"
+                  className="rounded-xl h-10"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Email Address</label>
+                <Input
+                  value={workerForm.email}
+                  onChange={(e) => setWorkerForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="name@complex.com"
+                  className="rounded-xl h-10"
+                  type="email"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Experience</label>
+                <Input
+                  value={workerForm.experience}
+                  onChange={(e) => setWorkerForm(prev => ({ ...prev, experience: e.target.value }))}
+                  placeholder="e.g. 5 years"
+                  className="rounded-xl h-10"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Visit Charge (₹)</label>
+                <Input
+                  value={workerForm.visitCharge}
+                  onChange={(e) => setWorkerForm(prev => ({ ...prev, visitCharge: e.target.value }))}
+                  type="number"
+                  className="rounded-xl h-10"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Roster Availability</label>
+                <select
+                  value={workerForm.availability}
+                  onChange={(e) => setWorkerForm(prev => ({ ...prev, availability: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-card text-xs"
+                >
+                  <option value="Available">Available (Green)</option>
+                  <option value="Busy">Busy (Red)</option>
+                  <option value="On Leave">On Leave</option>
+                </select>
+              </div>
+              <div className="flex gap-2 items-center justify-around border border-border rounded-xl px-2 h-10 mt-5">
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={workerForm.isSocietyVerified}
+                    onChange={(e) => setWorkerForm(prev => ({ ...prev, isSocietyVerified: e.target.checked }))}
+                    className="rounded border-border focus:ring-primary w-4 h-4 cursor-pointer"
+                  />
+                  <span>🏢 Society</span>
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={workerForm.isPoliceVerified}
+                    onChange={(e) => setWorkerForm(prev => ({ ...prev, isPoliceVerified: e.target.checked }))}
+                    className="rounded border-border focus:ring-primary w-4 h-4 cursor-pointer"
+                  />
+                  <span>👮 Police</span>
+                </label>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowWorkerModal(false)} className="rounded-xl h-10">
+                Cancel
+              </Button>
+              <Button type="submit" className="gradient-primary text-white border-0 rounded-xl h-10 font-bold px-5">
+                Save Worker
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

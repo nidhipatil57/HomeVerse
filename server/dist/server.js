@@ -12,6 +12,7 @@ const index_js_1 = require("./socket/index.js");
 const auth_js_1 = __importDefault(require("./routes/auth.js"));
 const complaints_js_1 = __importDefault(require("./routes/complaints.js"));
 const visitors_js_1 = __importDefault(require("./routes/visitors.js"));
+const communityServices_js_1 = __importDefault(require("./routes/communityServices.js"));
 const misc_js_1 = __importDefault(require("./routes/misc.js"));
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
@@ -30,6 +31,7 @@ const io = (0, index_js_1.initSocket)(server);
 app.use("/api/auth", auth_js_1.default);
 app.use("/api/complaints", complaints_js_1.default);
 app.use("/api/visitors", visitors_js_1.default);
+app.use("/api/community-services", communityServices_js_1.default);
 // Miscellaneous sub-features are routed under `/api` directly in miscRouter
 app.use("/api", misc_js_1.default);
 // Basic health check endpoint

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../config/db.js";
 import { authenticateToken } from "../middleware/auth.js";
+import { broadcastUpdate } from "../socket/index.js";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "homeverse-secret-key-12345";
@@ -52,6 +53,7 @@ router.post("/login", async (req, res) => {
 
 // Register endpoint
 router.post("/register", async (req, res) => {
+  console.log("📝 Registration request received:", req.body);
   const { id, email, password, name, phone, role, portal, unit, building, societyName, communityCode, ownerOrTenant } = req.body;
 
   if (!email || !password || !name) {
@@ -66,6 +68,7 @@ router.post("/register", async (req, res) => {
 
     const hashedPassword = bcrypt.hashSync(password, 10);
     const generatedId = id || `user-${role}-${Math.floor(100 + Math.random() * 900)}`;
+    const userStatus = (role === "resident" || role === "worker") ? "pending" : "approved";
 
     const user = await prisma.user.create({
       data: {
@@ -80,6 +83,7 @@ router.post("/register", async (req, res) => {
         societyName,
         communityCode,
         ownerOrTenant,
+        status: userStatus,
         password: hashedPassword,
         joinedAt: new Date().toISOString().split("T")[0]
       }
@@ -101,6 +105,8 @@ router.post("/register", async (req, res) => {
     const userProfile = { ...user };
     // @ts-ignore
     delete userProfile.password;
+
+    broadcastUpdate("user:update", userProfile);
 
     res.status(201).json({ token, user: userProfile });
   } catch (error: any) {

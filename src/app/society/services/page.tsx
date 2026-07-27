@@ -1,51 +1,48 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Star, Search, PhoneCall, ShieldCheck, CalendarRange, Clock, CheckCircle2,
-  MessageSquare, Send, Loader2, User, CalendarDays, MapPin, X, ArrowRight,
-  TrendingUp, CheckCircle, AlertCircle, DollarSign, MessageCircle
+  Calendar, Clock, User, CheckCircle2, XCircle, Wrench, AlertCircle,
+  Play, ShieldCheck, Phone, Clipboard, ArrowRight, Search, Check
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { useShallow } from "zustand/react/shallow";
 
-export default function WorkerServicesPage() {
+export default function ManagerServicesPage() {
   const { user, initialize } = useAuth();
   const {
-    workerProfiles,
     serviceBookings,
-    chatMessages,
+    users,
+    scheduleBooking,
+    completeBooking,
     updateBookingStatus,
-    sendChatMessage,
-    fetchChatMessages,
     initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
-      workerProfiles: state.workerProfiles || [],
       serviceBookings: state.serviceBookings || [],
-      chatMessages: state.chatMessages || [],
+      users: state.users || [],
+      scheduleBooking: state.scheduleBooking,
+      completeBooking: state.completeBooking,
       updateBookingStatus: state.updateBookingStatus,
-      sendChatMessage: state.sendChatMessage,
-      fetchChatMessages: state.fetchChatMessages,
       initializeDb: state.initializeDb
     }))
   );
 
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState("bookings");
-  const [selectedContact, setSelectedContact] = useState<any>(null);
-  
-  // Chat state
-  const [chatInput, setChatInput] = useState("");
-  const [sendingMessage, setSendingMessage] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("All");
+
+  // Booking scheduling states
+  const [schedulingBooking, setSchedulingBooking] = useState<any | null>(null);
+  const [expectedArrival, setExpectedArrival] = useState("");
+  const [operationalNotes, setOperationalNotes] = useState("");
 
   useEffect(() => {
     initialize();
@@ -53,446 +50,309 @@ export default function WorkerServicesPage() {
     setMounted(true);
   }, [initialize, initializeDb]);
 
-  // Fetch messages in real-time when chatting
-  useEffect(() => {
-    let interval: any;
-    if (selectedContact) {
-      fetchChatMessages(selectedContact.id);
-      interval = setInterval(() => {
-        fetchChatMessages(selectedContact.id);
-      }, 3000);
-    }
-    return () => clearInterval(interval);
-  }, [selectedContact, fetchChatMessages]);
+  // Filter available workers for assignment
+  const availableWorkers = useMemo(() => {
+    return users.filter(u => u.role === "worker");
+  }, [users]);
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
+  // Filter bookings based on search & filter status
+  const filteredBookings = useMemo(() => {
+    return serviceBookings.filter((b) => {
+      // For Manager: only show bookings approved/forwarded by the Secretary
+      const allowedStatuses = [
+        "Forwarded to Manager",
+        "Scheduled",
+        "In Progress",
+        "Completed",
+        "Cancelled"
+      ];
+      if (!allowedStatuses.includes(b.status)) return false;
 
-  // Get active contacts (residents who booked or have chat history)
-  const activeContacts = useMemo(() => {
-    const contactsMap = new Map();
-    // Add contacts from bookings
-    serviceBookings.forEach((b) => {
-      if (b.resident) {
-        contactsMap.set(b.resident.id, {
-          id: b.resident.id,
-          name: b.resident.name,
-          phone: b.resident.phone,
-          unit: b.resident.unit,
-          building: b.resident.building
-        });
-      }
+      // Status Filter
+      if (selectedStatusFilter !== "All" && b.status !== selectedStatusFilter) return false;
+
+      // Search Query
+      const query = searchTerm.toLowerCase();
+      const residentName = b.resident?.name?.toLowerCase() || "";
+      const workerName = b.worker?.name?.toLowerCase() || "";
+      const category = b.category?.toLowerCase() || "";
+      const unit = b.address?.toLowerCase() || "";
+
+      return residentName.includes(query) || workerName.includes(query) || category.includes(query) || unit.includes(query);
     });
-
-    // Make sure Sara Shah is in Ramesh's contact list if Ramesh is logged in (matches seed data)
-    if (user?.id === "user-worker-1") {
-      contactsMap.set("user-resident-1", {
-        id: "user-resident-1",
-        name: "Sara Shah",
-        phone: "+91 98765 43210",
-        unit: "204",
-        building: "A Wing"
-      });
-    }
-
-    return Array.from(contactsMap.values());
-  }, [serviceBookings, user]);
-
-  // Find profile of this worker
-  const myProfile = useMemo(() => {
-    return workerProfiles.find((w) => w.id === user?.id);
-  }, [workerProfiles, user]);
+  }, [serviceBookings, searchTerm, selectedStatusFilter]);
 
   if (!mounted) return null;
 
-  // Worker stats
-  const pendingRequests = serviceBookings.filter((b) => b.status === "Pending");
-  const activeBookings = serviceBookings.filter((b) => b.status === "Accepted");
-  const completedBookings = serviceBookings.filter((b) => b.status === "Completed");
+  const handleOpenScheduleModal = (booking: any) => {
+    setSchedulingBooking(booking);
+    setExpectedArrival(booking.bookingDate + " at " + booking.bookingTime);
+    setOperationalNotes("");
+  };
 
-  const totalEarnings = completedBookings.length * (myProfile?.workerProfile?.visitCharge || 120.0);
-
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleScheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim() || !selectedContact) return;
+    if (!schedulingBooking) return;
 
-    setSendingMessage(true);
     try {
-      await sendChatMessage({
-        receiverId: selectedContact.id,
-        message: chatInput
-      });
-      setChatInput("");
-      fetchChatMessages(selectedContact.id);
-    } catch (e) {
-      alert("Failed to send message");
-    } finally {
-      setSendingMessage(false);
+      // Call scheduleBooking store action
+      await scheduleBooking(schedulingBooking.id, `Visit scheduled: Expected arrival is ${expectedArrival}. Note: ${operationalNotes}`);
+      setSchedulingBooking(null);
+      alert("Service visit scheduled successfully!");
+    } catch (e: any) {
+      alert("Failed to schedule booking: " + e.message);
+    }
+  };
+
+  const handleStartService = async (id: string) => {
+    try {
+      await updateBookingStatus(id, "In Progress");
+      alert("Service commenced! Status updated to 'In Progress'.");
+    } catch (e: any) {
+      alert("Failed to start service: " + e.message);
+    }
+  };
+
+  const handleCompleteService = async (id: string) => {
+    try {
+      await completeBooking(id, "Completed service visit. Roster closed.");
+      alert("Service request completed successfully!");
+    } catch (e: any) {
+      alert("Failed to complete service: " + e.message);
+    }
+  };
+
+  const handleCancelService = async (id: string) => {
+    if (confirm("Are you sure you want to cancel this service request booking?")) {
+      try {
+        await updateBookingStatus(id, "Cancelled");
+        alert("Service request cancelled.");
+      } catch (e: any) {
+        alert("Failed to cancel service: " + e.message);
+      }
+    }
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "Forwarded to Manager":
+        return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+      case "Scheduled":
+        return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+      case "In Progress":
+        return "bg-orange-500/10 text-orange-600 border-orange-500/20 animate-pulse";
+      case "Completed":
+        return "bg-green-500/10 text-green-600 border-green-500/20";
+      case "Cancelled":
+        return "bg-red-500/10 text-red-600 border-red-500/20";
+      default:
+        return "bg-secondary text-secondary-foreground";
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="relative rounded-3xl overflow-hidden gradient-primary text-white p-6 lg:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl border-0">
-        <div className="space-y-1">
-          <Badge className="bg-white/10 text-white border-0 rounded-full px-3 py-1 text-xs backdrop-blur-sm">
-            💼 Service Provider Console
-          </Badge>
-          <h1 className="text-3xl font-extrabold font-[family-name:var(--font-heading)] leading-none tracking-tight">
-            Worker Dashboard
-          </h1>
-          <p className="text-white/80 text-sm font-medium">
-            Manage your service requests, communicate with residents, and track your completed job scorecards.
-          </p>
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight font-[family-name:var(--font-heading)]">Service Requests Console 💼</h1>
+        <p className="text-muted-foreground mt-1">
+          Coordinate, schedule, and track community services bookings escalated by the Secretary.
+        </p>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-secondary/10 p-4 rounded-2xl border border-border/40">
+        <div className="relative w-full md:w-80">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by Flat, resident or category..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 bg-background h-10 text-xs rounded-xl"
+          />
         </div>
-        <div className="flex gap-4 lg:gap-8 items-center bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 w-full md:w-auto">
-          <div className="text-center flex-1 md:flex-none">
-            <span className="block text-2xl font-bold">₹{totalEarnings}</span>
-            <span className="text-[10px] text-white/70">Total Revenue</span>
-          </div>
-          <div className="w-px h-10 bg-white/20" />
-          <div className="text-center flex-1 md:flex-none">
-            <span className="block text-2xl font-bold">{myProfile?.rating?.toFixed(1) || "4.8"}★</span>
-            <span className="text-[10px] text-white/70">Average Rating</span>
-          </div>
-          <div className="w-px h-10 bg-white/20" />
-          <div className="text-center flex-1 md:flex-none">
-            <span className="block text-2xl font-bold">{serviceBookings.length}</span>
-            <span className="text-[10px] text-white/70">Total Jobs</span>
-          </div>
+
+        <div className="flex gap-2 flex-wrap w-full md:w-auto">
+          {["All", "Forwarded to Manager", "Scheduled", "In Progress", "Completed", "Cancelled"].map((status) => (
+            <Button
+              key={status}
+              size="sm"
+              variant={selectedStatusFilter === status ? "default" : "outline"}
+              onClick={() => setSelectedStatusFilter(status)}
+              className="text-[10px] h-8 rounded-xl font-bold"
+            >
+              {status === "Forwarded to Manager" ? "Forwarded" : status}
+            </Button>
+          ))}
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-4 w-full md:w-[600px] h-12 bg-secondary/30 rounded-2xl p-1 mb-6">
-          <TabsTrigger value="bookings" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
-            Job Requests
-          </TabsTrigger>
-          <TabsTrigger value="inbox" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
-            Inbox Chat
-          </TabsTrigger>
-          <TabsTrigger value="earnings" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
-            Earnings
-          </TabsTrigger>
-          <TabsTrigger value="reviews" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
-            Reviews
-          </TabsTrigger>
-        </TabsList>
+      {/* Bookings Display */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filteredBookings.length === 0 ? (
+          <div className="col-span-full py-16 text-center text-muted-foreground border border-dashed border-border rounded-3xl bg-secondary/5">
+            <Calendar className="w-12 h-12 mx-auto text-muted-foreground/60 mb-3" />
+            No service requests match the active filter criteria.
+          </div>
+        ) : (
+          filteredBookings.map((bk) => (
+            <Card key={bk.id} className="glass-card hover:shadow-md transition-shadow rounded-2xl border-border/50">
+              <CardHeader className="pb-3 border-b border-border/30 bg-secondary/10 p-4 rounded-t-2xl flex flex-row justify-between items-center">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Flat {bk.address}</span>
+                  <span className="font-bold text-foreground text-sm block">{bk.resident?.name || "Resident"}</span>
+                </div>
+                <Badge variant="outline" className={`text-[8px] font-extrabold uppercase py-0.5 px-2 rounded-full border ${getStatusBadgeClass(bk.status)}`}>
+                  {bk.status}
+                </Badge>
+              </CardHeader>
+              
+              <CardContent className="p-4 space-y-4 text-xs">
+                {/* Details grid */}
+                <div className="grid grid-cols-2 gap-4 border-b border-border/30 pb-3">
+                  <div>
+                    <span className="text-muted-foreground block text-[9px] uppercase font-bold">Service Category</span>
+                    <span className="font-semibold text-foreground text-xs flex items-center gap-1 mt-0.5">
+                      <Wrench className="w-3.5 h-3.5 text-primary" /> {bk.category}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[9px] uppercase font-bold">Requested Slot</span>
+                    <span className="font-semibold text-foreground text-xs flex items-center gap-1 mt-0.5">
+                      <Clock className="w-3.5 h-3.5 text-primary" /> {bk.bookingDate} at {bk.bookingTime}
+                    </span>
+                  </div>
+                </div>
 
-        {/* BOOKINGS CONTENT */}
-        <TabsContent value="bookings" className="space-y-6 outline-none">
-          {/* Pending requests */}
-          <div className="space-y-3">
-            <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-500" /> Pending Requests ({pendingRequests.length})
-            </h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              {pendingRequests.map((bk) => (
-                <Card key={bk.id} className="border-amber-500/20 bg-amber-500/2.5 rounded-2xl overflow-hidden border">
-                  <CardHeader className="pb-2 border-b border-border/10 bg-secondary/20 p-4">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-foreground">Flat {bk.resident?.unit} • {bk.resident?.name}</span>
-                      <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[8px] font-extrabold uppercase py-0.5">Pending</Badge>
+                {/* Assigned worker info */}
+                <div className="grid grid-cols-2 gap-4 border-b border-border/30 pb-3">
+                  <div>
+                    <span className="text-muted-foreground block text-[9px] uppercase font-bold">Assigned Worker</span>
+                    <span className="font-semibold text-foreground text-xs flex items-center gap-1 mt-0.5">
+                      <User className="w-3.5 h-3.5 text-primary" /> {bk.worker?.name || "Offline Coordinated"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[9px] uppercase font-bold">Expected Arrival</span>
+                    <span className="font-semibold text-foreground text-xs flex items-center gap-1 mt-0.5">
+                      <Clock className="w-3.5 h-3.5 text-primary" /> {bk.expectedArrival || bk.bookingTime || "Pending Schedule"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Notes logs */}
+                <div className="space-y-2">
+                  {bk.adminNotes && (
+                    <div className="p-2.5 rounded-lg bg-indigo-500/5 border border-indigo-500/10 text-[11px]">
+                      <span className="font-bold text-indigo-500 uppercase tracking-wider text-[8px] block mb-0.5">Secretary Notes</span>
+                      <p className="text-foreground/80 font-medium">{bk.adminNotes}</p>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-4 space-y-3 text-xs">
-                    <div className="space-y-1 text-muted-foreground text-[11px]">
-                      <p><strong>Appointment Date:</strong> {bk.bookingDate}</p>
-                      <p><strong>Preferred Time:</strong> {bk.bookingTime}</p>
-                      <p><strong>Service Location:</strong> {bk.address}</p>
-                      {bk.notes && <p className="italic bg-background p-2 rounded border-l-2 border-amber-500 mt-2">"{bk.notes}"</p>}
+                  )}
+                  {bk.operationalNotes && (
+                    <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/10 text-[11px]">
+                      <span className="font-bold text-emerald-600 uppercase tracking-wider text-[8px] block mb-0.5">Manager Coordination Notes</span>
+                      <p className="text-foreground/80 font-medium">{bk.operationalNotes}</p>
                     </div>
-                    <div className="pt-2 flex gap-2 border-t border-border/10">
+                  )}
+                </div>
+
+                {/* Actions Panel */}
+                <div className="flex gap-2 justify-end pt-2">
+                  {bk.status === "Forwarded to Manager" && (
+                    <>
                       <Button
-                        onClick={() => updateBookingStatus(bk.id, "Accepted")}
-                        className="flex-1 h-8 rounded-lg text-[10px] font-bold bg-primary hover:bg-primary/95 text-white border-0 shadow-sm"
-                      >
-                        Accept
-                      </Button>
-                      <Button
+                        size="sm"
                         variant="outline"
-                        onClick={() => updateBookingStatus(bk.id, "Rejected")}
-                        className="flex-1 h-8 rounded-lg text-[10px] font-bold border-rose-500/30 text-rose-500 hover:bg-rose-500/5 bg-background"
+                        onClick={() => handleCancelService(bk.id)}
+                        className="text-[10px] h-8 rounded-lg border-red-500/20 text-red-500 hover:bg-red-500/5"
                       >
-                        Reject
+                        <XCircle className="w-3.5 h-3.5 mr-1" /> Cancel
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {pendingRequests.length === 0 && (
-                <div className="col-span-full py-12 text-center text-muted-foreground text-xs italic bg-secondary/10 rounded-2xl border border-border/50">
-                  No pending service dispatches or job tickets in queue.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Accepted / In Progress bookings */}
-          <div className="space-y-3 pt-4">
-            <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-primary" /> Active Assignments ({activeBookings.length})
-            </h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              {activeBookings.map((bk) => (
-                <Card key={bk.id} className="border-primary/20 bg-background rounded-2xl overflow-hidden shadow-sm">
-                  <CardHeader className="pb-2 border-b border-border/10 bg-secondary/10 p-4">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-foreground">Flat {bk.resident?.unit} • {bk.resident?.name}</span>
-                      <Badge className="bg-primary/10 text-primary border border-primary/20 text-[8px] font-extrabold uppercase py-0.5">Accepted</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-4 space-y-3 text-xs">
-                    <div className="space-y-1 text-muted-foreground text-[11px]">
-                      <p><strong>Appointment Date:</strong> {bk.bookingDate}</p>
-                      <p><strong>Arrival Time:</strong> {bk.bookingTime}</p>
-                      <p><strong>Location:</strong> {bk.address}</p>
-                      <p><strong>Contact Resident:</strong> {bk.resident?.phone}</p>
-                      {bk.notes && <p className="italic bg-secondary/10 p-2 rounded border-l-2 border-primary mt-2">"{bk.notes}"</p>}
-                    </div>
-                    <div className="pt-2 flex gap-2 border-t border-border/10">
                       <Button
-                        onClick={() => updateBookingStatus(bk.id, "Completed")}
-                        className="w-full h-8 rounded-lg text-[10px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white border-0 shadow-sm"
+                        size="sm"
+                        onClick={() => handleOpenScheduleModal(bk)}
+                        className="text-[10px] h-8 rounded-lg gradient-primary text-white border-0"
                       >
-                        Mark Completed
+                        <Calendar className="w-3.5 h-3.5 mr-1" /> Schedule Visit
                       </Button>
-                      <a href={`tel:${bk.resident?.phone}`} className="shrink-0">
-                        <Button size="icon" variant="outline" className="h-8 w-8 rounded-lg border-border/50 hover:bg-secondary">
-                          <PhoneCall className="w-3.5 h-3.5 text-emerald-500" />
-                        </Button>
-                      </a>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {activeBookings.length === 0 && (
-                <div className="col-span-full py-12 text-center text-muted-foreground text-xs italic bg-secondary/10 rounded-2xl border border-border/50">
-                  No active work tasks in progress.
-                </div>
-              )}
-            </div>
-          </div>
-        </TabsContent>
+                    </>
+                  )}
 
-        {/* INBOX MESSAGING TAB */}
-        <TabsContent value="inbox" className="grid grid-cols-12 gap-6 outline-none h-[calc(100vh-22rem)]">
-          {/* Contacts List sidebar */}
-          <Card className="col-span-12 md:col-span-4 border-border/50 bg-card rounded-2xl overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-border/15">
-              <h4 className="font-bold text-xs text-foreground uppercase tracking-widest">Active Contacts</h4>
-            </div>
-            <div className="flex-1 overflow-y-auto divide-y divide-border/10">
-              {activeContacts.map((contact) => (
-                <div
-                  key={contact.id}
-                  onClick={() => setSelectedContact(contact)}
-                  className={`p-4 flex items-center gap-3 cursor-pointer transition-colors ${
-                    selectedContact?.id === contact.id ? "bg-primary/5 border-r-3 border-primary" : "hover:bg-secondary/10"
-                  }`}
-                >
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
-                    {contact.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
-                  </div>
-                  <div className="min-w-0 flex-1 text-xs">
-                    <span className="font-bold text-foreground block truncate">{contact.name}</span>
-                    <span className="text-[10px] text-muted-foreground">Flat {contact.unit} · {contact.building}</span>
-                  </div>
-                </div>
-              ))}
-              {activeContacts.length === 0 && (
-                <div className="text-center py-16 text-muted-foreground text-xs italic">
-                  No resident chat threads active.
-                </div>
-              )}
-            </div>
-          </Card>
+                  {bk.status === "Scheduled" && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCancelService(bk.id)}
+                        className="text-[10px] h-8 rounded-lg border-red-500/20 text-red-500 hover:bg-red-500/5"
+                      >
+                        <XCircle className="w-3.5 h-3.5 mr-1" /> Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleStartService(bk.id)}
+                        className="text-[10px] h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white border-0"
+                      >
+                        <Play className="w-3.5 h-3.5 mr-1" /> Commenced Work
+                      </Button>
+                    </>
+                  )}
 
-          {/* Chat Window */}
-          <Card className="col-span-12 md:col-span-8 border-border/50 bg-card rounded-2xl overflow-hidden flex flex-col h-full">
-            {selectedContact ? (
-              <>
-                {/* Header */}
-                <div className="p-4 border-b border-border/15 bg-secondary/10 flex justify-between items-center text-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-bold">
-                      {selectedContact.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-foreground">{selectedContact.name}</h4>
-                      <p className="text-[10px] text-muted-foreground">Flat {selectedContact.unit} • {selectedContact.building}</p>
-                    </div>
-                  </div>
-                  <a href={`tel:${selectedContact.phone}`} className="shrink-0">
-                    <Button variant="outline" size="sm" className="rounded-xl h-8.5 px-3.5 border-border/50 flex items-center gap-1.5 font-bold hover:bg-secondary/40">
-                      <PhoneCall className="w-3.5 h-3.5 text-emerald-500" />
-                      {selectedContact.phone}
-                    </Button>
-                  </a>
-                </div>
-
-                {/* Messages list */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-secondary/5 dark:bg-card">
-                  {chatMessages.map((msg: any) => {
-                    const isMe = msg.senderId === user?.id;
-                    return (
-                      <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed ${
-                          isMe
-                            ? "gradient-primary text-white rounded-tr-none"
-                            : "bg-secondary/40 text-foreground rounded-tl-none border border-border/20"
-                        }`}>
-                          <p>{msg.message}</p>
-                          <span className="block text-[8px] text-right mt-1 opacity-70">
-                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div ref={chatEndRef} />
-                </div>
-
-                {/* Message input */}
-                <div className="p-4 border-t border-border/10 bg-card">
-                  <form onSubmit={handleSendMessage} className="flex gap-2">
-                    <Input
-                      placeholder="Type your response to the resident..."
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      className="h-10 rounded-xl bg-secondary/10 border-border/50 text-xs"
-                    />
+                  {bk.status === "In Progress" && (
                     <Button
-                      type="submit"
-                      disabled={!chatInput.trim() || sendingMessage}
-                      className="rounded-xl h-10 px-4 gradient-primary text-white border-0 flex gap-1 font-bold shrink-0"
+                      size="sm"
+                      onClick={() => handleCompleteService(bk.id)}
+                      className="text-[10px] h-8 rounded-lg bg-green-600 hover:bg-green-700 text-white border-0 w-full"
                     >
-                      {sendingMessage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                      Send
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Mark Service Completed
                     </Button>
-                  </form>
+                  )}
                 </div>
-              </>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-3 text-muted-foreground text-xs">
-                <MessageCircle className="w-12 h-12 text-muted-foreground/30 animate-bounce" />
-                <div>
-                  <h4 className="font-bold text-sm text-foreground">Select a Chat Thread</h4>
-                  <p className="text-[10px]">Click a contact in the sidebar list to see the resident message history.</p>
-                </div>
-              </div>
-            )}
-          </Card>
-        </TabsContent>
-
-        {/* EARNINGS TAB */}
-        <TabsContent value="earnings" className="space-y-6 outline-none">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="border-border/50 rounded-2xl bg-card shadow-sm p-5 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-muted-foreground uppercase">Average Payout</span>
-                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><DollarSign className="w-4 h-4" /></div>
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-black text-foreground">₹{myProfile?.workerProfile?.visitCharge || "120"}</h2>
-                <p className="text-[10px] text-muted-foreground font-medium">Standard visitation fee per accepted ticket</p>
-              </div>
+              </CardContent>
             </Card>
+          ))
+        )}
+      </div>
 
-            <Card className="border-border/50 rounded-2xl bg-card shadow-sm p-5 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-muted-foreground uppercase">Revenue generated</span>
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center"><TrendingUp className="w-4 h-4" /></div>
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-black text-emerald-500">₹{totalEarnings}</h2>
-                <p className="text-[10px] text-muted-foreground font-medium">Calculated from {completedBookings.length} completed services</p>
-              </div>
-            </Card>
+      {/* Schedule Visit Modal */}
+      <Dialog open={!!schedulingBooking} onOpenChange={(open) => !open && setSchedulingBooking(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-[family-name:var(--font-heading)]">Schedule Technician Visit</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleScheduleSubmit} className="space-y-4 mt-2 text-xs">
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Expected Arrival Date/Time</label>
+              <Input
+                value={expectedArrival}
+                onChange={(e) => setExpectedArrival(e.target.value)}
+                placeholder="e.g. 26-07-2026 at 10:00 AM"
+                className="rounded-xl h-10"
+                required
+              />
+            </div>
 
-            <Card className="border-border/50 rounded-2xl bg-card shadow-sm p-5 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-muted-foreground uppercase">Satisfaction rating</span>
-                <div className="w-8 h-8 rounded-lg bg-yellow-500/10 text-yellow-500 flex items-center justify-center"><Star className="w-4 h-4 fill-yellow-500" /></div>
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-black text-foreground">{myProfile?.rating?.toFixed(1) || "4.8"} / 5</h2>
-                <p className="text-[10px] text-muted-foreground font-medium">Calculated score from citizen feedback logs</p>
-              </div>
-            </Card>
-          </div>
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Operational Dispatch Notes</label>
+              <Input
+                value={operationalNotes}
+                onChange={(e) => setOperationalNotes(e.target.value)}
+                placeholder="e.g., Electrician Ramesh dispatched. Placed call to vendor."
+                className="rounded-xl h-10"
+              />
+            </div>
 
-          <Card className="border-border/50 bg-card rounded-2xl shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/10">
-              <CardTitle className="text-base font-bold">Rostered Job Receipts ({completedBookings.length})</CardTitle>
-              <CardDescription>Archived receipts of verified task completions</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border/20">
-                {completedBookings.map((bk) => (
-                  <div key={bk.id} className="p-4 flex justify-between items-center hover:bg-secondary/10 transition-all text-xs">
-                    <div className="space-y-1.5">
-                      <span className="font-bold text-foreground block">Flat {bk.resident?.unit} • {bk.resident?.name}</span>
-                      <p className="text-[10px] text-muted-foreground flex gap-4">
-                        <span>Date: {bk.bookingDate}</span>
-                        <span>Visit Cost: ₹{bk.price}</span>
-                      </p>
-                    </div>
-                    <Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[8px] font-extrabold uppercase py-0.5">Disbursed</Badge>
-                  </div>
-                ))}
-                {completedBookings.length === 0 && (
-                  <div className="text-center py-16 text-muted-foreground text-xs italic">
-                    No completed job receipts archived.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* REVIEWS TAB */}
-        <TabsContent value="reviews" className="space-y-6 outline-none">
-          <Card className="border-border/50 bg-card rounded-2xl shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/10">
-              <CardTitle className="text-base font-bold">Customer Feedback & Reviews ({myProfile?.workerReviews?.length || 0})</CardTitle>
-              <CardDescription>Review list posted by Sunshine Complex residents</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border/20">
-                {myProfile?.workerReviews?.map((rv: any) => (
-                  <div key={rv.id} className="p-5 space-y-2 hover:bg-secondary/10 transition-all text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-foreground">Flat {rv.resident?.unit} • {rv.resident?.name || "Resident"}</span>
-                      <div className="flex gap-0.5 shrink-0">
-                        {[...Array(rv.rating)].map((_, i) => (
-                          <Star key={i} className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
-                        ))}
-                        {[...Array(5 - rv.rating)].map((_, i) => (
-                          <Star key={i} className="w-3.5 h-3.5 text-muted-foreground" />
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-muted-foreground text-[11px] leading-relaxed italic bg-secondary/10 p-3 rounded-xl border-l-2 border-primary">
-                      "{rv.reviewText || "No written comment logged."}"
-                    </p>
-                    <div className="text-[9px] text-muted-foreground pt-1">
-                      Posted on: {new Date(rv.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))}
-                {(!myProfile?.workerReviews || myProfile.workerReviews.length === 0) && (
-                  <div className="text-center py-20 text-muted-foreground text-xs italic">
-                    No citizen reviews or ratings recorded yet.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setSchedulingBooking(null)} className="rounded-xl h-10">
+                Cancel
+              </Button>
+              <Button type="submit" className="gradient-primary text-white border-0 rounded-xl h-10 font-bold px-5">
+                Save & Schedule Visit
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

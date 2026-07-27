@@ -59,7 +59,8 @@ const statusIcons: Record<ComplaintStatus, React.ComponentType<{ className?: str
   "Work In Progress": Zap,
   "Resident Feedback": ShieldAlert,
   "Completed": CheckCircle2,
-  "Rejected": XCircle
+  "Rejected": XCircle,
+  "reopened": Clock
 };
 
 function EyeIcon({ className }: { className?: string }) { return <Eye className={className} />; }
@@ -88,7 +89,8 @@ const statusColors: Record<ComplaintStatus, string> = {
   "Work In Progress": "bg-orange-500/10 text-orange-600 border-orange-500/20 animate-pulse",
   "Resident Feedback": "bg-pink-500/10 text-pink-600 border-pink-500/20",
   "Completed": "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-  "Rejected": "bg-red-500/10 text-red-600 border-red-500/20"
+  "Rejected": "bg-red-500/10 text-red-600 border-red-500/20",
+  "reopened": "bg-purple-500/10 text-purple-600 border-purple-500/20"
 };
 
 const categoryIconMap: Record<string, any> = {
@@ -128,7 +130,8 @@ export default function ComplaintsPage() {
     subscribeToComplaint,
     updateComplaintEta,
     users,
-    initializeDb
+    initializeDb,
+    actionComplaintManager
   } = useCommunityStore(
     useShallow((state) => ({
       complaints: state.complaints || [],
@@ -142,11 +145,40 @@ export default function ComplaintsPage() {
       updateComplaintEta: state.updateComplaintEta,
       users: state.users || [],
       initializeDb: state.initializeDb,
+      actionComplaintManager: state.actionComplaintManager,
     }))
   );
 
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<"ledger" | "analytics">("ledger");
+
+  // Sub-tabs for role-based complaint rosters
+  const [residentTab, setResidentTab] = useState<"active" | "completed">("active");
+  const [secretaryTab, setSecretaryTab] = useState<"active" | "rejected" | "history">("active");
+  const [managerTab, setManagerTab] = useState<"in-progress" | "solved">("in-progress");
+
+  const getResidentMaskedStatus = (status: string) => {
+    const s = status.toLowerCase();
+    if (["submitted", "under-review", "verified", "forwarded to manager"].includes(s)) {
+      return { label: "Under Review", badgeClass: "bg-amber-500/10 text-amber-600 border-amber-500/20" };
+    }
+    if (["worker being coordinated", "assigned", "accepted"].includes(s)) {
+      return { label: "Worker Assigned", badgeClass: "bg-blue-500/10 text-blue-600 border-blue-500/20" };
+    }
+    if (["scheduled", "work in progress", "in-progress", "work-started", "travelling", "reached-society", "reached-building", "reached-flat"].includes(s)) {
+      return { label: "Work In Progress", badgeClass: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20" };
+    }
+    if (s === "completed") {
+      return { label: "Completed", badgeClass: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" };
+    }
+    if (s === "closed") {
+      return { label: "Closed", badgeClass: "bg-gray-500/10 text-gray-500 border-gray-500/20" };
+    }
+    if (s === "reopened") {
+      return { label: "Reopened (Under Review)", badgeClass: "bg-purple-500/10 text-purple-600 border-purple-500/20" };
+    }
+    return { label: status, badgeClass: statusColors[status as keyof typeof statusColors] || "bg-secondary text-foreground" };
+  };
 
   // Form State for creating complaints
   const [title, setTitle] = useState("");
@@ -177,6 +209,11 @@ export default function ComplaintsPage() {
   const [secNotes, setSecNotes] = useState("");
   const [overridePriority, setOverridePriority] = useState<ComplaintPriority | "">("");
 
+  // Manager actions
+  const [managerWorkerId, setManagerWorkerId] = useState("");
+  const [managerEta, setManagerEta] = useState("");
+  const [managerOpsNotes, setManagerOpsNotes] = useState("");
+
   // Chat/Remarks state
   const [chatMessage, setChatMessage] = useState("");
   const [ratingVal, setRatingVal] = useState(5);
@@ -188,8 +225,7 @@ export default function ComplaintsPage() {
 
   // Community board dialog
   const [boardOpen, setBoardOpen] = useState(false);
-
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     initialize();
@@ -202,15 +238,18 @@ export default function ComplaintsPage() {
   const isSecretary = user?.role === "secretary" || user?.role === "admin";
   const isSecurity = user?.role === "security";
   const isResident = user?.role === "resident";
+  const isManager = user?.role === "manager";
 
   // Active workers for assignment
   const availableWorkers = useMemo(() => {
     return users.filter(u => u.role === "worker");
   }, [users]);
 
-  // Scroll chat to bottom
+  // Scroll chat to bottom (does not scroll page)
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [selectedComplaintId, complaints]);
 
   // Filter complaints based on roles (clutter-free, no top filters)
@@ -225,6 +264,21 @@ export default function ComplaintsPage() {
         const isOwner = c.raisedBy === user?.id || c.unit === user?.unit;
         const isSubscribed = c.subscribers?.some(s => s.userId === user?.id);
         if (!isOwner && !isSubscribed) return false;
+
+        // Apply resident tab filtering
+        const isActiveStatus = [
+          "submitted", "under-review", "Verified", "Forwarded to Manager",
+          "Worker Being Coordinated", "Scheduled", "Work In Progress", "reopened",
+          "assigned", "accepted", "travelling", "reached-society", "reached-building",
+          "reached-flat", "work-started", "in-progress", "completed", "Completed"
+        ].includes(c.status);
+
+        if (residentTab === "active") {
+          if (!isActiveStatus) return false;
+        } else {
+          // completed
+          if (isActiveStatus) return false;
+        }
       } else if (isWorker) {
         // Worker sees only assigned jobs (matching their category or assignedToId)
         const catMatch = c.category?.toLowerCase() === user?.workerCategory?.toLowerCase();
@@ -239,17 +293,37 @@ export default function ComplaintsPage() {
         ];
         const isSecurityCat = securityCats.includes(c.category || "") || c.category === "security" || c.category === "parking";
         if (!isSecurityCat) return false;
+      } else if (isSecretary) {
+        // Secretary filters based on secretaryTab
+        if (secretaryTab === "active") {
+          if (["Rejected", "closed", "resolved"].includes(c.status)) return false;
+        } else if (secretaryTab === "rejected") {
+          if (c.status !== "Rejected") return false;
+        }
+        // "history" sees all
+      } else if (isManager) {
+        // Manager filters based on managerTab
+        const isSolved = ["closed", "resolved"].includes(c.status);
+        if (managerTab === "in-progress") {
+          if (isSolved) return false;
+        } else if (managerTab === "solved") {
+          if (!isSolved) return false;
+        }
       }
-      // Secretary sees all complex complaints
 
       return true;
     });
-  }, [complaints, isResident, isWorker, isSecurity, user]);
+  }, [complaints, isResident, isWorker, isSecurity, isSecretary, isManager, user, residentTab, secretaryTab, managerTab]);
 
   // Set default selection
   useEffect(() => {
-    if (filteredComplaints.length > 0 && !selectedComplaintId) {
-      setSelectedComplaintId(filteredComplaints[0].id);
+    if (filteredComplaints.length > 0) {
+      const exists = filteredComplaints.some(c => c.id === selectedComplaintId);
+      if (!exists) {
+        setSelectedComplaintId(filteredComplaints[0].id);
+      }
+    } else {
+      setSelectedComplaintId(null);
     }
   }, [filteredComplaints, selectedComplaintId]);
 
@@ -259,7 +333,10 @@ export default function ComplaintsPage() {
 
   // Community Active Complaints
   const activeComplexComplaints = useMemo(() => {
-    return complaints.filter(c => c.portal === "society" && c.status !== "closed" && c.status !== "resolved");
+    return complaints.filter(c => 
+      c.portal === "society" && 
+      !["completed", "Completed", "resolved", "closed"].includes(c.status)
+    );
   }, [complaints]);
 
   // Dynamic Suggestion checking during creation
@@ -365,36 +442,18 @@ export default function ComplaintsPage() {
     return complaints.filter(c => c.status !== "closed" && c.aiAnalysis?.isDuplicate && c.aiAnalysis?.possibleDuplicateOf);
   }, [complaints]);
 
-  // Direct chat permissions: Resident + Assigned Worker + Secretary (view-only)
+  // Direct chat permissions: Resident + Manager + Secretary (view-only)
   const chatPermission = useMemo(() => {
     if (!selected) return { visible: false, canSend: false, role: "guest" };
     
-    // Check if worker is assigned yet
-    if (!selected.assignedToId) return { visible: false, canSend: false, role: "guest" };
-
     if (isSecretary) return { visible: true, canSend: false, role: "secretary" };
+    if (isManager) return { visible: true, canSend: true, role: "manager" };
     if (isResident && (selected.raisedBy === user?.id || selected.unit === user?.unit)) {
       return { visible: true, canSend: true, role: "resident" };
     }
-    if (isWorker && selected.assignedToId === user?.id) {
-      return { visible: true, canSend: true, role: "worker" };
-    }
-    if (isSecurity) {
-      const securityCats = [
-        "security", "parking", "others", "unauthorized-visitor", 
-        "theft", "lost-item", "suspicious-activity", "gate-issue", 
-        "vehicle-issue", "cctv", "security-staff-complaint"
-      ];
-      const isSecCat = securityCats.includes(selected.category || "") || selected.category === "security";
-      const isAssigned = selected.assignedToId === user?.id;
-      if (isSecCat && isAssigned) {
-        return { visible: true, canSend: true, role: "security" };
-      }
-      return { visible: false, canSend: false, role: "security-denied" };
-    }
 
     return { visible: false, canSend: false, role: "unauthorized" };
-  }, [selected, user, isSecretary, isResident, isWorker, isSecurity]);
+  }, [selected, user, isSecretary, isManager, isResident]);
 
   // Helper to mask Flat numbers for privacy on Community Complaint board (e.g. Flat B-302 -> Flat B-30X)
   const maskFlatNumber = (unitStr: string) => {
@@ -530,9 +589,29 @@ export default function ComplaintsPage() {
 
   const handleResidentVerifyClose = async () => {
     if (!selected) return;
-    await rateComplaint(selected.id, ratingVal, reviewVal);
-    setReviewVal("");
-    setRatingVal(5);
+    try {
+      await rateComplaint(selected.id, ratingVal, reviewVal);
+      setReviewVal("");
+      setRatingVal(5);
+      alert("Complaint successfully resolved and closed!");
+    } catch (err: any) {
+      alert("Error closing complaint: " + err.message);
+    }
+  };
+
+  const handleResidentReopen = async () => {
+    if (!selected) return;
+    try {
+      await updateComplaintStatus(selected.id, "reopened", {
+        by: user?.name || "Resident",
+        note: `Resident raised further issue: "${reviewVal || "No additional comments"}"`
+      });
+      setReviewVal("");
+      setRatingVal(5);
+      alert("Complaint reopened successfully and routed back to operations.");
+    } catch (err: any) {
+      alert("Error reopening complaint: " + err.message);
+    }
   };
 
   const handleSecurityActionSubmit = async (status: "in-progress" | "completed") => {
@@ -571,6 +650,44 @@ export default function ComplaintsPage() {
       by: user?.name || "Secretary",
       note: `Admin override: Status changed directly to ${status.toUpperCase()}.`
     });
+  };
+
+  const handleManagerActionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected || !managerWorkerId) return;
+
+    const worker = availableWorkers.find(w => w.id === managerWorkerId);
+    if (!worker) return;
+
+    try {
+      await actionComplaintManager(selected.id, {
+        status: "Work In Progress",
+        assignedTo: worker.name,
+        assignedToId: worker.id,
+        expectedArrival: managerEta,
+        operationalNotes: managerOpsNotes || `Dispatched to ${worker.name}. ETA: ${managerEta}.`
+      });
+
+      setManagerWorkerId("");
+      setManagerEta("");
+      setManagerOpsNotes("");
+      alert("Worker assigned and task dispatched successfully!");
+    } catch (err: any) {
+      alert("Error dispatching: " + err.message);
+    }
+  };
+
+  const handleManagerQuickStatus = async (status: string) => {
+    if (!selected) return;
+    try {
+      await actionComplaintManager(selected.id, {
+        status,
+        operationalNotes: `Manager marked work as ${status}.`
+      });
+      alert(`Complaint status updated to ${status} successfully!`);
+    } catch (err: any) {
+      alert("Error updating status: " + err.message);
+    }
   };
 
   return (
@@ -1071,7 +1188,76 @@ export default function ComplaintsPage() {
           {/* Clean Ledger split */}
           <div className="grid lg:grid-cols-12 gap-6 items-start">
             {/* Left Ledger List */}
-            <div className="lg:col-span-5 space-y-3 max-h-[85vh] overflow-y-auto pr-1">
+            <div className="lg:col-span-5 space-y-4 max-h-[85vh] overflow-y-auto pr-1">
+              {/* Role sub-tabs */}
+              {isResident && (
+                <div className="flex border border-border/50 rounded-2xl p-1 bg-secondary/15">
+                  <Button
+                    variant={residentTab === "active" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setResidentTab("active")}
+                    className={`flex-1 h-8 rounded-xl text-xs font-bold transition-all ${
+                      residentTab === "active" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Active Complaints
+                  </Button>
+                  <Button
+                    variant={residentTab === "completed" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setResidentTab("completed")}
+                    className={`flex-1 h-8 rounded-xl text-xs font-bold transition-all ${
+                      residentTab === "completed" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Completed History
+                  </Button>
+                </div>
+              )}
+
+              {isSecretary && (
+                <div className="flex border border-border/50 rounded-2xl p-1 bg-secondary/15 gap-1 overflow-x-auto">
+                  {[
+                    { id: "active", label: "Active" },
+                    { id: "rejected", label: "Rejected" },
+                    { id: "history", label: "History" }
+                  ].map((tab) => (
+                    <Button
+                      key={tab.id}
+                      variant={secretaryTab === tab.id ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setSecretaryTab(tab.id as any)}
+                      className={`flex-1 h-8 rounded-xl text-[10px] font-bold transition-all px-2 shrink-0 ${
+                        secretaryTab === tab.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {tab.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
+              {isManager && (
+                <div className="flex border border-border/50 rounded-2xl p-1 bg-secondary/15 gap-1">
+                  {[
+                    { id: "in-progress", label: "In Progress" },
+                    { id: "solved", label: "Solved" }
+                  ].map((tab) => (
+                    <Button
+                      key={tab.id}
+                      variant={managerTab === tab.id ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setManagerTab(tab.id as any)}
+                      className={`flex-1 h-8 rounded-xl text-xs font-bold transition-all ${
+                        managerTab === tab.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {tab.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
               {filteredComplaints.map((c) => {
                 const priorityConf = PRIORITY_CONFIG[c.priority as keyof typeof PRIORITY_CONFIG] || PRIORITY_CONFIG.medium;
                 const catConf = COMPLAINT_CATEGORIES.find(cat => cat.value === c.category) || { label: "Others", icon: "CircleDot" };
@@ -1091,9 +1277,18 @@ export default function ComplaintsPage() {
                       <div className="min-w-0 flex-1 space-y-1 pl-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-mono font-bold text-muted-foreground text-[10px]">{c.id}</span>
-                          <Badge className={`${statusColors[c.status]} text-[9px] font-semibold border`} variant="outline">
-                            {c.status.replace("-", " ")}
-                          </Badge>
+                          {isResident ? (() => {
+                            const masked = getResidentMaskedStatus(c.status);
+                            return (
+                              <Badge className={`${masked.badgeClass} text-[9px] font-semibold border`} variant="outline">
+                                {masked.label}
+                              </Badge>
+                            );
+                          })() : (
+                            <Badge className={`${statusColors[c.status]} text-[9px] font-semibold border`} variant="outline">
+                              {c.status.replace("-", " ")}
+                            </Badge>
+                          )}
                           <Badge
                             className="text-[9px] font-semibold border"
                             style={{
@@ -1154,9 +1349,18 @@ export default function ComplaintsPage() {
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono font-bold text-muted-foreground text-xs">{selected.id}</span>
-                          <Badge className={`${statusColors[selected.status]} text-xs font-semibold`} variant="outline">
-                            {selected.status.replace("-", " ")}
-                          </Badge>
+                          {isResident ? (() => {
+                            const masked = getResidentMaskedStatus(selected.status);
+                            return (
+                              <Badge className={`${masked.badgeClass} text-xs font-semibold`} variant="outline">
+                                {masked.label}
+                              </Badge>
+                            );
+                          })() : (
+                            <Badge className={`${statusColors[selected.status]} text-xs font-semibold`} variant="outline">
+                              {selected.status.replace("-", " ")}
+                            </Badge>
+                          )}
                           {selected.emergency && (
                             <Badge className="bg-red-600 text-white text-[10px] animate-pulse">EMERGENCY LEVEL</Badge>
                           )}
@@ -1188,6 +1392,79 @@ export default function ComplaintsPage() {
                     </div>
 
                     <CardContent className="p-6 space-y-6 text-xs leading-relaxed">
+                      {/* Visual Progress Stepper Stepped Timeline */}
+                      <div className="mb-6 p-4 bg-secondary/15 rounded-xl border border-border/40 space-y-3">
+                        <span className="font-bold text-[10px] text-muted-foreground uppercase tracking-wider block">Complaint Milestones Progress</span>
+                        <div className="flex flex-col md:flex-row justify-between md:items-center gap-2 md:gap-1 text-[9px] relative font-semibold">
+                          {(isResident ? [
+                            "Submitted",
+                            "Under Review",
+                            "Worker Assigned",
+                            "Work In Progress",
+                            "Completed",
+                            "Closed"
+                          ] : [
+                            "Submitted",
+                            "Review",
+                            "Verified",
+                            "Coordinated",
+                            "Scheduled",
+                            "In Progress",
+                            "Completed",
+                            "Closed"
+                          ]).map((stepLabel, idx) => {
+                            const getStepIndex = (status: string) => {
+                              const s = status.toLowerCase();
+                              if (isResident) {
+                                if (s === "submitted") return 0;
+                                if (["under-review", "verified", "forwarded to manager"].includes(s)) return 1;
+                                if (["worker being coordinated", "assigned", "accepted"].includes(s)) return 2;
+                                if (["scheduled", "work in progress", "in-progress", "work-started", "travelling", "reached-society", "reached-building", "reached-flat"].includes(s)) return 3;
+                                if (s === "completed") return 4;
+                                if (s === "closed" || s === "resolved") return 5;
+                                if (s === "reopened") return 1;
+                                return 0;
+                              } else {
+                                if (s === "submitted") return 0;
+                                if (s === "under-review") return 1;
+                                if (["forwarded to manager", "verified"].includes(s)) return 2;
+                                if (s === "worker being coordinated") return 3;
+                                if (s === "scheduled") return 4;
+                                if (["work in progress", "in-progress"].includes(s)) return 5;
+                                if (s === "completed") return 6;
+                                  if (["resolved", "closed", "resident feedback"].includes(s)) return 7;
+                                return 0;
+                              }
+                            };
+                            const currentIdx = getStepIndex(selected.status);
+                            const isDone = currentIdx >= idx;
+                            const isCurrent = currentIdx === idx;
+                            return (
+                              <div key={idx} className="flex md:flex-col items-center gap-2 md:gap-1 flex-1 text-center relative group">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center border text-[9px] font-bold z-10 shrink-0 transition-all ${
+                                  isDone 
+                                    ? "bg-green-600 border-green-700 text-white shadow-md shadow-green-500/10" 
+                                    : isCurrent 
+                                      ? "bg-primary border-primary text-white animate-pulse" 
+                                      : "bg-background border-border text-muted-foreground"
+                                }`}>
+                                  {isDone && idx < currentIdx ? "✓" : idx + 1}
+                                </div>
+                                <span className={`${
+                                  isCurrent 
+                                    ? "text-primary font-extrabold" 
+                                    : isDone 
+                                      ? "text-green-600 font-bold" 
+                                      : "text-muted-foreground"
+                                }`}>
+                                  {stepLabel}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       {/* Statement and attachments */}
                       <div className="space-y-2">
                         <span className="font-bold text-muted-foreground uppercase tracking-wider text-[10px] block">Resident Issue Statement</span>
@@ -1259,60 +1536,106 @@ export default function ComplaintsPage() {
                         </div>
                       )}
 
+                      {/* --- MANAGER ACTION WIDGET --- */}
+                      {isManager && (
+                        <div className="p-4 bg-secondary/15 rounded-xl border border-border/40 space-y-4">
+                          <span className="font-bold text-foreground block text-sm">Manager Operations Console</span>
+
+                          {selected.status !== "Completed" && selected.status !== "closed" ? (
+                            <>
+                              {!["Work In Progress", "in-progress", "work-started"].includes(selected.status) ? (
+                                /* Form to Assign Worker & Dispatch */
+                                <form onSubmit={handleManagerActionSubmit} className="space-y-3">
+                                  <span className="font-bold text-muted-foreground text-[10px] block uppercase tracking-wider">Assign Worker & Dispatch Task</span>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                                    <div>
+                                      <label className="text-[9px] text-muted-foreground mb-1 block font-bold uppercase">Select Worker / Technician</label>
+                                      <select
+                                        value={managerWorkerId}
+                                        onChange={(e) => setManagerWorkerId(e.target.value)}
+                                        className="w-full h-9 px-2 rounded-xl border border-border bg-card text-xs font-semibold"
+                                        required
+                                      >
+                                        <option value="">Select Technician</option>
+                                        {availableWorkers.map(w => (
+                                          <option key={w.id} value={w.id}>{w.name} ({w.workerCategory || "Technician"})</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="text-[9px] text-muted-foreground mb-1 block font-bold uppercase">Expected Arrival / ETA</label>
+                                      <Input
+                                        placeholder="e.g. Today 4 PM, tomorrow 10 AM"
+                                        value={managerEta}
+                                        onChange={(e) => setManagerEta(e.target.value)}
+                                        className="h-9 text-xs rounded-xl"
+                                        required
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[9px] text-muted-foreground mb-1 block font-bold uppercase">Dispatch Notes / Remarks</label>
+                                    <Input
+                                      placeholder="e.g. Technician contacted, tools gathered..."
+                                      value={managerOpsNotes}
+                                      onChange={(e) => setManagerOpsNotes(e.target.value)}
+                                      className="h-9 text-xs rounded-xl"
+                                    />
+                                  </div>
+
+                                  <Button type="submit" className="w-full gradient-primary text-white border-0 h-10 font-bold rounded-xl mt-2 shadow-md">
+                                    Assign Worker & Dispatch
+                                  </Button>
+                                </form>
+                              ) : (
+                                /* Dispatch active, option to Mark Completed */
+                                <div className="space-y-4">
+                                  <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-xl space-y-2 text-xs">
+                                    <span className="font-extrabold text-[10px] text-blue-600 block uppercase tracking-wider">⚡ Dispatch Active</span>
+                                    <p className="font-semibold text-foreground">
+                                      Worker: <strong className="text-primary">{selected.assignedTo || "Unassigned"}</strong>
+                                    </p>
+                                    <p className="text-muted-foreground">
+                                      ETA: <strong>{selected.expectedArrival || "N/A"}</strong>
+                                    </p>
+                                    {selected.operationalNotes && (
+                                      <p className="text-[11px] italic text-muted-foreground">
+                                        Notes: "{selected.operationalNotes}"
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  <Button 
+                                    onClick={() => handleManagerQuickStatus("Completed")} 
+                                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-10 rounded-xl shadow-md border-0"
+                                  >
+                                    Mark Work Completed
+                                  </Button>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="p-3 bg-secondary/5 rounded-xl border border-dashed text-center text-muted-foreground text-[10px] font-semibold">
+                              Task successfully resolved and completed by management.
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* --- SECRETARY DISPATCH CONTROL WIDGET --- */}
                       {isSecretary && (
-                        <div className="p-4 bg-secondary/10 rounded-xl border border-border/45 space-y-4">
-                          <span className="font-bold text-foreground block text-sm">Administrative Dispatch Actions</span>
-                          
-                          <div className="flex gap-2 flex-wrap">
-                            <Button size="sm" variant="outline" onClick={() => handleStatusChangeAdmin("under-review")} className="text-[9px] h-7">Set Under Review</Button>
-                            <Button size="sm" variant="outline" onClick={() => handleStatusChangeAdmin("in-progress")} className="text-[9px] h-7">Force In-Progress</Button>
-                            <Button size="sm" variant="outline" onClick={() => handleStatusChangeAdmin("completed")} className="text-[9px] h-7">Force Completed</Button>
-                            <Button size="sm" variant="outline" onClick={() => handleStatusChangeAdmin("closed")} className="text-[9px] h-7 bg-red-500/10 text-red-600 hover:bg-red-500/20 border-red-500/20">Direct Close</Button>
-                          </div>
-
-                          {/* Assign Worker */}
-                          {["submitted", "under-review", "assigned"].includes(selected.status) && (
-                            <form onSubmit={handleAssignWorkerSubmit} className="space-y-3 pt-2 border-t border-border/30">
-                              <span className="font-bold text-muted-foreground text-[10px] block">Delegate Worker Assignment</span>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                <div>
-                                  <label className="text-[9px] text-muted-foreground mb-1 block">Contractor Team</label>
-                                  <select
-                                    value={selectedWorkerId}
-                                    onChange={(e) => setSelectedWorkerId(e.target.value)}
-                                    className="w-full h-8 px-2 rounded-lg border border-border bg-card text-[10px]"
-                                    required
-                                  >
-                                    <option value="">Select Worker</option>
-                                    {availableWorkers.map(w => (
-                                      <option key={w.id} value={w.id}>{w.name} ({w.workerCategory || "Contractor"})</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="text-[9px] text-muted-foreground mb-1 block">Required ETA</label>
-                                  <Input value={eta} onChange={(e) => setEta(e.target.value)} className="h-8 text-[10px]" required />
-                                </div>
-                                <div>
-                                  <label className="text-[9px] text-muted-foreground mb-1 block">Internal dispatch notes</label>
-                                  <Input placeholder="e.g. Inspect AC filter" value={secNotes} onChange={(e) => setSecNotes(e.target.value)} className="h-8 text-[10px]" />
-                                </div>
-                              </div>
-                              <Button type="submit" className="w-full gradient-primary text-white border-0 h-9 font-semibold text-[10px]">
-                                Assign & Dispatch Task
-                              </Button>
-                            </form>
-                          )}
+                        <div className="p-4 bg-secondary/15 rounded-xl border border-border/40 space-y-4">
+                          <span className="font-bold text-foreground block text-sm">Administrative Review Actions</span>
 
                           {/* Override priority */}
-                          <div className="flex items-center gap-2 pt-2 border-t border-border/30">
-                            <div className="flex-1">
-                              <label className="text-[9px] text-muted-foreground mb-1 block">Override Priority</label>
+                          <div className="space-y-2">
+                            <label className="text-[10px] text-muted-foreground uppercase font-bold block">Urgency / Severity Override</label>
+                            <div className="flex items-center gap-2">
                               <select
                                 value={overridePriority}
                                 onChange={(e) => setOverridePriority(e.target.value as ComplaintPriority)}
-                                className="w-full h-8 px-2 rounded-lg border border-border bg-card text-[10px]"
+                                className="flex-1 h-9 px-2 rounded-xl border border-border bg-card text-xs font-semibold"
                               >
                                 <option value="">Select Priority</option>
                                 <option value="low">Low</option>
@@ -1321,11 +1644,80 @@ export default function ComplaintsPage() {
                                 <option value="critical">Critical</option>
                                 <option value="emergency">Emergency</option>
                               </select>
+                              <Button 
+                                onClick={handlePriorityOverride} 
+                                size="sm" 
+                                className="h-9 px-4 text-[10px] font-bold rounded-xl"
+                                disabled={!overridePriority}
+                              >
+                                Save Urgency
+                              </Button>
                             </div>
-                            <Button onClick={handlePriorityOverride} size="sm" className="h-8 text-[10px] mt-4">
-                              Update Severity
-                            </Button>
                           </div>
+
+                          {/* Forward or Reject Controls */}
+                          {["submitted", "under-review"].includes(selected.status) ? (
+                            <div className="space-y-4 pt-3 border-t border-border/30">
+                              <div>
+                                <label className="text-[10px] text-muted-foreground uppercase font-bold block mb-1">Administrative / Rejection Notes</label>
+                                <Textarea
+                                  placeholder="Write notes here... (Required for rejection reason)"
+                                  value={secNotes}
+                                  onChange={(e) => setSecNotes(e.target.value)}
+                                  className="min-h-[70px] text-xs rounded-xl"
+                                />
+                              </div>
+                              <div className="flex gap-3">
+                                <Button
+                                  onClick={async () => {
+                                    if (confirm("Forward this complaint to the Society Operations Manager?")) {
+                                      try {
+                                        await useCommunityStore.getState().reviewComplaintSecretary(selected.id, {
+                                          status: "Forwarded to Manager",
+                                          adminNotes: secNotes || "Verified and approved by Secretary."
+                                        });
+                                        setSecNotes("");
+                                        alert("Complaint forwarded to Manager successfully!");
+                                      } catch (err: any) {
+                                        alert("Error forwarding complaint: " + err.message);
+                                      }
+                                    }
+                                  }}
+                                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold h-10 rounded-xl border-0"
+                                >
+                                  Forward to Manager
+                                </Button>
+                                <Button
+                                  onClick={async () => {
+                                    if (!secNotes.trim()) {
+                                      alert("Please write a rejection reason in the remarks field above.");
+                                      return;
+                                    }
+                                    if (confirm("Are you sure you want to reject this complaint?")) {
+                                      try {
+                                        await useCommunityStore.getState().reviewComplaintSecretary(selected.id, {
+                                          status: "Rejected",
+                                          rejectReason: secNotes
+                                        });
+                                        setSecNotes("");
+                                        alert("Complaint rejected.");
+                                      } catch (err: any) {
+                                        alert("Error rejecting complaint: " + err.message);
+                                      }
+                                    }
+                                  }}
+                                  variant="outline"
+                                  className="flex-1 border-red-500/20 text-red-500 hover:bg-red-500/5 font-bold h-10 rounded-xl"
+                                >
+                                  Reject Complaint
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-3 bg-secondary/5 rounded-xl border border-dashed text-center text-muted-foreground text-[10px] font-semibold">
+                              This complaint has been administratively verified and processed.
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1462,7 +1854,7 @@ export default function ComplaintsPage() {
                             </Dialog>
                           )}
 
-                          {selected.status === "completed" && (
+                          {["completed", "Completed"].includes(selected.status) && (
                             <p className="text-center text-muted-foreground py-2 italic">
                               Work completed. Pending resident audit and verification feedback.
                             </p>
@@ -1521,7 +1913,7 @@ export default function ComplaintsPage() {
                       )}
 
                       {/* --- RESIDENT FEEDBACK --- */}
-                      {isResident && selected.status === "completed" && (
+                      {isResident && ["completed", "Completed"].includes(selected.status) && (
                         <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3">
                           <span className="font-extrabold block text-foreground uppercase tracking-wider text-[10px]">
                             ⭐ Audit, Feedback & Close Ticket
@@ -1552,9 +1944,18 @@ export default function ComplaintsPage() {
                             />
                           </div>
 
-                          <Button onClick={handleResidentVerifyClose} className="w-full gradient-primary text-white border-0 rounded-xl h-10 font-bold mt-1 shadow-md">
-                            Confirm Resolution & Close Ticket
-                          </Button>
+                           <div className="flex gap-3 pt-1">
+                            <Button onClick={handleResidentVerifyClose} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold h-10 rounded-xl border-0 shadow-md">
+                              Confirm & Close
+                            </Button>
+                            <Button 
+                              onClick={handleResidentReopen} 
+                              variant="outline" 
+                              className="flex-1 border-red-500/20 text-red-500 hover:bg-red-500/5 font-bold h-10 rounded-xl"
+                            >
+                              Need Further Help
+                            </Button>
+                          </div>
                         </div>
                       )}
 
@@ -1604,7 +2005,7 @@ export default function ComplaintsPage() {
 
                       <CardContent className="p-0 text-xs">
                         {/* Messages panel */}
-                        <div className="h-56 overflow-y-auto p-4 space-y-3 bg-secondary/5">
+                        <div ref={chatContainerRef} className="h-56 overflow-y-auto p-4 space-y-3 bg-secondary/5">
                           {selected.chat && selected.chat.length > 0 ? (
                             selected.chat.map((msg: ComplaintChatMessage) => {
                               const self = msg.senderId === user?.id;
@@ -1630,7 +2031,6 @@ export default function ComplaintsPage() {
                               No discussion logged yet. Send a hello to initiate!
                             </div>
                           )}
-                          <div ref={chatEndRef} />
                         </div>
 
                         {/* Quick updates keys */}

@@ -20,6 +20,14 @@ async function main() {
     await prisma.roommatePreference.deleteMany();
     await prisma.facilityBooking.deleteMany();
     await prisma.gatePass.deleteMany();
+    await prisma.serviceReview.deleteMany();
+    await prisma.serviceBooking.deleteMany();
+    await prisma.favoriteWorker.deleteMany();
+    await prisma.workerProfile.deleteMany();
+    await prisma.workerSkill.deleteMany();
+    await prisma.workerAvailability.deleteMany();
+    await prisma.chatMessage.deleteMany();
+    await prisma.serviceCategory.deleteMany();
     await prisma.residentWorkerAssignment.deleteMany();
     await prisma.user.deleteMany();
     await prisma.leaveRequest.deleteMany();
@@ -27,7 +35,10 @@ async function main() {
     await prisma.laundrySlot.deleteMany();
     await prisma.parcel.deleteMany();
     await prisma.marketplaceItem.deleteMany();
-    await prisma.lostFoundItem.deleteMany();
+    await prisma.itemMatch.deleteMany();
+    await prisma.claim.deleteMany();
+    await prisma.foundItem.deleteMany();
+    await prisma.lostReport.deleteMany();
     await prisma.roomChangeRequest.deleteMany();
     await prisma.maintenanceBill.deleteMany();
     await prisma.emergencyAlert.deleteMany();
@@ -239,20 +250,86 @@ async function main() {
             }
         });
     }
-    console.log("🧸 Seeding Lost & Found...");
-    for (const lf of db.lostFoundItems) {
-        await prisma.lostFoundItem.create({
+    console.log("🧸 Seeding Found Items...");
+    for (const item of db.foundItems) {
+        await prisma.foundItem.create({
             data: {
-                id: lf.id,
-                title: lf.title,
-                description: lf.description,
-                status: lf.status,
-                reporterId: lf.reporterId,
-                reporterName: lf.reporterName,
-                claimantId: lf.claimantId,
-                claimantName: lf.claimantName,
-                portal: lf.portal,
-                createdAt: new Date(lf.createdAt)
+                id: item.id,
+                reporterId: item.reporterId,
+                reporterName: item.reporterName,
+                communityCode: item.communityCode,
+                category: item.category,
+                description: item.description,
+                images: item.images,
+                foundLocation: item.foundLocation,
+                dateFound: item.dateFound,
+                timeFound: item.timeFound,
+                additionalNotes: item.additionalNotes,
+                status: item.status,
+                portal: item.portal,
+                createdAt: new Date(item.createdAt)
+            }
+        });
+    }
+    console.log("🎟️ Seeding Claims...");
+    for (const claim of db.claims) {
+        await prisma.claim.create({
+            data: {
+                id: claim.id,
+                itemId: claim.itemId,
+                residentId: claim.residentId,
+                residentName: claim.residentName,
+                claimReason: claim.claimReason,
+                itemDetails: claim.itemDetails,
+                proofImage: claim.proofImage,
+                contactNumber: claim.contactNumber,
+                status: claim.status,
+                approvalDate: claim.approvalDate ? new Date(claim.approvalDate) : null,
+                collectionDate: claim.collectionDate ? new Date(claim.collectionDate) : null,
+                collectionTime: claim.collectionTime,
+                collectedBy: claim.collectedBy,
+                verifiedBySecurity: claim.verifiedBySecurity
+            }
+        });
+    }
+    console.log("🎒 Seeding Lost Reports...");
+    for (const lr of (db.lostReports || [])) {
+        await prisma.lostReport.create({
+            data: {
+                id: lr.id,
+                residentId: lr.residentId,
+                itemName: lr.itemName,
+                category: lr.category,
+                brand: lr.brand,
+                colour: lr.colour,
+                description: lr.description,
+                distinguishingFeatures: lr.distinguishingFeatures,
+                dateLost: lr.dateLost,
+                timeLost: lr.timeLost,
+                lastSeenLocation: lr.lastSeenLocation,
+                status: lr.status,
+                images: lr.images,
+                additionalNotes: lr.additionalNotes,
+                portal: lr.portal,
+                communityCode: lr.communityCode,
+                createdAt: lr.createdAt ? new Date(lr.createdAt) : new Date()
+            }
+        });
+    }
+    console.log("🔗 Seeding Item Matches...");
+    for (const match of (db.itemMatches || [])) {
+        await prisma.itemMatch.create({
+            data: {
+                id: match.id,
+                lostReportId: match.lostReportId,
+                foundItemId: match.foundItemId,
+                status: match.status,
+                verifiedBy: match.verifiedBy,
+                verificationDate: match.verificationDate ? new Date(match.verificationDate) : null,
+                collectionDate: match.collectionDate ? new Date(match.collectionDate) : null,
+                collectionTime: match.collectionTime,
+                collectedBy: match.collectedBy,
+                createdAt: match.createdAt ? new Date(match.createdAt) : new Date()
             }
         });
     }
@@ -504,6 +581,56 @@ async function main() {
                 duration: flatAtt.duration || null,
                 servicePerformed: flatAtt.servicePerformed,
                 status: flatAtt.status
+            }
+        });
+    }
+    console.log("🗂️ Seeding Service Categories...");
+    for (const cat of db.categories) {
+        await prisma.serviceCategory.create({
+            data: cat
+        });
+    }
+    console.log("👤 Seeding Worker Profiles...");
+    for (const prof of db.workerProfiles) {
+        await prisma.workerProfile.create({
+            data: prof
+        });
+    }
+    console.log("🛠️ Seeding Worker Skills...");
+    for (const sk of db.workerSkills) {
+        await prisma.workerSkill.create({
+            data: sk
+        });
+    }
+    console.log("⏰ Seeding Worker Availability...");
+    for (const av of db.workerAvailability) {
+        await prisma.workerAvailability.create({
+            data: av
+        });
+    }
+    console.log("📅 Seeding Service Bookings...");
+    for (const bk of db.bookings) {
+        await prisma.serviceBooking.create({
+            data: bk
+        });
+    }
+    console.log("⭐ Seeding Service Reviews...");
+    for (const rv of db.reviews) {
+        await prisma.serviceReview.create({
+            data: rv
+        });
+    }
+    console.log("💬 Seeding Chat Messages...");
+    for (const msg of db.messages) {
+        await prisma.chatMessage.create({
+            data: {
+                id: msg.id,
+                senderId: msg.senderId,
+                receiverId: msg.receiverId,
+                message: msg.message,
+                timestamp: new Date(msg.timestamp),
+                isRead: msg.isRead,
+                status: msg.status
             }
         });
     }
