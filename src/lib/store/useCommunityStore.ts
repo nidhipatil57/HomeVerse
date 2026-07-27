@@ -625,6 +625,16 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                   workerCategory: att.category || att.workerCategory
                 }));
               }
+              if (key === "users" && Array.isArray(data)) {
+                if (typeof window !== "undefined") {
+                  try {
+                    const localRegs = JSON.parse(localStorage.getItem("homeverse_registered_users") || "[]");
+                    const dbEmails = new Set(data.map((u: any) => u.email.toLowerCase()));
+                    const uniqueLocal = localRegs.filter((u: any) => !dbEmails.has(u.email.toLowerCase()));
+                    data = [...data, ...uniqueLocal];
+                  } catch (e) {}
+                }
+              }
               set({ [key]: data } as any);
             }
           } catch (e) {}
@@ -642,11 +652,14 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
     const pollInterval = setInterval(async () => {
       const criticalEndpoints = [
+        { key: "complaints", path: "/api/complaints" },
+        { key: "serviceBookings", path: "/api/community-services/bookings" },
         { key: "helpers", path: "/api/visitors/helpers" },
         { key: "attendance", path: "/api/visitors/attendance" },
         { key: "flatAttendance", path: "/api/visitors/helpers/flat-attendance" },
         { key: "payments", path: "/api/payments" },
-        { key: "collections", path: "/api/payments/collections" }
+        { key: "collections", path: "/api/payments/collections" },
+        { key: "users", path: "/api/users" }
       ];
       criticalEndpoints.forEach(async ({ key, path }) => {
         try {
@@ -682,6 +695,18 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
     socket.on("connect", () => {
       console.log("⚡ Connected to HomeVerse Socket.IO Server!");
+    });
+
+    socket.on("user:update", (updated: any) => {
+      const current = get().users || [];
+      const index = current.findIndex(u => u.id === updated.id);
+      if (index > -1) {
+        const next = [...current];
+        next[index] = updated;
+        set({ users: next });
+      } else {
+        set({ users: [updated, ...current] });
+      }
     });
 
     socket.on("payment:update", (updated: any) => {
@@ -1774,27 +1799,42 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   approveUser: async (userId) => {
-    await fetch(`/api/users/${userId}/status`, {
+    const res = await fetch(`/api/users/${userId}/status`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "approved" })
     });
+    if (res.ok) {
+      set((state) => ({
+        users: state.users.map((u) => (u.id === userId ? { ...u, status: "approved" } : u))
+      }));
+    }
   },
 
   rejectUser: async (userId) => {
-    await fetch(`/api/users/${userId}/status`, {
+    const res = await fetch(`/api/users/${userId}/status`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "rejected" })
     });
+    if (res.ok) {
+      set((state) => ({
+        users: state.users.map((u) => (u.id === userId ? { ...u, status: "rejected" } : u))
+      }));
+    }
   },
 
   activateDeactivateUser: async (userId, status) => {
-    await fetch(`/api/users/${userId}/status`, {
+    const res = await fetch(`/api/users/${userId}/status`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status })
     });
+    if (res.ok) {
+      set((state) => ({
+        users: state.users.map((u) => (u.id === userId ? { ...u, status } : u))
+      }));
+    }
   },
 
   addFlat: async (flat) => {
@@ -1900,6 +1940,9 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
     if (res.ok) {
       const data = await res.json();
+      set((state) => ({
+        serviceBookings: state.serviceBookings.map((b) => (b.id === id ? data : b))
+      }));
       return data;
     }
     throw new Error("Failed to update booking status");
@@ -1975,6 +2018,30 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
     if (res.ok) {
       const result = await res.json();
+      set((state) => {
+        const nextUsers = state.users.map((u) => {
+          if (u.id === workerId) {
+            return {
+              ...u,
+              status: (data.approve ? "approved" : data.remove ? "rejected" : u.status) as any
+            };
+          }
+          return u;
+        }).filter(u => (u.status as string) !== "removed");
+
+        const nextProfiles = state.workerProfiles.map((p) => {
+          if (p.workerId === workerId || p.id === workerId) {
+            return {
+              ...p,
+              isSocietyVerified: data.isSocietyVerified !== undefined ? data.isSocietyVerified : p.isSocietyVerified,
+              isPoliceVerified: data.isPoliceVerified !== undefined ? data.isPoliceVerified : p.isPoliceVerified,
+            };
+          }
+          return p;
+        });
+
+        return { users: nextUsers, workerProfiles: nextProfiles } as any;
+      });
       return result;
     }
     throw new Error("Failed to verify worker");
@@ -1995,7 +2062,13 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "Forwarded to Manager", adminNotes, forwardedToManager: true })
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      set((state) => ({
+        serviceBookings: state.serviceBookings.map((b) => (b.id === id ? data : b))
+      }));
+      return data;
+    }
     throw new Error("Failed to forward booking");
   },
 
@@ -2005,7 +2078,13 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "Scheduled", operationalNotes })
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      set((state) => ({
+        serviceBookings: state.serviceBookings.map((b) => (b.id === id ? data : b))
+      }));
+      return data;
+    }
     throw new Error("Failed to schedule booking");
   },
 
@@ -2015,7 +2094,13 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "Completed", operationalNotes: notes })
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      set((state) => ({
+        serviceBookings: state.serviceBookings.map((b) => (b.id === id ? data : b))
+      }));
+      return data;
+    }
     throw new Error("Failed to complete booking");
   },
 
@@ -2025,7 +2110,13 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const updated = await res.json();
+      set((state) => ({
+        complaints: state.complaints.map((c) => (c.id === id ? updated : c))
+      }));
+      return updated;
+    }
     throw new Error("Failed to review complaint");
   },
 
@@ -2035,7 +2126,13 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const updated = await res.json();
+      set((state) => ({
+        complaints: state.complaints.map((c) => (c.id === id ? updated : c))
+      }));
+      return updated;
+    }
     throw new Error("Failed to update complaint operations");
   },
 
@@ -2045,7 +2142,14 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(workerData)
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      set((state) => ({
+        users: [...state.users, data.user as any],
+        workerProfiles: [...state.workerProfiles, data.profile as any]
+      }));
+      return data;
+    }
     throw new Error("Failed to add worker");
   },
 
@@ -2055,7 +2159,14 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(workerData)
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      set((state) => ({
+        users: state.users.map((u) => (u.id === id ? data.user as any : u)),
+        workerProfiles: state.workerProfiles.map((p) => (p.workerId === id || p.id === id ? data.profile as any : p))
+      }));
+      return data;
+    }
     throw new Error("Failed to update worker");
   },
 
@@ -2063,7 +2174,14 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     const res = await fetch(`/api/community-services/workers/${id}`, {
       method: "DELETE"
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      set((state) => ({
+        users: state.users.filter((u) => u.id !== id),
+        workerProfiles: state.workerProfiles.filter((p) => p.workerId !== id && p.id !== id)
+      }));
+      return data;
+    }
     throw new Error("Failed to delete worker");
   }
 }));

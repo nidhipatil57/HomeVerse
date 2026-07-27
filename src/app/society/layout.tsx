@@ -35,7 +35,12 @@ const getAllowedPaths = (role: string): string[] => {
         "/society/dashboard",
         "/society/ai-assistant",
         "/society/complaints",
-        "/society/daily-checkins",
+        "/society/services",
+        "/society/workers",
+        "/society/schedules",
+        "/society/daily-operations",
+        "/society/emergency",
+        "/society/analytics",
         "/society/notifications",
         "/society/settings"
       ];

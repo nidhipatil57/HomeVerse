@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
@@ -20,6 +20,7 @@ function DemoCredentialsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, logout } = useAuth();
+  const dbUsers = useCommunityStore(state => state.users || []);
   const initializeDb = useCommunityStore(state => state.initializeDb);
 
   // Hydrate store database on mount
@@ -47,7 +48,33 @@ function DemoCredentialsContent() {
     }
   }, [portalParam]);
 
-  const users = getPrepopulatedUsers();
+  const users = useMemo(() => {
+    const prepopulated = getPrepopulatedUsers();
+    const prepopulatedEmails = new Set(prepopulated.map(u => u.email.toLowerCase()));
+
+    let localUsers: any[] = [];
+    if (typeof window !== "undefined") {
+      try {
+        localUsers = JSON.parse(localStorage.getItem("homeverse_registered_users") || "[]");
+      } catch (e) {}
+    }
+
+    const mergedDbUsers = dbUsers.map(dbU => {
+      const match = localUsers.find(lu => lu.email.toLowerCase() === dbU.email.toLowerCase());
+      return {
+        ...dbU,
+        password: match ? match.password : dbU.password
+      };
+    });
+
+    const combined = [...prepopulated];
+    for (const u of mergedDbUsers) {
+      if (!prepopulatedEmails.has(u.email.toLowerCase())) {
+        combined.push(u);
+      }
+    }
+    return combined;
+  }, [dbUsers]);
 
   const societyUsers = users.filter(u => u.portal === "society");
   const hostelUsers = users.filter(u => u.portal === "hostel");

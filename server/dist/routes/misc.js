@@ -313,17 +313,23 @@ router.get("/maintenance", auth_js_1.authenticateToken, async (req, res) => {
     }
 });
 router.post("/maintenance/generate", auth_js_1.authenticateToken, async (req, res) => {
-    const { residentId, residentName, unit, month, amount, dueDate, breakdown } = req.body;
+    const { residentId, residentName, unit, month, amount, dueDate, breakdown, lateFee, description, applicableTo, selectedBuilding } = req.body;
     try {
         // If no residentId is provided, perform bulk generation for all approved residents
         if (!residentId) {
+            const filter = { role: "resident", status: "approved" };
+            if (applicableTo === "Selected Building" && selectedBuilding) {
+                filter.building = selectedBuilding;
+            }
             const residents = await db_js_1.default.user.findMany({
-                where: { role: "resident", status: "approved" }
+                where: filter
             });
             const generatedBills = [];
             const billMonth = month || "July 2026";
             const billAmount = parseFloat(amount) || 3500;
             const billDueDate = dueDate || "15 August";
+            const billLateFee = lateFee ? parseFloat(lateFee) : null;
+            const billDesc = description || "Monthly Maintenance Charges";
             for (const r of residents) {
                 const id = `BILL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
                 // 1. Create MaintenanceBill
@@ -336,7 +342,9 @@ router.post("/maintenance/generate", auth_js_1.authenticateToken, async (req, re
                         month: billMonth,
                         amount: billAmount,
                         dueDate: billDueDate,
-                        status: "pending"
+                        status: "pending",
+                        description: billDesc,
+                        lateFee: billLateFee
                     }
                 });
                 // 2. Also create a ResidentPayment record to track this transaction
@@ -353,11 +361,13 @@ router.post("/maintenance/generate", auth_js_1.authenticateToken, async (req, re
                         amount: billAmount,
                         status: "pending",
                         dueDate: billDueDate,
-                        referenceId: id
+                        referenceId: id,
+                        description: billDesc,
+                        lateFee: billLateFee
                     }
                 });
                 // 3. Send in-app notification: Maintenance bill generated.
-                await sendInAppNotification(r.id, "Maintenance Bill Generated", "Maintenance bill generated.", "info");
+                await sendInAppNotification(r.id, "Maintenance Bill Generated 🧾", `📢 ${billMonth} maintenance bill has been generated. Due date: ${billDueDate}`, "warning");
                 generatedBills.push(bill);
                 (0, index_js_1.broadcastUpdate)("maintenance:update", bill);
             }
@@ -365,6 +375,8 @@ router.post("/maintenance/generate", auth_js_1.authenticateToken, async (req, re
         }
         // Otherwise, generate a single maintenance bill
         const id = `BILL-${Math.floor(100 + Math.random() * 900)}`;
+        const billLateFee = lateFee ? parseFloat(lateFee) : null;
+        const billDesc = description || "Monthly Maintenance Charges";
         const bill = await db_js_1.default.maintenanceBill.create({
             data: {
                 id,
@@ -374,7 +386,9 @@ router.post("/maintenance/generate", auth_js_1.authenticateToken, async (req, re
                 month,
                 amount: parseFloat(amount),
                 dueDate,
-                status: "pending"
+                status: "pending",
+                description: billDesc,
+                lateFee: billLateFee
             }
         });
         // Also create a ResidentPayment record for this single bill
@@ -391,11 +405,13 @@ router.post("/maintenance/generate", auth_js_1.authenticateToken, async (req, re
                 amount: parseFloat(amount),
                 status: "pending",
                 dueDate,
-                referenceId: id
+                referenceId: id,
+                description: billDesc,
+                lateFee: billLateFee
             }
         });
         // Send notification
-        await sendInAppNotification(residentId, "Maintenance Bill Generated", "Maintenance bill generated.", "info");
+        await sendInAppNotification(residentId, "Maintenance Bill Generated 🧾", `📢 ${month} maintenance bill has been generated. Due date: ${dueDate}`, "warning");
         (0, index_js_1.broadcastUpdate)("maintenance:update", bill);
         res.status(201).json(bill);
     }
@@ -656,11 +672,12 @@ router.put("/payments/:id/pay", auth_js_1.authenticateToken, async (req, res) =>
             });
         }
         // Send notifications
-        await sendInAppNotification(payment.residentId, "Payment Successful", "Payment successful.", "success");
-        await sendInAppNotification(payment.residentId, "Receipt Ready", "Receipt ready to download.", "success");
+        await sendInAppNotification(payment.residentId, "Payment Successful ✅", `${payment.paymentType} payment successful. Receipt generated. Thank you.`, "success");
+        await sendInAppNotification(payment.residentId, "Receipt Ready 📄", "📄 Receipt is ready to download.", "success");
         const secretaryUsers = await db_js_1.default.user.findMany({ where: { role: "secretary" } });
         for (const sec of secretaryUsers) {
-            await sendInAppNotification(sec.id, "Resident Payment Received", "Resident completed payment.", "success");
+            await sendInAppNotification(sec.id, "Resident Payment Received ✅", `✅ ${payment.residentName} (${payment.building || ""} Flat ${payment.unit}) paid ${payment.paymentType}.`, "success");
+            await sendInAppNotification(sec.id, "Collection Progress Updated 📊", `📊 Collection progress updated for ${payment.paymentType}.`, "info");
         }
         // Check if collection target reached
         if (payment.referenceId && payment.paymentType !== "Maintenance") {
@@ -781,21 +798,37 @@ router.put("/rent/:id/pay", auth_js_1.authenticateToken, async (req, res) => {
 // ==========================================
 // 📅 Community Events
 // ==========================================
+// ==========================================
+// 📅 Community Events
+// ==========================================
 router.get("/events", auth_js_1.authenticateToken, async (req, res) => {
     try {
         const list = await db_js_1.default.communityEvent.findMany({
-            include: { rsvps: true }
+            where: { communityCode: req.user.communityCode || "SUN123" },
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
         });
         res.json(list);
     }
     catch (error) {
+        console.error(error);
         res.status(500).json({ error: "Failed to fetch community events" });
     }
 });
 router.post("/events", auth_js_1.authenticateToken, async (req, res) => {
-    const { title, description, date, time, location, organizer, priority } = req.body;
+    const { title, description, date, time, location, organizer, priority, category, bannerImage, endTime, contactPerson, contactNumber, maxParticipants, registrationDeadline, entryFee, registrationRequired, volunteerRequired, visibility, rules, thingsToBring, budget } = req.body;
     if (!title || !description || !date || !time || !location || !organizer) {
-        return res.status(400).json({ error: "All event details (title, description, date, time, location, organizer) are required" });
+        return res.status(400).json({ error: "All core event details (title, description, date, time, location, organizer) are required" });
     }
     try {
         const id = `EV-${Math.floor(100 + Math.random() * 900)}`;
@@ -809,34 +842,171 @@ router.post("/events", auth_js_1.authenticateToken, async (req, res) => {
                 location,
                 organizer,
                 priority: priority || "normal",
-                communityCode: req.user.communityCode || "SUN123"
+                communityCode: req.user.communityCode || "SUN123",
+                category: category || "Other",
+                bannerImage: bannerImage || null,
+                endTime: endTime || null,
+                contactPerson: contactPerson || null,
+                contactNumber: contactNumber || null,
+                maxParticipants: maxParticipants ? parseInt(maxParticipants) : null,
+                registrationDeadline: registrationDeadline || null,
+                entryFee: entryFee ? parseFloat(entryFee) : null,
+                registrationRequired: registrationRequired === true || registrationRequired === "true" || registrationRequired === "Yes",
+                volunteerRequired: volunteerRequired === true || volunteerRequired === "true" || volunteerRequired === "Yes",
+                visibility: visibility || "public",
+                rules: rules || null,
+                thingsToBring: thingsToBring || null,
+                budget: budget ? parseFloat(budget) : 0.0,
+                status: "Active"
             },
-            include: { rsvps: true }
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
         });
+        // Notify all residents
+        const residents = await db_js_1.default.user.findMany({
+            where: { communityCode: req.user.communityCode || "SUN123", role: "resident" }
+        });
+        for (const resi of residents) {
+            await sendInAppNotification(resi.id, "New event published.", `🎪 "${title}" has been scheduled at the ${location} on ${date}.`, "info");
+        }
         (0, index_js_1.broadcastUpdate)("event:update", newItem);
         res.status(201).json(newItem);
     }
     catch (error) {
+        console.error(error);
         res.status(500).json({ error: "Failed to create event" });
     }
 });
-router.post("/events/:id/rsvp", auth_js_1.authenticateToken, async (req, res) => {
+router.put("/events/:id", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
-    const { status } = req.body;
+    const { title, description, date, time, location, organizer, priority, category, bannerImage, endTime, contactPerson, contactNumber, maxParticipants, registrationDeadline, entryFee, registrationRequired, volunteerRequired, visibility, rules, thingsToBring, budget, status } = req.body;
     try {
-        const existing = await db_js_1.default.eventRsvp.findFirst({
+        const existing = await db_js_1.default.communityEvent.findUnique({
+            where: { id },
+            include: { registrations: true }
+        });
+        if (!existing) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        const isCancelled = status === "Cancelled" && existing.status !== "Cancelled";
+        const updated = await db_js_1.default.communityEvent.update({
+            where: { id },
+            data: {
+                title: title !== undefined ? title : existing.title,
+                description: description !== undefined ? description : existing.description,
+                date: date !== undefined ? date : existing.date,
+                time: time !== undefined ? time : existing.time,
+                location: location !== undefined ? location : existing.location,
+                organizer: organizer !== undefined ? organizer : existing.organizer,
+                priority: priority !== undefined ? priority : existing.priority,
+                category: category !== undefined ? category : existing.category,
+                bannerImage: bannerImage !== undefined ? bannerImage : existing.bannerImage,
+                endTime: endTime !== undefined ? endTime : existing.endTime,
+                contactPerson: contactPerson !== undefined ? contactPerson : existing.contactPerson,
+                contactNumber: contactNumber !== undefined ? contactNumber : existing.contactNumber,
+                maxParticipants: maxParticipants !== undefined ? (maxParticipants ? parseInt(maxParticipants) : null) : existing.maxParticipants,
+                registrationDeadline: registrationDeadline !== undefined ? registrationDeadline : existing.registrationDeadline,
+                entryFee: entryFee !== undefined ? (entryFee ? parseFloat(entryFee) : null) : existing.entryFee,
+                registrationRequired: registrationRequired !== undefined ? (registrationRequired === true || registrationRequired === "true" || registrationRequired === "Yes") : existing.registrationRequired,
+                volunteerRequired: volunteerRequired !== undefined ? (volunteerRequired === true || volunteerRequired === "true" || volunteerRequired === "Yes") : existing.volunteerRequired,
+                visibility: visibility !== undefined ? visibility : existing.visibility,
+                rules: rules !== undefined ? rules : existing.rules,
+                thingsToBring: thingsToBring !== undefined ? thingsToBring : existing.thingsToBring,
+                budget: budget !== undefined ? (budget ? parseFloat(budget) : 0.0) : existing.budget,
+                status: status !== undefined ? status : existing.status
+            },
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
+        });
+        if (isCancelled) {
+            // Notify all registered participants
+            for (const reg of existing.registrations) {
+                await sendInAppNotification(reg.userId, "Event cancelled.", `⚠️ The event "${updated.title}" has been cancelled by the organizer.`, "warning");
+            }
+        }
+        (0, index_js_1.broadcastUpdate)("event:update", updated);
+        res.json(updated);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update event" });
+    }
+});
+router.post("/events/:id/register", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { guestCount, guestNames, rsvpStatus, contactNumber } = req.body;
+    try {
+        const event = await db_js_1.default.communityEvent.findUnique({
+            where: { id },
+            include: { registrations: true }
+        });
+        if (!event) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        // Check capacity limit
+        const totalRegistered = event.registrations.reduce((acc, curr) => acc + 1 + curr.guestCount, 0);
+        const incomingCount = 1 + (guestCount ? parseInt(guestCount) : 0);
+        if (event.maxParticipants && totalRegistered + incomingCount > event.maxParticipants) {
+            return res.status(400).json({ error: "Registration failed. Maximum capacity reached." });
+        }
+        // Upsert registration
+        const existingReg = await db_js_1.default.eventRegistration.findFirst({
             where: { eventId: id, userId: req.user.id }
         });
-        if (existing) {
-            if (existing.status === status) {
-                await db_js_1.default.eventRsvp.delete({ where: { id: existing.id } });
-            }
-            else {
-                await db_js_1.default.eventRsvp.update({
-                    where: { id: existing.id },
-                    data: { status }
-                });
-            }
+        if (existingReg) {
+            await db_js_1.default.eventRegistration.update({
+                where: { id: existingReg.id },
+                data: {
+                    guestCount: guestCount ? parseInt(guestCount) : 0,
+                    guestNames: guestNames || null,
+                    rsvpStatus: rsvpStatus || "Going",
+                    contactNumber: contactNumber || req.user.phone
+                }
+            });
+        }
+        else {
+            await db_js_1.default.eventRegistration.create({
+                data: {
+                    eventId: id,
+                    userId: req.user.id,
+                    userName: req.user.name || "Resident",
+                    flatNumber: req.user.unit || "A-402",
+                    contactNumber: contactNumber || req.user.phone,
+                    guestCount: guestCount ? parseInt(guestCount) : 0,
+                    guestNames: guestNames || null,
+                    rsvpStatus: rsvpStatus || "Going"
+                }
+            });
+        }
+        // Sync RSVP table too for backwards compatibility
+        const existingRsvp = await db_js_1.default.eventRsvp.findFirst({
+            where: { eventId: id, userId: req.user.id }
+        });
+        if (existingRsvp) {
+            await db_js_1.default.eventRsvp.update({
+                where: { id: existingRsvp.id },
+                data: { status: rsvpStatus || "Going" }
+            });
         }
         else {
             await db_js_1.default.eventRsvp.create({
@@ -844,19 +1014,391 @@ router.post("/events/:id/rsvp", auth_js_1.authenticateToken, async (req, res) =>
                     eventId: id,
                     userId: req.user.id,
                     userName: req.user.name || "Resident",
-                    status
+                    status: rsvpStatus || "Going"
                 }
             });
         }
         const updated = await db_js_1.default.communityEvent.findUnique({
             where: { id },
-            include: { rsvps: true }
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
         });
         (0, index_js_1.broadcastUpdate)("event:update", updated);
         res.json(updated);
     }
     catch (error) {
-        res.status(500).json({ error: "Failed to update RSVP" });
+        console.error(error);
+        res.status(500).json({ error: "Failed to register for event" });
+    }
+});
+router.post("/events/:id/volunteer", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { role, contactNumber } = req.body;
+    if (!role) {
+        return res.status(400).json({ error: "Volunteer role is required" });
+    }
+    try {
+        const event = await db_js_1.default.communityEvent.findUnique({ where: { id } });
+        if (!event) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        const existingVol = await db_js_1.default.eventVolunteer.findFirst({
+            where: { eventId: id, userId: req.user.id }
+        });
+        if (existingVol) {
+            await db_js_1.default.eventVolunteer.update({
+                where: { id: existingVol.id },
+                data: { role, contactNumber: contactNumber || req.user.phone }
+            });
+        }
+        else {
+            await db_js_1.default.eventVolunteer.create({
+                data: {
+                    eventId: id,
+                    userId: req.user.id,
+                    volunteerName: req.user.name || "Resident",
+                    flatNumber: req.user.unit || "A-402",
+                    contactNumber: contactNumber || req.user.phone,
+                    role
+                }
+            });
+        }
+        const updated = await db_js_1.default.communityEvent.findUnique({
+            where: { id },
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
+        });
+        (0, index_js_1.broadcastUpdate)("event:update", updated);
+        res.json(updated);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to register as volunteer" });
+    }
+});
+router.post("/events/:id/attendance", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { userId, isAttending } = req.body;
+    try {
+        const event = await db_js_1.default.communityEvent.findUnique({ where: { id } });
+        if (!event) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        const resident = await db_js_1.default.user.findUnique({ where: { id: userId } });
+        if (!resident) {
+            return res.status(404).json({ error: "Resident not found" });
+        }
+        const existingAtt = await db_js_1.default.eventAttendance.findFirst({
+            where: { eventId: id, userId }
+        });
+        if (isAttending === false) {
+            if (existingAtt) {
+                await db_js_1.default.eventAttendance.delete({ where: { id: existingAtt.id } });
+            }
+        }
+        else {
+            if (!existingAtt) {
+                await db_js_1.default.eventAttendance.create({
+                    data: {
+                        eventId: id,
+                        userId,
+                        userName: resident.name,
+                        flatNumber: resident.unit || "N/A",
+                        markedBy: req.user.name || "Secretary"
+                    }
+                });
+            }
+        }
+        const updated = await db_js_1.default.communityEvent.findUnique({
+            where: { id },
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
+        });
+        (0, index_js_1.broadcastUpdate)("event:update", updated);
+        res.json(updated);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update attendance" });
+    }
+});
+router.post("/events/:id/feedback", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { rating, comment, suggestions, wouldAttendSimilar } = req.body;
+    if (!rating) {
+        return res.status(400).json({ error: "Rating is required" });
+    }
+    try {
+        const event = await db_js_1.default.communityEvent.findUnique({ where: { id } });
+        if (!event) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        const existingFeedback = await db_js_1.default.eventFeedback.findFirst({
+            where: { eventId: id, userId: req.user.id }
+        });
+        if (existingFeedback) {
+            await db_js_1.default.eventFeedback.update({
+                where: { id: existingFeedback.id },
+                data: {
+                    rating: parseInt(rating),
+                    comment: comment || null,
+                    suggestions: suggestions || null,
+                    wouldAttendSimilar: wouldAttendSimilar === true || wouldAttendSimilar === "true" || wouldAttendSimilar === "Yes"
+                }
+            });
+        }
+        else {
+            await db_js_1.default.eventFeedback.create({
+                data: {
+                    eventId: id,
+                    userId: req.user.id,
+                    userName: req.user.name || "Resident",
+                    rating: parseInt(rating),
+                    comment: comment || null,
+                    suggestions: suggestions || null,
+                    wouldAttendSimilar: wouldAttendSimilar === true || wouldAttendSimilar === "true" || wouldAttendSimilar === "Yes"
+                }
+            });
+        }
+        const updated = await db_js_1.default.communityEvent.findUnique({
+            where: { id },
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
+        });
+        (0, index_js_1.broadcastUpdate)("event:update", updated);
+        res.json(updated);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to submit feedback" });
+    }
+});
+router.post("/events/:id/gallery", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { imageUrl } = req.body;
+    if (!imageUrl) {
+        return res.status(400).json({ error: "Image URL or data is required" });
+    }
+    try {
+        const event = await db_js_1.default.communityEvent.findUnique({ where: { id } });
+        if (!event) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        await db_js_1.default.eventGalleryPhoto.create({
+            data: {
+                eventId: id,
+                imageUrl
+            }
+        });
+        // Notify all registered participants that gallery is uploaded
+        const registrants = await db_js_1.default.eventRegistration.findMany({
+            where: { eventId: id }
+        });
+        for (const reg of registrants) {
+            await sendInAppNotification(reg.userId, "Gallery uploaded.", `📸 Photos from the event "${event.title}" have been uploaded! Take a look.`, "info");
+        }
+        const updated = await db_js_1.default.communityEvent.findUnique({
+            where: { id },
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
+        });
+        (0, index_js_1.broadcastUpdate)("event:update", updated);
+        res.json(updated);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to upload photo to gallery" });
+    }
+});
+router.post("/events/:id/polls", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { question, options } = req.body;
+    if (!question || !options || !Array.isArray(options) || options.length < 2) {
+        return res.status(400).json({ error: "Question and at least 2 options are required" });
+    }
+    try {
+        const event = await db_js_1.default.communityEvent.findUnique({ where: { id } });
+        if (!event) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        await db_js_1.default.eventPoll.create({
+            data: {
+                eventId: id,
+                question,
+                options,
+                status: "Open"
+            }
+        });
+        const updated = await db_js_1.default.communityEvent.findUnique({
+            where: { id },
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
+        });
+        (0, index_js_1.broadcastUpdate)("event:update", updated);
+        res.json(updated);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to create poll" });
+    }
+});
+router.post("/events/polls/:pollId/vote", auth_js_1.authenticateToken, async (req, res) => {
+    const { pollId } = req.params;
+    const { option } = req.body;
+    if (!option) {
+        return res.status(400).json({ error: "Option selection is required" });
+    }
+    try {
+        const poll = await db_js_1.default.eventPoll.findUnique({ where: { id: pollId } });
+        if (!poll) {
+            return res.status(404).json({ error: "Poll not found" });
+        }
+        if (poll.status === "Closed") {
+            return res.status(400).json({ error: "Voting is closed for this poll." });
+        }
+        const existingVote = await db_js_1.default.eventPollVote.findFirst({
+            where: { pollId, userId: req.user.id }
+        });
+        if (existingVote) {
+            await db_js_1.default.eventPollVote.update({
+                where: { id: existingVote.id },
+                data: { option }
+            });
+        }
+        else {
+            await db_js_1.default.eventPollVote.create({
+                data: {
+                    pollId,
+                    userId: req.user.id,
+                    userName: req.user.name || "Resident",
+                    option
+                }
+            });
+        }
+        const event = await db_js_1.default.communityEvent.findUnique({
+            where: { id: poll.eventId },
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
+        });
+        (0, index_js_1.broadcastUpdate)("event:update", event);
+        res.json(event);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to submit vote" });
+    }
+});
+router.post("/events/:id/expenses", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { category, amount, description, date } = req.body;
+    if (!category || !amount || !date) {
+        return res.status(400).json({ error: "Category, amount, and date are required" });
+    }
+    try {
+        const event = await db_js_1.default.communityEvent.findUnique({ where: { id } });
+        if (!event) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        await db_js_1.default.eventExpense.create({
+            data: {
+                eventId: id,
+                category,
+                amount: parseFloat(amount),
+                description: description || null,
+                date
+            }
+        });
+        const updated = await db_js_1.default.communityEvent.findUnique({
+            where: { id },
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
+        });
+        (0, index_js_1.broadcastUpdate)("event:update", updated);
+        res.json(updated);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to log expense" });
     }
 });
 // ==========================================
@@ -1242,63 +1784,943 @@ router.put("/marketplace/:id/status", auth_js_1.authenticateToken, async (req, r
         res.status(500).json({ error: "Failed to update marketplace status" });
     }
 });
+function isPossibleMatch(lost, found) {
+    if (lost.category.toLowerCase() !== found.category.toLowerCase()) {
+        return false;
+    }
+    const lostDate = new Date(lost.dateLost);
+    const foundDate = new Date(found.dateFound);
+    const diffTime = Math.abs(foundDate.getTime() - lostDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays > 10) {
+        return false;
+    }
+    let score = 0;
+    const getWords = (str) => (str || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(Boolean);
+    const lostNameWords = getWords(lost.itemName);
+    const foundDescWords = getWords(found.description);
+    const nameOverlap = lostNameWords.filter(w => foundDescWords.includes(w));
+    if (nameOverlap.length > 0)
+        score += 30;
+    if (lost.colour && found.description.toLowerCase().includes(lost.colour.toLowerCase())) {
+        score += 30;
+    }
+    if (found.colour && lost.description.toLowerCase().includes(found.colour.toLowerCase())) {
+        score += 30;
+    }
+    const lostLocWords = getWords(lost.lastSeenLocation);
+    const foundLocWords = getWords(found.foundLocation);
+    const locOverlap = lostLocWords.filter(w => foundLocWords.includes(w));
+    if (locOverlap.length > 0)
+        score += 20;
+    const lostDescWords = getWords(lost.description);
+    const descOverlap = lostDescWords.filter(w => foundDescWords.includes(w));
+    if (descOverlap.length > 1)
+        score += 20;
+    if (lost.brand && found.description.toLowerCase().includes(lost.brand.toLowerCase())) {
+        score += 20;
+    }
+    if (found.brand && lost.description.toLowerCase().includes(found.brand.toLowerCase())) {
+        score += 20;
+    }
+    return score >= 40;
+}
+async function triggerSmartMatching(itemOrReport) {
+    try {
+        if (itemOrReport.type === "lost") {
+            const lostReport = await db_js_1.default.lostReport.findUnique({
+                where: { id: itemOrReport.id }
+            });
+            if (!lostReport)
+                return;
+            const availableFound = await db_js_1.default.foundItem.findMany({
+                where: {
+                    communityCode: lostReport.communityCode,
+                    portal: lostReport.portal,
+                    status: { in: ["Available for Claim", "Possible Match Found"] }
+                }
+            });
+            let matchCreated = false;
+            for (const foundItem of availableFound) {
+                if (isPossibleMatch(lostReport, foundItem)) {
+                    const existing = await db_js_1.default.itemMatch.findFirst({
+                        where: { lostReportId: lostReport.id, foundItemId: foundItem.id }
+                    });
+                    if (!existing) {
+                        const mId = `MT-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+                        await db_js_1.default.itemMatch.create({
+                            data: {
+                                id: mId,
+                                lostReportId: lostReport.id,
+                                foundItemId: foundItem.id,
+                                status: "Suggested"
+                            }
+                        });
+                        matchCreated = true;
+                        if (foundItem.status === "Available for Claim") {
+                            const updatedFound = await db_js_1.default.foundItem.update({
+                                where: { id: foundItem.id },
+                                data: { status: "Possible Match Found" }
+                            });
+                            (0, index_js_1.broadcastUpdate)("lostfound:update", updatedFound);
+                        }
+                        const securityRole = lostReport.portal === "society" ? "security" : "warden";
+                        const secUsers = await db_js_1.default.user.findMany({
+                            where: { portal: lostReport.portal, role: securityRole }
+                        });
+                        for (const sec of secUsers) {
+                            await sendInAppNotification(sec.id, "Possible Match Suggested", `Smart Matching found a possible match for lost item: ${lostReport.itemName} and found item ID ${foundItem.id}`, "info");
+                        }
+                    }
+                }
+            }
+            if (matchCreated) {
+                const updatedLost = await db_js_1.default.lostReport.update({
+                    where: { id: lostReport.id },
+                    data: { status: "Possible Match Found" }
+                });
+                const lrUser = await db_js_1.default.user.findUnique({ where: { id: lostReport.residentId } });
+                (0, index_js_1.broadcastUpdate)("lostreport:update", {
+                    ...updatedLost,
+                    residentName: lrUser?.name || "Resident",
+                    flatNumber: lrUser?.unit || "N/A"
+                });
+            }
+        }
+        else {
+            const foundItem = await db_js_1.default.foundItem.findUnique({
+                where: { id: itemOrReport.id }
+            });
+            if (!foundItem || foundItem.status !== "Available for Claim")
+                return;
+            const searchingLost = await db_js_1.default.lostReport.findMany({
+                where: {
+                    communityCode: foundItem.communityCode,
+                    portal: foundItem.portal,
+                    status: { in: ["Searching", "Possible Match Found"] }
+                }
+            });
+            let matchCreated = false;
+            for (const lostReport of searchingLost) {
+                if (isPossibleMatch(lostReport, foundItem)) {
+                    const existing = await db_js_1.default.itemMatch.findFirst({
+                        where: { lostReportId: lostReport.id, foundItemId: foundItem.id }
+                    });
+                    if (!existing) {
+                        const mId = `MT-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+                        await db_js_1.default.itemMatch.create({
+                            data: {
+                                id: mId,
+                                lostReportId: lostReport.id,
+                                foundItemId: foundItem.id,
+                                status: "Suggested"
+                            }
+                        });
+                        matchCreated = true;
+                        if (lostReport.status === "Searching") {
+                            const updatedLost = await db_js_1.default.lostReport.update({
+                                where: { id: lostReport.id },
+                                data: { status: "Possible Match Found" }
+                            });
+                            const lrUser = await db_js_1.default.user.findUnique({ where: { id: lostReport.residentId } });
+                            (0, index_js_1.broadcastUpdate)("lostreport:update", {
+                                ...updatedLost,
+                                residentName: lrUser?.name || "Resident",
+                                flatNumber: lrUser?.unit || "N/A"
+                            });
+                        }
+                        const securityRole = foundItem.portal === "society" ? "security" : "warden";
+                        const secUsers = await db_js_1.default.user.findMany({
+                            where: { portal: foundItem.portal, role: securityRole }
+                        });
+                        for (const sec of secUsers) {
+                            await sendInAppNotification(sec.id, "Possible Match Suggested", `Smart Matching found a possible match for lost item: ${lostReport.itemName} and found item ID ${foundItem.id}`, "info");
+                        }
+                    }
+                }
+            }
+            if (matchCreated) {
+                const updatedFound = await db_js_1.default.foundItem.update({
+                    where: { id: foundItem.id },
+                    data: { status: "Possible Match Found" }
+                });
+                (0, index_js_1.broadcastUpdate)("lostfound:update", updatedFound);
+            }
+        }
+    }
+    catch (error) {
+        console.error("Error in triggerSmartMatching:", error);
+    }
+}
 // ==========================================
 // 🧸 Lost & Found Items
 // ==========================================
 router.get("/lostfound", auth_js_1.authenticateToken, async (req, res) => {
     try {
-        const list = await db_js_1.default.lostFoundItem.findMany({
-            where: { portal: req.user.portal },
+        const { role, portal, id: userId } = req.user;
+        const list = await db_js_1.default.foundItem.findMany({
+            where: { portal },
+            include: {
+                claims: true
+            },
             orderBy: { createdAt: "desc" }
         });
-        res.json(list);
+        if (role === "security" || role === "secretary" || role === "warden") {
+            return res.json(list);
+        }
+        const sanitizedList = list
+            .filter(item => {
+            if (item.status === "Pending Verification" || item.status === "Rejected") {
+                return item.reporterId === userId;
+            }
+            return true;
+        })
+            .map(item => {
+            if (item.reporterId !== userId) {
+                return {
+                    ...item,
+                    reporterId: "hidden",
+                    reporterName: "Community Member"
+                };
+            }
+            return item;
+        });
+        res.json(sanitizedList);
     }
     catch (error) {
         res.status(500).json({ error: "Failed to fetch lost/found items" });
     }
 });
 router.post("/lostfound", auth_js_1.authenticateToken, async (req, res) => {
-    const { title, description } = req.body;
-    if (!title || !description) {
-        return res.status(400).json({ error: "Title and description are required" });
+    const { category, brand, colour, description, images, foundLocation, dateFound, timeFound, additionalNotes } = req.body;
+    if (!category || !description || !foundLocation || !dateFound || !timeFound) {
+        return res.status(400).json({ error: "Required fields are missing" });
     }
     try {
-        const id = `LF-${Math.floor(100 + Math.random() * 900)}`;
-        const newItem = await db_js_1.default.lostFoundItem.create({
+        const { id: userId, name: userName, portal } = req.user;
+        const dbUser = await db_js_1.default.user.findUnique({ where: { id: userId } });
+        const communityCode = dbUser?.communityCode || (portal === "society" ? "SUN123" : "VESIT26");
+        const id = `LF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+        const newItem = await db_js_1.default.foundItem.create({
             data: {
                 id,
-                title,
+                reporterId: userId,
+                reporterName: userName,
+                communityCode,
+                category,
+                brand: brand || "",
+                colour: colour || "",
                 description,
-                status: "reported",
-                reporterId: req.user.id,
-                reporterName: req.user.name || "User",
-                portal: req.user.portal
+                images: images || [],
+                foundLocation,
+                dateFound,
+                timeFound,
+                additionalNotes: additionalNotes || "",
+                status: "Pending Verification",
+                portal
+            },
+            include: {
+                claims: true
             }
         });
+        const securityRole = portal === "society" ? "security" : "warden";
+        const securityUsers = await db_js_1.default.user.findMany({
+            where: { portal, role: securityRole }
+        });
+        for (const sec of securityUsers) {
+            await sendInAppNotification(sec.id, "New Found Item Submitted", `A new item (${category}) has been reported by a resident and is awaiting verification.`, "info");
+        }
+        await sendInAppNotification(userId, "Report Submitted Successfully", "Your Lost & Found report has been received and is pending security verification.", "success");
         (0, index_js_1.broadcastUpdate)("lostfound:update", newItem);
         res.status(201).json(newItem);
     }
     catch (error) {
-        res.status(500).json({ error: "Failed to report lost/found item" });
+        console.error(error);
+        res.status(500).json({ error: "Failed to report found item" });
     }
 });
-router.put("/lostfound/:id/claim", auth_js_1.authenticateToken, async (req, res) => {
+router.put("/lostfound/:id/verify", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
-    const { claimantId, claimantName } = req.body;
     try {
-        const updated = await db_js_1.default.lostFoundItem.update({
+        const item = await db_js_1.default.foundItem.findUnique({ where: { id } });
+        if (!item) {
+            return res.status(404).json({ error: "Found item not found" });
+        }
+        const updated = await db_js_1.default.foundItem.update({
             where: { id },
-            data: {
-                status: "claimed",
-                claimantId: claimantId || req.user.id,
-                claimantName: claimantName || req.user.name || "Claimant"
-            }
+            data: { status: "Available" },
+            include: { claims: true }
         });
+        await sendInAppNotification(item.reporterId, "Found Item Verified", `Security has verified your submitted item: ${item.category}. It is now available for claims.`, "success");
+        const securityRole = item.portal === "society" ? "security" : "warden";
+        await sendInAppNotification(req.user.id, "Item Verified", `You verified found item ID ${id}. Status set to Available for Claim.`, "success");
         (0, index_js_1.broadcastUpdate)("lostfound:update", updated);
         res.json(updated);
     }
     catch (error) {
-        res.status(500).json({ error: "Failed to claim item" });
+        res.status(500).json({ error: "Failed to verify item" });
+    }
+});
+router.put("/lostfound/:id/reject", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const item = await db_js_1.default.foundItem.findUnique({ where: { id } });
+        if (!item) {
+            return res.status(404).json({ error: "Found item not found" });
+        }
+        const updated = await db_js_1.default.foundItem.update({
+            where: { id },
+            data: { status: "Rejected" },
+            include: { claims: true }
+        });
+        await sendInAppNotification(item.reporterId, "Found Item Report Rejected", `Security has rejected your submitted item report: ${item.category}.`, "error");
+        (0, index_js_1.broadcastUpdate)("lostfound:update", updated);
+        res.json(updated);
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to reject item" });
+    }
+});
+router.post("/lostfound/:id/claim", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { claimReason, itemDetails, proofImage, contactNumber } = req.body;
+    if (!claimReason) {
+        return res.status(400).json({ error: "Claim reason is required" });
+    }
+    try {
+        const { id: userId, name: userName, portal } = req.user;
+        const item = await db_js_1.default.foundItem.findUnique({ where: { id } });
+        if (!item) {
+            return res.status(404).json({ error: "Found item not found" });
+        }
+        const claimId = `CLM-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+        await db_js_1.default.claim.create({
+            data: {
+                id: claimId,
+                itemId: id,
+                residentId: userId,
+                residentName: userName,
+                claimReason,
+                itemDetails: itemDetails || "",
+                proofImage: proofImage || "",
+                contactNumber: contactNumber || "",
+                status: "Claim Pending Verification"
+            }
+        });
+        const updatedItem = await db_js_1.default.foundItem.update({
+            where: { id },
+            data: { status: "Claim Pending Verification" },
+            include: { claims: true }
+        });
+        const securityRole = portal === "society" ? "security" : "warden";
+        const securityUsers = await db_js_1.default.user.findMany({
+            where: { portal, role: securityRole }
+        });
+        for (const sec of securityUsers) {
+            await sendInAppNotification(sec.id, "New Claim Request Received", `A resident has submitted a claim for item: ${item.category}.`, "info");
+        }
+        await sendInAppNotification(userId, "Claim Request Submitted", "Your claim request has been submitted and is pending verification.", "success");
+        (0, index_js_1.broadcastUpdate)("lostfound:update", updatedItem);
+        res.status(201).json(updatedItem);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to submit claim request" });
+    }
+});
+router.put("/lostfound/claims/:claimId/approve", auth_js_1.authenticateToken, async (req, res) => {
+    const { claimId } = req.params;
+    try {
+        const claim = await db_js_1.default.claim.findUnique({ where: { id: claimId } });
+        if (!claim) {
+            return res.status(404).json({ error: "Claim not found" });
+        }
+        await db_js_1.default.claim.update({
+            where: { id: claimId },
+            data: {
+                status: "Ready for Pickup",
+                approvalDate: new Date()
+            }
+        });
+        const updatedItem = await db_js_1.default.foundItem.update({
+            where: { id: claim.itemId },
+            data: { status: "Ready for Pickup" },
+            include: { claims: true }
+        });
+        await sendInAppNotification(claim.residentId, "Claim Request Approved", "Your claim has been approved. Please collect your item from the Security Desk.", "success");
+        const otherClaims = await db_js_1.default.claim.findMany({
+            where: {
+                itemId: claim.itemId,
+                id: { not: claimId },
+                status: "Claim Pending Verification"
+            }
+        });
+        for (const other of otherClaims) {
+            await db_js_1.default.claim.update({
+                where: { id: other.id },
+                data: { status: "Rejected" }
+            });
+            await sendInAppNotification(other.residentId, "Claim Request Rejected", `Your claim request for item ${updatedItem.category} was rejected because it was claimed by another resident.`, "error");
+        }
+        await sendInAppNotification(req.user.id, "Claim Approved", `You approved claim CLM-${claimId}. Status set to Ready for Pickup.`, "success");
+        (0, index_js_1.broadcastUpdate)("lostfound:update", updatedItem);
+        res.json(updatedItem);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to approve claim" });
+    }
+});
+router.put("/lostfound/claims/:claimId/reject", auth_js_1.authenticateToken, async (req, res) => {
+    const { claimId } = req.params;
+    try {
+        const claim = await db_js_1.default.claim.findUnique({ where: { id: claimId } });
+        if (!claim) {
+            return res.status(404).json({ error: "Claim not found" });
+        }
+        await db_js_1.default.claim.update({
+            where: { id: claimId },
+            data: { status: "Rejected" }
+        });
+        const pendingClaims = await db_js_1.default.claim.findMany({
+            where: {
+                itemId: claim.itemId,
+                status: "Claim Pending Verification"
+            }
+        });
+        let nextStatus = "Available for Claim";
+        if (pendingClaims.length > 0) {
+            nextStatus = "Claim Pending Verification";
+        }
+        const updatedItem = await db_js_1.default.foundItem.update({
+            where: { id: claim.itemId },
+            data: { status: nextStatus },
+            include: { claims: true }
+        });
+        await sendInAppNotification(claim.residentId, "Claim Request Rejected", "Your claim request has been rejected after verification.", "error");
+        (0, index_js_1.broadcastUpdate)("lostfound:update", updatedItem);
+        res.json(updatedItem);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to reject claim" });
+    }
+});
+router.put("/lostfound/claims/:claimId/pickup", auth_js_1.authenticateToken, async (req, res) => {
+    const { claimId } = req.params;
+    const { collectedBy, verifiedBySecurity } = req.body;
+    try {
+        const claim = await db_js_1.default.claim.findUnique({ where: { id: claimId } });
+        if (!claim) {
+            return res.status(404).json({ error: "Claim not found" });
+        }
+        const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        await db_js_1.default.claim.update({
+            where: { id: claimId },
+            data: {
+                status: "Returned",
+                collectionDate: new Date(),
+                collectionTime: timeString,
+                collectedBy: collectedBy || claim.residentName,
+                verifiedBySecurity: verifiedBySecurity || req.user.name || "Security"
+            }
+        });
+        const updatedItem = await db_js_1.default.foundItem.update({
+            where: { id: claim.itemId },
+            data: { status: "Returned" },
+            include: { claims: true }
+        });
+        await sendInAppNotification(claim.residentId, "Item Handed Over", "Your item has been marked as returned. Thank you!", "success");
+        await sendInAppNotification(req.user.id, "Item Marked as Returned", `Handover resolved for claim CLM-${claimId}.`, "success");
+        (0, index_js_1.broadcastUpdate)("lostfound:update", updatedItem);
+        res.json(updatedItem);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to log handover" });
+    }
+});
+// ==========================================
+// 🎒 Lost Reports & Smart Matching
+// ==========================================
+router.get("/lostfound/lost", auth_js_1.authenticateToken, async (req, res) => {
+    try {
+        const { role, portal, id: userId } = req.user;
+        const dbUser = await db_js_1.default.user.findUnique({ where: { id: userId } });
+        const communityCode = dbUser?.communityCode || (portal === "society" ? "SUN123" : "VESIT26");
+        const list = await db_js_1.default.lostReport.findMany({
+            where: { portal, communityCode },
+            include: {
+                resident: true,
+                matches: {
+                    include: {
+                        foundItem: true
+                    }
+                }
+            },
+            orderBy: { createdAt: "desc" }
+        });
+        if (role === "security" || role === "secretary" || role === "warden") {
+            const formatted = list.map(report => ({
+                ...report,
+                residentName: report.resident.name,
+                flatNumber: report.resident.unit || "N/A",
+                resident: undefined
+            }));
+            return res.json(formatted);
+        }
+        const filtered = list.filter(r => r.residentId === userId).map(report => ({
+            ...report,
+            residentName: report.resident.name,
+            flatNumber: report.resident.unit || "N/A",
+            resident: undefined
+        }));
+        res.json(filtered);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to fetch lost reports" });
+    }
+});
+router.post("/lostfound/lost", auth_js_1.authenticateToken, async (req, res) => {
+    const { itemName, category, brand, colour, description, distinguishingFeatures, dateLost, timeLost, lastSeenLocation, images, additionalNotes } = req.body;
+    if (!itemName || !category || !description || !dateLost || !lastSeenLocation) {
+        return res.status(400).json({ error: "Required fields are missing" });
+    }
+    try {
+        const { id: userId, portal } = req.user;
+        const dbUser = await db_js_1.default.user.findUnique({ where: { id: userId } });
+        const communityCode = dbUser?.communityCode || (portal === "society" ? "SUN123" : "VESIT26");
+        const id = `LR-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+        const newReport = await db_js_1.default.lostReport.create({
+            data: {
+                id,
+                residentId: userId,
+                itemName,
+                category,
+                brand: brand || "",
+                colour: colour || "",
+                description,
+                distinguishingFeatures: distinguishingFeatures || "",
+                dateLost,
+                timeLost: timeLost || "",
+                lastSeenLocation,
+                images: images || [],
+                additionalNotes: additionalNotes || "",
+                status: "Searching",
+                portal,
+                communityCode
+            }
+        });
+        const securityRole = portal === "society" ? "security" : "warden";
+        const secUsers = await db_js_1.default.user.findMany({
+            where: { portal, role: securityRole }
+        });
+        for (const sec of secUsers) {
+            await sendInAppNotification(sec.id, "New Lost Item Reported", `A resident has reported a lost item: ${itemName} (${category}).`, "info");
+        }
+        (0, index_js_1.broadcastUpdate)("lostreport:update", {
+            ...newReport,
+            residentName: dbUser?.name || "Resident",
+            flatNumber: dbUser?.unit || "N/A"
+        });
+        res.status(201).json(newReport);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to submit lost report" });
+    }
+});
+router.get("/lostfound/matches", auth_js_1.authenticateToken, async (req, res) => {
+    try {
+        const { portal } = req.user;
+        const list = await db_js_1.default.itemMatch.findMany({
+            where: {
+                lostReport: { portal }
+            },
+            include: {
+                lostReport: {
+                    include: { resident: true }
+                },
+                foundItem: {
+                    include: { reporter: true }
+                }
+            },
+            orderBy: { createdAt: "desc" }
+        });
+        const formatted = list.map(match => ({
+            ...match,
+            lostReport: {
+                ...match.lostReport,
+                residentName: match.lostReport.resident.name,
+                flatNumber: match.lostReport.resident.unit || "N/A",
+                resident: undefined
+            },
+            foundItem: {
+                ...match.foundItem,
+                reporterName: match.foundItem.reporter.name,
+                reporter: undefined
+            }
+        }));
+        res.json(formatted);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to fetch item matches" });
+    }
+});
+router.post("/lostfound/matches/:matchId/confirm", auth_js_1.authenticateToken, async (req, res) => {
+    const { matchId } = req.params;
+    const { verifiedBy } = req.body;
+    try {
+        const match = await db_js_1.default.itemMatch.findUnique({
+            where: { id: matchId },
+            include: { lostReport: true, foundItem: true }
+        });
+        if (!match) {
+            return res.status(404).json({ error: "Match not found" });
+        }
+        const updatedMatch = await db_js_1.default.itemMatch.update({
+            where: { id: matchId },
+            data: {
+                status: "Confirmed",
+                verifiedBy: verifiedBy || req.user.name || "Security",
+                verificationDate: new Date()
+            }
+        });
+        const updatedLost = await db_js_1.default.lostReport.update({
+            where: { id: match.lostReportId },
+            data: { status: "Matched" }
+        });
+        const updatedFound = await db_js_1.default.foundItem.update({
+            where: { id: match.foundItemId },
+            data: { status: "Owner Identified" }
+        });
+        await sendInAppNotification(match.lostReport.residentId, "Lost Item Matched", `Good news! An item matching your Lost Item Report (${match.lostReport.itemName}) has been identified. Please visit the Security Desk to verify and collect your belongings.`, "success");
+        const otherMatches = await db_js_1.default.itemMatch.findMany({
+            where: {
+                id: { not: matchId },
+                OR: [
+                    { lostReportId: match.lostReportId },
+                    { foundItemId: match.foundItemId }
+                ],
+                status: "Suggested"
+            }
+        });
+        for (const om of otherMatches) {
+            await db_js_1.default.itemMatch.update({
+                where: { id: om.id },
+                data: { status: "Rejected" }
+            });
+        }
+        const lrUser = await db_js_1.default.user.findUnique({ where: { id: match.lostReport.residentId } });
+        (0, index_js_1.broadcastUpdate)("lostreport:update", {
+            ...updatedLost,
+            residentName: lrUser?.name || "Resident",
+            flatNumber: lrUser?.unit || "N/A"
+        });
+        (0, index_js_1.broadcastUpdate)("lostfound:update", updatedFound);
+        (0, index_js_1.broadcastUpdate)("itemmatch:update", {
+            ...updatedMatch,
+            lostReport: {
+                ...match.lostReport,
+                residentName: lrUser?.name || "Resident",
+                flatNumber: lrUser?.unit || "N/A"
+            },
+            foundItem: match.foundItem
+        });
+        res.json({ success: true, match: updatedMatch });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to confirm match" });
+    }
+});
+router.post("/lostfound/matches/:matchId/reject", auth_js_1.authenticateToken, async (req, res) => {
+    const { matchId } = req.params;
+    try {
+        const match = await db_js_1.default.itemMatch.findUnique({
+            where: { id: matchId },
+            include: { lostReport: true, foundItem: true }
+        });
+        if (!match) {
+            return res.status(404).json({ error: "Match not found" });
+        }
+        const updatedMatch = await db_js_1.default.itemMatch.update({
+            where: { id: matchId },
+            data: { status: "Rejected" }
+        });
+        const remainingLostMatches = await db_js_1.default.itemMatch.count({
+            where: { lostReportId: match.lostReportId, status: { in: ["Suggested", "Confirmed"] } }
+        });
+        if (remainingLostMatches === 0) {
+            const updatedLost = await db_js_1.default.lostReport.update({
+                where: { id: match.lostReportId },
+                data: { status: "Searching" }
+            });
+            const lrUser = await db_js_1.default.user.findUnique({ where: { id: match.lostReport.residentId } });
+            (0, index_js_1.broadcastUpdate)("lostreport:update", {
+                ...updatedLost,
+                residentName: lrUser?.name || "Resident",
+                flatNumber: lrUser?.unit || "N/A"
+            });
+        }
+        const remainingFoundMatches = await db_js_1.default.itemMatch.count({
+            where: { foundItemId: match.foundItemId, status: { in: ["Suggested", "Confirmed"] } }
+        });
+        if (remainingFoundMatches === 0) {
+            const updatedFound = await db_js_1.default.foundItem.update({
+                where: { id: match.foundItemId },
+                data: { status: "Available for Claim" }
+            });
+            (0, index_js_1.broadcastUpdate)("lostfound:update", updatedFound);
+        }
+        res.json({ success: true, match: updatedMatch });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to reject match" });
+    }
+});
+router.post("/lostfound/suggest", auth_js_1.authenticateToken, async (req, res) => {
+    const { lostReportId, foundItemId, securityNote, additionalPhoto } = req.body;
+    if (!lostReportId || !foundItemId) {
+        return res.status(400).json({ error: "Required fields lostReportId and foundItemId are missing" });
+    }
+    try {
+        const lostReport = await db_js_1.default.lostReport.findUnique({
+            where: { id: lostReportId },
+            include: { resident: true }
+        });
+        const foundItem = await db_js_1.default.foundItem.findUnique({
+            where: { id: foundItemId }
+        });
+        if (!lostReport || !foundItem) {
+            return res.status(404).json({ error: "Lost report or found item not found" });
+        }
+        const mId = `MT-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
+        const newMatch = await db_js_1.default.itemMatch.create({
+            data: {
+                id: mId,
+                lostReportId,
+                foundItemId,
+                status: "Suggested",
+                securityNote: securityNote || "",
+                additionalPhoto: additionalPhoto || "",
+                verifiedBy: req.user.name || "Security",
+                verificationDate: new Date()
+            },
+            include: {
+                lostReport: {
+                    include: { resident: true }
+                },
+                foundItem: {
+                    include: { reporter: true }
+                }
+            }
+        });
+        const updatedLost = await db_js_1.default.lostReport.update({
+            where: { id: lostReportId },
+            data: { status: "Belonging Suggested" }
+        });
+        const updatedFound = await db_js_1.default.foundItem.update({
+            where: { id: foundItemId },
+            data: { status: "Suggested To Resident" }
+        });
+        // Notify resident
+        await sendInAppNotification(lostReport.residentId, "Belonging Suggested", `A possible belonging has been sent to you by Security. Please review it.`, "info");
+        const formatted = {
+            ...newMatch,
+            lostReport: {
+                ...newMatch.lostReport,
+                residentName: newMatch.lostReport.resident.name,
+                flatNumber: newMatch.lostReport.resident.unit || "N/A",
+                resident: undefined
+            },
+            foundItem: {
+                ...newMatch.foundItem,
+                reporterName: newMatch.foundItem.reporter.name,
+                reporter: undefined
+            }
+        };
+        (0, index_js_1.broadcastUpdate)("lostreport:update", {
+            ...updatedLost,
+            residentName: lostReport.resident.name,
+            flatNumber: lostReport.resident.unit || "N/A"
+        });
+        (0, index_js_1.broadcastUpdate)("lostfound:update", updatedFound);
+        (0, index_js_1.broadcastUpdate)("itemmatch:update", formatted);
+        res.status(201).json(formatted);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to suggest match" });
+    }
+});
+router.post("/lostfound/matches/:matchId/claim", auth_js_1.authenticateToken, async (req, res) => {
+    const { matchId } = req.params;
+    try {
+        const match = await db_js_1.default.itemMatch.findUnique({
+            where: { id: matchId },
+            include: {
+                lostReport: {
+                    include: { resident: true }
+                },
+                foundItem: true
+            }
+        });
+        if (!match) {
+            return res.status(404).json({ error: "Match not found" });
+        }
+        // Update lost report status to "Claim Confirmed"
+        const updatedLost = await db_js_1.default.lostReport.update({
+            where: { id: match.lostReportId },
+            data: { status: "Claim Confirmed" }
+        });
+        // Update found item status to "Claim Confirmed"
+        const updatedFound = await db_js_1.default.foundItem.update({
+            where: { id: match.foundItemId },
+            data: { status: "Claim Confirmed" }
+        });
+        const residentName = match.lostReport.resident.name;
+        const portal = match.lostReport.portal;
+        const securityRole = portal === "society" ? "security" : "warden";
+        // Notify all security guards
+        const secUsers = await db_js_1.default.user.findMany({
+            where: { portal, role: securityRole }
+        });
+        for (const sec of secUsers) {
+            await sendInAppNotification(sec.id, "Proposed Belonging Confirmed", `${residentName} confirmed that the suggested item belongs to her.`, "success");
+        }
+        (0, index_js_1.broadcastUpdate)("lostreport:update", {
+            ...updatedLost,
+            residentName,
+            flatNumber: match.lostReport.resident.unit || "N/A"
+        });
+        (0, index_js_1.broadcastUpdate)("lostfound:update", updatedFound);
+        res.json({ success: true, lostReport: updatedLost, foundItem: updatedFound });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to claim match" });
+    }
+});
+router.post("/lostfound/matches/:matchId/reject-match", auth_js_1.authenticateToken, async (req, res) => {
+    const { matchId } = req.params;
+    try {
+        const match = await db_js_1.default.itemMatch.findUnique({
+            where: { id: matchId },
+            include: {
+                lostReport: {
+                    include: { resident: true }
+                },
+                foundItem: true
+            }
+        });
+        if (!match) {
+            return res.status(404).json({ error: "Match not found" });
+        }
+        // Update match status to Rejected
+        const updatedMatch = await db_js_1.default.itemMatch.update({
+            where: { id: matchId },
+            data: { status: "Rejected" }
+        });
+        // Update lost report status back to Searching
+        const updatedLost = await db_js_1.default.lostReport.update({
+            where: { id: match.lostReportId },
+            data: { status: "Searching" }
+        });
+        // Update found item status back to Available
+        const updatedFound = await db_js_1.default.foundItem.update({
+            where: { id: match.foundItemId },
+            data: { status: "Available" }
+        });
+        const residentName = match.lostReport.resident.name;
+        const portal = match.lostReport.portal;
+        const securityRole = portal === "society" ? "security" : "warden";
+        // Notify all security guards
+        const secUsers = await db_js_1.default.user.findMany({
+            where: { portal, role: securityRole }
+        });
+        for (const sec of secUsers) {
+            await sendInAppNotification(sec.id, "Proposed Belonging Rejected", `${residentName} rejected the proposed belonging (Match Ref: ${matchId}).`, "error");
+        }
+        (0, index_js_1.broadcastUpdate)("lostreport:update", {
+            ...updatedLost,
+            residentName,
+            flatNumber: match.lostReport.resident.unit || "N/A"
+        });
+        (0, index_js_1.broadcastUpdate)("lostfound:update", updatedFound);
+        // Broadcast match status update
+        (0, index_js_1.broadcastUpdate)("itemmatch:update", {
+            ...updatedMatch,
+            lostReport: {
+                ...match.lostReport,
+                residentName,
+                flatNumber: match.lostReport.resident.unit || "N/A",
+                resident: undefined
+            },
+            foundItem: updatedFound
+        });
+        res.json({ success: true, match: updatedMatch, lostReport: updatedLost, foundItem: updatedFound });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to reject match suggestion" });
+    }
+});
+router.put("/lostfound/matches/:matchId/handover", auth_js_1.authenticateToken, async (req, res) => {
+    const { matchId } = req.params;
+    const { collectedBy, verifiedBySecurity } = req.body;
+    try {
+        const match = await db_js_1.default.itemMatch.findUnique({
+            where: { id: matchId },
+            include: { lostReport: true, foundItem: true }
+        });
+        if (!match) {
+            return res.status(404).json({ error: "Match not found" });
+        }
+        const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const updatedMatch = await db_js_1.default.itemMatch.update({
+            where: { id: matchId },
+            data: {
+                status: "Confirmed",
+                collectionDate: new Date(),
+                collectionTime: timeString,
+                collectedBy: collectedBy || match.lostReport.residentId,
+                verifiedBy: verifiedBySecurity || req.user.name || "Security"
+            }
+        });
+        const updatedLost = await db_js_1.default.lostReport.update({
+            where: { id: match.lostReportId },
+            data: { status: "Returned" }
+        });
+        const updatedFound = await db_js_1.default.foundItem.update({
+            where: { id: match.foundItemId },
+            data: { status: "Returned" }
+        });
+        await sendInAppNotification(match.lostReport.residentId, "Item Returned Successfully", `Your lost item (${match.lostReport.itemName}) has been successfully handed over to you.`, "success");
+        const lrUser = await db_js_1.default.user.findUnique({ where: { id: match.lostReport.residentId } });
+        (0, index_js_1.broadcastUpdate)("lostreport:update", {
+            ...updatedLost,
+            residentName: lrUser?.name || "Resident",
+            flatNumber: lrUser?.unit || "N/A"
+        });
+        (0, index_js_1.broadcastUpdate)("lostfound:update", updatedFound);
+        (0, index_js_1.broadcastUpdate)("itemmatch:update", {
+            ...updatedMatch,
+            lostReport: {
+                ...match.lostReport,
+                residentName: lrUser?.name || "Resident",
+                flatNumber: lrUser?.unit || "N/A"
+            },
+            foundItem: updatedFound
+        });
+        res.json({ success: true, match: updatedMatch });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to handover item" });
     }
 });
 // ==========================================

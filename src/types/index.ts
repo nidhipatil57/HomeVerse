@@ -63,7 +63,8 @@ export type ComplaintStatus =
   | 'Work In Progress'
   | 'Resident Feedback'
   | 'Completed'
-  | 'Rejected';
+  | 'Rejected'
+  | 'reopened';
 
 export type ComplaintPriority = 'critical' | 'high' | 'medium' | 'low' | 'emergency';
 
