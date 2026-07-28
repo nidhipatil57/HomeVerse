@@ -96,6 +96,7 @@ export const SECRETARY_SIDEBAR_ITEMS = [
   { label: 'Security Staff', href: '/society/security-staff', icon: 'Shield' },
   { label: 'Visitors', href: '/society/visitors', icon: 'Users' },
   { label: 'Complaints', href: '/society/complaints', icon: 'MessageSquareWarning' },
+  { label: 'Service Requests', href: '/society/services', icon: 'Briefcase' },
   { label: 'Payments', href: '/society/payments', icon: 'CreditCard' },
   { label: 'Expenses', href: '/society/expenses', icon: 'DollarSign' },
   { label: 'Financial Reports', href: '/society/financial-reports', icon: 'FileText' },

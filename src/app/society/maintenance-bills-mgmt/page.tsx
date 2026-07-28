@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { IndianRupee, Plus, AlertTriangle } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { IndianRupee, Plus, AlertTriangle, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,9 +12,10 @@ import { useAuth } from "@/lib/store/useAuth";
 export default function SecretaryMaintenanceBillsMgmtPage() {
   const { user, initialize } = useAuth();
   const {
-    generateBulkMaintenanceBills, initializeDb
+    users, generateBulkMaintenanceBills, initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
+      users: state.users || [],
       generateBulkMaintenanceBills: state.generateBulkMaintenanceBills,
       initializeDb: state.initializeDb,
     }))
@@ -24,6 +25,12 @@ export default function SecretaryMaintenanceBillsMgmtPage() {
 
   // Form State
   const [billingMonth, setBillingMonth] = useState("July 2026");
+  const [billingDueDate, setBillingDueDate] = useState("15 August 2026");
+  const [billingDescription, setBillingDescription] = useState("Monthly Maintenance Charges");
+  const [billingTarget, setBillingTarget] = useState("Everyone"); // Everyone or Selected Building
+  const [selectedBuilding, setSelectedBuilding] = useState("");
+  const [billingLateFee, setBillingLateFee] = useState(200);
+
   const [chargeMaintenance, setChargeMaintenance] = useState(3000);
   const [chargeWater, setChargeWater] = useState(500);
   const [chargeElectricity, setChargeElectricity] = useState(600);
@@ -39,6 +46,21 @@ export default function SecretaryMaintenanceBillsMgmtPage() {
     setMounted(true);
   }, [initialize, initializeDb]);
 
+  // Extract unique building names dynamically
+  const buildingsList = useMemo(() => {
+    const buildings = users
+      .filter(u => u.role === "resident" && u.building)
+      .map(u => u.building);
+    return Array.from(new Set(buildings));
+  }, [users]);
+
+  // Set first building as default if applicable
+  useEffect(() => {
+    if (buildingsList.length > 0 && !selectedBuilding) {
+      setSelectedBuilding(buildingsList[0] || "");
+    }
+  }, [buildingsList, selectedBuilding]);
+
   if (!mounted) return null;
 
   const handleGenerateBills = (e: React.FormEvent) => {
@@ -50,6 +72,11 @@ export default function SecretaryMaintenanceBillsMgmtPage() {
     generateBulkMaintenanceBills({
       month: billingMonth,
       amount: totalAmount,
+      dueDate: billingDueDate,
+      description: billingDescription,
+      lateFee: billingLateFee,
+      applicableTo: billingTarget,
+      selectedBuilding: billingTarget === "Selected Building" ? selectedBuilding : undefined,
       breakdown: [
         { label: "Maintenance", amount: Number(chargeMaintenance) },
         { label: "Water", amount: Number(chargeWater) },
@@ -61,7 +88,8 @@ export default function SecretaryMaintenanceBillsMgmtPage() {
         { label: "Other Levies", amount: Number(chargeOther) }
       ]
     });
-    alert(`Maintenance bills generated for all approved residents for ${billingMonth}!`);
+    
+    alert(`Maintenance bills generated and dispatched successfully for ${billingMonth}!`);
   };
 
   return (
@@ -82,62 +110,115 @@ export default function SecretaryMaintenanceBillsMgmtPage() {
           <CardTitle className="text-base font-bold flex items-center gap-1.5">
             <Plus className="w-4 h-4 text-primary" /> Generate New Billing Cycle
           </CardTitle>
-          <CardDescription>Dispatch bulk maintenance bills to all approved residents</CardDescription>
+          <CardDescription>Dispatch bulk maintenance bills to target residents</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleGenerateBills} className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Billing Month Cycle</label>
-              <Input value={billingMonth} onChange={(e) => setBillingMonth(e.target.value)} className="h-10 rounded-xl text-xs" required />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3.5 text-xs">
+            <div className="grid grid-cols-2 gap-3.5 text-xs text-left">
               <div>
-                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Society Maintenance (₹)</label>
-                <Input type="number" value={chargeMaintenance} onChange={(e) => setChargeMaintenance(Number(e.target.value))} className="h-9 rounded-lg" required />
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Billing Month Cycle</label>
+                <Input value={billingMonth} onChange={(e) => setBillingMonth(e.target.value)} className="h-10 rounded-xl text-xs" required />
               </div>
               <div>
-                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Water Tariff Charges (₹)</label>
-                <Input type="number" value={chargeWater} onChange={(e) => setChargeWater(Number(e.target.value))} className="h-9 rounded-lg" required />
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Due Date</label>
+                <Input value={billingDueDate} onChange={(e) => setBillingDueDate(e.target.value)} placeholder="e.g. 15 August 2026" className="h-10 rounded-xl text-xs" required />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3.5 text-xs">
+            <div className="grid grid-cols-2 gap-3.5 text-xs text-left">
               <div>
-                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Common Area Electricity (₹)</label>
-                <Input type="number" value={chargeElectricity} onChange={(e) => setChargeElectricity(Number(e.target.value))} className="h-9 rounded-lg" required />
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Billing Description</label>
+                <Input value={billingDescription} onChange={(e) => setBillingDescription(e.target.value)} className="h-10 rounded-xl text-xs" required />
               </div>
               <div>
-                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Parking Slot Charges (₹)</label>
-                <Input type="number" value={chargeParking} onChange={(e) => setChargeParking(Number(e.target.value))} className="h-9 rounded-lg" required />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3.5 text-xs">
-              <div>
-                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Sinking Fund Allocation (₹)</label>
-                <Input type="number" value={chargeSinking} onChange={(e) => setChargeSinking(Number(e.target.value))} className="h-9 rounded-lg" required />
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Repairs & Infrastructure (₹)</label>
-                <Input type="number" value={chargeRepair} onChange={(e) => setChargeRepair(Number(e.target.value))} className="h-9 rounded-lg" required />
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Grace Period Late Fee (₹)</label>
+                <Input type="number" value={billingLateFee} onChange={(e) => setBillingLateFee(Number(e.target.value))} className="h-10 rounded-xl text-xs" required />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3.5 text-xs">
+            <div className="grid grid-cols-2 gap-3.5 text-xs text-left">
               <div>
-                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Penalties / Late Fees (₹)</label>
-                <Input type="number" value={chargePenalties} onChange={(e) => setChargePenalties(Number(e.target.value))} className="h-9 rounded-lg" required />
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Target Scope</label>
+                <select
+                  value={billingTarget}
+                  onChange={(e) => setBillingTarget(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-card text-xs font-semibold"
+                >
+                  <option value="Everyone">Everyone (All Approved Residents)</option>
+                  <option value="Selected Building">Selected Building Wing</option>
+                </select>
               </div>
-              <div>
-                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Other Levies (₹)</label>
-                <Input type="number" value={chargeOther} onChange={(e) => setChargeOther(Number(e.target.value))} className="h-9 rounded-lg" required />
+              {billingTarget === "Selected Building" && (
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Target Building / Wing</label>
+                  <select
+                    value={selectedBuilding}
+                    onChange={(e) => setSelectedBuilding(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-border bg-card text-xs font-semibold"
+                  >
+                    {buildingsList.length === 0 ? (
+                      <option value="" disabled>No buildings detected in database</option>
+                    ) : (
+                      buildingsList.map(building => (
+                        <option key={building} value={building}>{building}</option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-border/30 pt-4 space-y-3.5">
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block text-left">Breakdown Items</span>
+              
+              <div className="grid grid-cols-2 gap-3.5 text-xs text-left">
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Society Maintenance (₹)</label>
+                  <Input type="number" value={chargeMaintenance} onChange={(e) => setChargeMaintenance(Number(e.target.value))} className="h-9 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Water Tariff Charges (₹)</label>
+                  <Input type="number" value={chargeWater} onChange={(e) => setChargeWater(Number(e.target.value))} className="h-9 rounded-lg" required />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5 text-xs text-left">
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Common Area Electricity (₹)</label>
+                  <Input type="number" value={chargeElectricity} onChange={(e) => setChargeElectricity(Number(e.target.value))} className="h-9 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Parking Slot Charges (₹)</label>
+                  <Input type="number" value={chargeParking} onChange={(e) => setChargeParking(Number(e.target.value))} className="h-9 rounded-lg" required />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5 text-xs text-left">
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Sinking Fund Allocation (₹)</label>
+                  <Input type="number" value={chargeSinking} onChange={(e) => setChargeSinking(Number(e.target.value))} className="h-9 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Repairs & Infrastructure (₹)</label>
+                  <Input type="number" value={chargeRepair} onChange={(e) => setChargeRepair(Number(e.target.value))} className="h-9 rounded-lg" required />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5 text-xs text-left">
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Penalties / Late Fees (₹)</label>
+                  <Input type="number" value={chargePenalties} onChange={(e) => setChargePenalties(Number(e.target.value))} className="h-9 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Other Levies (₹)</label>
+                  <Input type="number" value={chargeOther} onChange={(e) => setChargeOther(Number(e.target.value))} className="h-9 rounded-lg" required />
+                </div>
               </div>
             </div>
 
-            <div className="p-3 bg-amber-500/10 text-amber-600 rounded-xl border border-amber-500/20 text-[10px] flex items-center gap-1.5">
+            <div className="p-3 bg-amber-500/10 text-amber-600 rounded-xl border border-amber-500/20 text-[10px] flex items-center gap-1.5 text-left">
               <AlertTriangle className="w-4.5 h-4.5 shrink-0" />
-              This will generate invoice records for all active residents and update outstanding dues.
+              This will generate invoice records for the target residents and update outstanding dues.
             </div>
 
             <Button type="submit" className="w-full h-10 rounded-xl gradient-primary text-white border-0 font-semibold text-xs shadow-md">

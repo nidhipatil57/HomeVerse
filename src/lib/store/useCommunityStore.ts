@@ -83,13 +83,18 @@ export interface Claim {
   itemDetails?: string;
   proofImage?: string;
   contactNumber?: string;
-  status: "Claim Pending Verification" | "Ready for Pickup" | "Returned" | "Rejected";
+  status: "Claim Pending Verification" | "Ready for Pickup" | "Returned" | "Rejected" | "More Evidence Required" | string;
   approvalDate?: string;
   collectionDate?: string;
   collectionTime?: string;
   collectedBy?: string;
   verifiedBySecurity?: string;
   createdAt: string;
+  item?: FoundItem;
+  evidence?: string;
+  rejectReason?: string;
+  collectionOtp?: string;
+  moreEvidenceRequest?: string;
 }
 
 export interface FoundItem {
@@ -106,11 +111,14 @@ export interface FoundItem {
   dateFound: string;
   timeFound: string;
   additionalNotes?: string;
-  status: "Pending Verification" | "Available" | "Suggested To Resident" | "Claim Requested" | "Claim Confirmed" | "Returned" | "Rejected" | "Available for Claim" | "Claim Pending Verification" | "Ready for Pickup" | "Possible Match Found" | "Owner Identified";
+  status: "Pending Verification" | "Available" | "Suggested To Resident" | "Claim Requested" | "Claim Confirmed" | "Returned" | "Rejected" | "Available for Claim" | "Claim Pending Verification" | "Ready for Pickup" | "Possible Match Found" | "Owner Identified" | string;
   portal: PortalType;
   createdAt: string;
   claims?: Claim[];
   matches?: ItemMatch[];
+  verification_status?: string;
+  publication_status?: string;
+  rejectReason?: string;
 }
 
 export interface LostReport {
@@ -125,7 +133,7 @@ export interface LostReport {
   dateLost: string;
   timeLost?: string;
   lastSeenLocation: string;
-  status: "Searching" | "Belonging Suggested" | "Claim Requested" | "Claim Confirmed" | "Returned" | "Closed" | "Possible Match Found" | "Matched";
+  status: "Pending Verification" | "Searching" | "Belonging Suggested" | "Claim Requested" | "Claim Confirmed" | "Returned" | "Closed" | "Possible Match Found" | "Matched" | "More Info Requested" | "Rejected" | string;
   images: string[];
   additionalNotes?: string;
   portal: PortalType;
@@ -135,6 +143,9 @@ export interface LostReport {
   matches?: ItemMatch[];
   residentName?: string;
   flatNumber?: string;
+  verification_status?: string;
+  publication_status?: string;
+  rejectReason?: string;
 }
 
 export interface ItemMatch {
@@ -330,6 +341,7 @@ interface CommunityState {
   lostFoundItems: FoundItem[];
   lostReports: LostReport[];
   itemMatches: ItemMatch[];
+  claims: Claim[];
   roomChangeRequests: RoomChangeRequest[];
   maintenanceBills: MaintenanceBill[];
   communityEvents: CommunityEvent[];
@@ -360,7 +372,7 @@ interface CommunityState {
   chatMessages: any[];
 
   createBooking: (bookingData: any) => Promise<any>;
-  updateBookingStatus: (id: string, status: string) => Promise<any>;
+  updateBookingStatus: (id: string, status: string, extraData?: any) => Promise<any>;
   submitReview: (reviewData: any) => Promise<any>;
   toggleFavorite: (workerId: string) => Promise<any>;
   updateAvailability: (availabilityData: any) => Promise<any>;
@@ -449,14 +461,24 @@ interface CommunityState {
     claimReason: string,
     itemDetails?: string,
     proofImage?: string,
-    contactNumber?: string
+    contactNumber?: string,
+    evidence?: any
   ) => Promise<void>;
   resolveLostFoundItem: (id: string) => Promise<void>;
   verifyFoundItem: (id: string) => Promise<void>;
+  verifyLostReport: (id: string) => Promise<void>;
   rejectFoundItem: (id: string) => Promise<void>;
+  rejectFoundItemWithReason: (id: string, reason: string) => Promise<void>;
+  rejectLostReport: (id: string, reason: string) => Promise<void>;
+  requestMoreInfoLostReport: (id: string, message: string) => Promise<void>;
+  editLostReport: (id: string, report: Partial<LostReport>) => Promise<void>;
   approveClaim: (claimId: string) => Promise<void>;
   rejectClaim: (claimId: string) => Promise<void>;
+  rejectClaimWithReason: (claimId: string, reason: string) => Promise<void>;
+  requestMoreEvidence: (claimId: string, message: string) => Promise<void>;
+  provideAdditionalEvidence: (claimId: string, text: string, image?: string) => Promise<void>;
   pickupItem: (claimId: string, collectedBy: string, verifiedBySecurity: string) => Promise<void>;
+  pickupItemWithOtp: (claimId: string, otp: string, collectedBy: string, verifiedBySecurity: string) => Promise<void>;
   reportLostItem: (report: Omit<LostReport, "id" | "status" | "createdAt">) => Promise<void>;
   confirmMatch: (matchId: string, verifiedBy: string) => Promise<void>;
   rejectMatch: (matchId: string) => Promise<void>;
@@ -466,6 +488,7 @@ interface CommunityState {
   rejectSuggestedMatch: (matchId: string) => Promise<void>;
   fetchLostReports: () => Promise<void>;
   fetchMatches: () => Promise<void>;
+  fetchMyClaims: () => Promise<void>;
 
   // Society Finance & Billing Transactions
   payMaintenanceBill: (id: string) => Promise<void>;
@@ -541,6 +564,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   lostFoundItems: [],
   lostReports: [],
   itemMatches: [],
+  claims: [],
   roomChangeRequests: [],
   maintenanceBills: [],
   communityEvents: [],
@@ -1508,11 +1532,11 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
   },
 
-  claimLostFoundItem: async (id, residentId, residentName, claimReason, itemDetails, proofImage, contactNumber) => {
+  claimLostFoundItem: async (id, residentId, residentName, claimReason, itemDetails, proofImage, contactNumber, evidence) => {
     await fetch(`/api/lostfound/${id}/claim`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ residentId, residentName, claimReason, itemDetails, proofImage, contactNumber })
+      body: JSON.stringify({ residentId, residentName, claimReason, itemDetails, proofImage, contactNumber, evidence })
     });
   },
 
@@ -1528,9 +1552,47 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
   },
 
+  verifyLostReport: async (id) => {
+    await fetch(`/api/lostfound/lost/${id}/verify`, {
+      method: "PUT"
+    });
+  },
+
   rejectFoundItem: async (id) => {
     await fetch(`/api/lostfound/${id}/reject`, {
       method: "PUT"
+    });
+  },
+
+  rejectFoundItemWithReason: async (id, reason) => {
+    await fetch(`/api/lostfound/${id}/reject`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rejectReason: reason })
+    });
+  },
+
+  rejectLostReport: async (id, reason) => {
+    await fetch(`/api/lostfound/lost/${id}/reject`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rejectReason: reason })
+    });
+  },
+
+  requestMoreInfoLostReport: async (id, message) => {
+    await fetch(`/api/lostfound/lost/${id}/request-info`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rejectReason: message })
+    });
+  },
+
+  editLostReport: async (id, report) => {
+    await fetch(`/api/lostfound/lost/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(report)
     });
   },
 
@@ -1546,11 +1608,43 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
   },
 
+  rejectClaimWithReason: async (claimId, reason) => {
+    await fetch(`/api/lostfound/claims/${claimId}/reject`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rejectReason: reason })
+    });
+  },
+
+  requestMoreEvidence: async (claimId, message) => {
+    await fetch(`/api/lostfound/claims/${claimId}/request-evidence`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message })
+    });
+  },
+
+  provideAdditionalEvidence: async (claimId, text, image) => {
+    await fetch(`/api/lostfound/claims/${claimId}/provide-evidence`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ additionalText: text, additionalImage: image })
+    });
+  },
+
   pickupItem: async (claimId, collectedBy, verifiedBySecurity) => {
     await fetch(`/api/lostfound/claims/${claimId}/pickup`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ collectedBy, verifiedBySecurity })
+    });
+  },
+
+  pickupItemWithOtp: async (claimId, otp, collectedBy, verifiedBySecurity) => {
+    await fetch(`/api/lostfound/claims/${claimId}/pickup`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ otp, collectedBy, verifiedBySecurity })
     });
   },
 
@@ -1622,6 +1716,18 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       if (res.ok) {
         const data = await res.json();
         set({ itemMatches: data });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  },
+
+  fetchMyClaims: async () => {
+    try {
+      const res = await fetch("/api/lostfound/claims");
+      if (res.ok) {
+        const data = await res.json();
+        set({ claims: data });
       }
     } catch (e) {
       console.error(e);
@@ -1932,11 +2038,11 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     throw new Error("Failed to create booking");
   },
 
-  updateBookingStatus: async (id: string, status: string) => {
+  updateBookingStatus: async (id: string, status: string, extraData?: any) => {
     const res = await fetch(`/api/community-services/bookings/${id}/status`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ status, ...extraData })
     });
     if (res.ok) {
       const data = await res.json();
