@@ -283,8 +283,12 @@ model FoundItem {
   additionalNotes String?
   status          String   // "Pending Verification", "Available for Claim", "Claim Pending Verification", "Ready for Pickup", "Returned", "Rejected"
   portal          String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  verification_status String   @default("PENDING")
+  publication_status  String   @default("UNPUBLISHED")
+  rejectReason        String?
+
 
   claims          Claim[]
   matches         ItemMatch[]
@@ -312,6 +316,11 @@ model Claim {
   verifiedBySecurity String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+  evidence           String?
+  rejectReason       String?
+  collectionOtp      String?
+  moreEvidenceRequest String?
+
 
   item               FoundItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
   resident           User      @relation("ResidentClaims", fields: [residentId], references: [id], onDelete: Cascade)
@@ -339,6 +348,10 @@ model LostReport {
   communityCode         String
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
+  verification_status   String      @default("PENDING")
+  publication_status    String      @default("UNPUBLISHED")
+  rejectReason          String?
+
 
   resident              User        @relation("ResidentLostReports", fields: [residentId], references: [id], onDelete: Cascade)
   matches               ItemMatch[]

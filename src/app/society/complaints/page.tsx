@@ -154,7 +154,7 @@ export default function ComplaintsPage() {
 
   // Sub-tabs for role-based complaint rosters
   const [residentTab, setResidentTab] = useState<"active" | "completed">("active");
-  const [secretaryTab, setSecretaryTab] = useState<"active" | "rejected" | "history">("active");
+  const [secretaryTab, setSecretaryTab] = useState<"new" | "forwarded" | "rejected" | "history">("new");
   const [managerTab, setManagerTab] = useState<"in-progress" | "solved">("in-progress");
 
   const getResidentMaskedStatus = (status: string) => {
@@ -165,10 +165,19 @@ export default function ComplaintsPage() {
     if (["worker being coordinated", "assigned", "accepted"].includes(s)) {
       return { label: "Worker Assigned", badgeClass: "bg-blue-500/10 text-blue-600 border-blue-500/20" };
     }
-    if (["scheduled", "work in progress", "in-progress", "work-started", "travelling", "reached-society", "reached-building", "reached-flat"].includes(s)) {
+    if (["scheduled", "work in progress", "in-progress", "work started", "work-started", "travelling", "reached-society", "reached-building", "reached-flat"].includes(s)) {
       return { label: "Work In Progress", badgeClass: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20" };
     }
-    if (s === "completed") {
+    if (s === "delayed") {
+      return { label: "Delayed", badgeClass: "bg-red-500/10 text-red-600 border-red-500/20" };
+    }
+    if (s === "rescheduled") {
+      return { label: "Rescheduled", badgeClass: "bg-orange-500/10 text-orange-600 border-orange-500/20" };
+    }
+    if (s === "awaiting completion") {
+      return { label: "Awaiting Completion", badgeClass: "bg-blue-500/10 text-blue-600 border-blue-500/20" };
+    }
+    if (["completed", "work completed"].includes(s)) {
       return { label: "Completed", badgeClass: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" };
     }
     if (s === "closed") {
@@ -295,15 +304,20 @@ export default function ComplaintsPage() {
         if (!isSecurityCat) return false;
       } else if (isSecretary) {
         // Secretary filters based on secretaryTab
-        if (secretaryTab === "active") {
-          if (["Rejected", "closed", "resolved"].includes(c.status)) return false;
+        const s = c.status?.toLowerCase();
+        if (secretaryTab === "new") {
+          return ["submitted", "under-review", "verified", "reopened", "reopen"].includes(s);
+        } else if (secretaryTab === "forwarded") {
+          return ["forwarded to manager", "worker being coordinated", "assigned", "accepted", "scheduled", "work in progress", "in-progress", "work started", "awaiting completion", "delayed", "rescheduled", "completed", "completed"].includes(s);
         } else if (secretaryTab === "rejected") {
-          if (c.status !== "Rejected") return false;
+          return s === "rejected";
+        } else if (secretaryTab === "history") {
+          return ["closed", "resolved"].includes(s);
         }
-        // "history" sees all
       } else if (isManager) {
         // Manager filters based on managerTab
-        const isSolved = ["closed", "resolved"].includes(c.status);
+        const s = c.status?.toLowerCase();
+        const isSolved = ["closed", "resolved", "completed", "work completed"].includes(s);
         if (managerTab === "in-progress") {
           if (isSolved) return false;
         } else if (managerTab === "solved") {
@@ -1218,7 +1232,8 @@ export default function ComplaintsPage() {
               {isSecretary && (
                 <div className="flex border border-border/50 rounded-2xl p-1 bg-secondary/15 gap-1 overflow-x-auto">
                   {[
-                    { id: "active", label: "Active" },
+                    { id: "new", label: "New Complaints" },
+                    { id: "forwarded", label: "Forwarded" },
                     { id: "rejected", label: "Rejected" },
                     { id: "history", label: "History" }
                   ].map((tab) => (
@@ -1606,12 +1621,34 @@ export default function ComplaintsPage() {
                                     )}
                                   </div>
 
-                                  <Button 
-                                    onClick={() => handleManagerQuickStatus("Completed")} 
-                                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-10 rounded-xl shadow-md border-0"
-                                  >
-                                    Mark Work Completed
-                                  </Button>
+                                  <div className="space-y-3">
+                                    <div className="space-y-1">
+                                      <label className="text-[10px] text-muted-foreground uppercase font-extrabold block text-left">Update Dispatch Status</label>
+                                      <select
+                                        defaultValue=""
+                                        onChange={(e) => {
+                                          if (e.target.value) {
+                                            handleManagerQuickStatus(e.target.value);
+                                            e.target.value = "";
+                                          }
+                                        }}
+                                        className="w-full h-10 px-3 rounded-xl border border-border bg-card text-xs font-semibold"
+                                      >
+                                        <option value="" disabled>Select status update...</option>
+                                        <option value="Work Started">Work Started</option>
+                                        <option value="Awaiting Completion">Awaiting Completion</option>
+                                        <option value="Delayed">Delayed</option>
+                                        <option value="Rescheduled">Rescheduled</option>
+                                      </select>
+                                    </div>
+
+                                    <Button 
+                                      onClick={() => handleManagerQuickStatus("Completed")} 
+                                      className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-10 rounded-xl shadow-md border-0"
+                                    >
+                                      Mark Work Completed
+                                    </Button>
+                                  </div>
                                 </div>
                               )}
                             </>

@@ -4,13 +4,14 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Calendar, Clock, User, CheckCircle2, XCircle, Wrench, AlertCircle,
-  Play, ShieldCheck, Phone, Clipboard, ArrowRight, Search, Check
+  Play, ShieldCheck, Phone, Clipboard, ArrowRight, Search, Check, Info
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { useShallow } from "zustand/react/shallow";
@@ -44,32 +45,41 @@ export default function ManagerServicesPage() {
   const [expectedArrival, setExpectedArrival] = useState("");
   const [operationalNotes, setOperationalNotes] = useState("");
 
+  // Secretary review states
+  const [reviewingBooking, setReviewingBooking] = useState<any | null>(null);
+  const [adminRemarks, setAdminRemarks] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+
   useEffect(() => {
     initialize();
     initializeDb();
     setMounted(true);
   }, [initialize, initializeDb]);
 
-  // Filter available workers for assignment
-  const availableWorkers = useMemo(() => {
-    return users.filter(u => u.role === "worker");
-  }, [users]);
+  const isSecretary = user?.role === "secretary";
+  const isManager = user?.role === "manager";
 
   // Filter bookings based on search & filter status
   const filteredBookings = useMemo(() => {
     return serviceBookings.filter((b) => {
-      // For Manager: only show bookings approved/forwarded by the Secretary
-      const allowedStatuses = [
-        "Forwarded to Manager",
-        "Scheduled",
-        "In Progress",
-        "Completed",
-        "Cancelled"
-      ];
-      if (!allowedStatuses.includes(b.status)) return false;
-
-      // Status Filter
-      if (selectedStatusFilter !== "All" && b.status !== selectedStatusFilter) return false;
+      // 1. Role boundary filtering
+      if (isSecretary) {
+        // Secretary reviews all bookings
+        if (selectedStatusFilter !== "All" && b.status !== selectedStatusFilter) return false;
+      } else if (isManager) {
+        // Manager only sees bookings forwarded to them or downstream
+        const allowedStatuses = [
+          "Forwarded to Manager",
+          "Scheduled",
+          "In Progress",
+          "Completed",
+          "Cancelled"
+        ];
+        if (!allowedStatuses.includes(b.status)) return false;
+        if (selectedStatusFilter !== "All" && b.status !== selectedStatusFilter) return false;
+      } else {
+        return false;
+      }
 
       // Search Query
       const query = searchTerm.toLowerCase();
@@ -80,7 +90,15 @@ export default function ManagerServicesPage() {
 
       return residentName.includes(query) || workerName.includes(query) || category.includes(query) || unit.includes(query);
     });
-  }, [serviceBookings, searchTerm, selectedStatusFilter]);
+  }, [serviceBookings, searchTerm, selectedStatusFilter, isSecretary, isManager]);
+
+  // Derived status tab categories based on role
+  const statusTabs = useMemo(() => {
+    if (isSecretary) {
+      return ["All", "Pending", "Forwarded to Manager", "Scheduled", "In Progress", "Completed", "Cancelled", "Rejected by Secretary"];
+    }
+    return ["All", "Forwarded to Manager", "Scheduled", "In Progress", "Completed", "Cancelled"];
+  }, [isSecretary]);
 
   if (!mounted) return null;
 
@@ -95,7 +113,6 @@ export default function ManagerServicesPage() {
     if (!schedulingBooking) return;
 
     try {
-      // Call scheduleBooking store action
       await scheduleBooking(schedulingBooking.id, `Visit scheduled: Expected arrival is ${expectedArrival}. Note: ${operationalNotes}`);
       setSchedulingBooking(null);
       alert("Service visit scheduled successfully!");
@@ -133,10 +150,35 @@ export default function ManagerServicesPage() {
     }
   };
 
+  const openSecretaryReview = (booking: any) => {
+    setReviewingBooking(booking);
+    setAdminRemarks("");
+  };
+
+  const handleSecretaryAction = async (status: "Forwarded to Manager" | "Rejected by Secretary") => {
+    if (!reviewingBooking) return;
+    setReviewLoading(true);
+    try {
+      await updateBookingStatus(reviewingBooking.id, status, {
+        adminNotes: adminRemarks,
+        forwardedToManager: status === "Forwarded to Manager"
+      });
+      alert(`Service booking request has been successfully resolved to: ${status}`);
+      setReviewingBooking(null);
+      setAdminRemarks("");
+    } catch (e: any) {
+      alert("Failed to update service request: " + e.message);
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
-      case "Forwarded to Manager":
+      case "Pending":
         return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+      case "Forwarded to Manager":
+        return "bg-indigo-500/10 text-indigo-600 border-indigo-500/20";
       case "Scheduled":
         return "bg-blue-500/10 text-blue-600 border-blue-500/20";
       case "In Progress":
@@ -144,6 +186,8 @@ export default function ManagerServicesPage() {
       case "Completed":
         return "bg-green-500/10 text-green-600 border-green-500/20";
       case "Cancelled":
+        return "bg-red-500/10 text-red-600 border-red-500/20";
+      case "Rejected by Secretary":
         return "bg-red-500/10 text-red-600 border-red-500/20";
       default:
         return "bg-secondary text-secondary-foreground";
@@ -153,38 +197,44 @@ export default function ManagerServicesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight font-[family-name:var(--font-heading)]">Service Requests Console 💼</h1>
-        <p className="text-muted-foreground mt-1">
-          Coordinate, schedule, and track community services bookings escalated by the Secretary.
-        </p>
-      </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
+            Service Requests Operations 💼
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {isSecretary 
+              ? "Review, approve, and escalate resident local help bookings to the Operations Manager." 
+              : "Coordinate, schedule, and track community services bookings escalated by the Secretary."}
+          </p>
+        </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-secondary/10 p-4 rounded-2xl border border-border/40">
-        <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative w-full sm:max-w-xs shrink-0">
+          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
           <Input
-            placeholder="Search by Flat, resident or category..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 bg-background h-10 text-xs rounded-xl"
+            placeholder="Search residents, workers, categories..."
+            className="pl-9 h-10 text-xs rounded-xl"
           />
         </div>
+      </div>
 
-        <div className="flex gap-2 flex-wrap w-full md:w-auto">
-          {["All", "Forwarded to Manager", "Scheduled", "In Progress", "Completed", "Cancelled"].map((status) => (
-            <Button
-              key={status}
-              size="sm"
-              variant={selectedStatusFilter === status ? "default" : "outline"}
-              onClick={() => setSelectedStatusFilter(status)}
-              className="text-[10px] h-8 rounded-xl font-bold"
-            >
-              {status === "Forwarded to Manager" ? "Forwarded" : status}
-            </Button>
-          ))}
-        </div>
+      {/* Tab Filter Controls */}
+      <div className="flex border border-border/40 rounded-2xl p-1 bg-secondary/15 gap-1 overflow-x-auto max-w-full">
+        {statusTabs.map((tab) => (
+          <Button
+            key={tab}
+            variant={selectedStatusFilter === tab ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setSelectedStatusFilter(tab)}
+            className={`h-8 rounded-xl text-[10px] font-bold transition-all px-3 shrink-0 ${
+              selectedStatusFilter === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab}
+          </Button>
+        ))}
       </div>
 
       {/* Bookings Display */}
@@ -241,7 +291,13 @@ export default function ManagerServicesPage() {
                 </div>
 
                 {/* Notes logs */}
-                <div className="space-y-2">
+                <div className="space-y-2 text-left">
+                  {bk.notes && (
+                    <div className="p-2.5 rounded-lg bg-secondary/30 border border-border/30 text-[11px]">
+                      <span className="font-bold text-muted-foreground uppercase tracking-wider text-[8px] block mb-0.5">Resident Notes</span>
+                      <p className="text-foreground/80 font-medium">{bk.notes}</p>
+                    </div>
+                  )}
                   {bk.adminNotes && (
                     <div className="p-2.5 rounded-lg bg-indigo-500/5 border border-indigo-500/10 text-[11px]">
                       <span className="font-bold text-indigo-500 uppercase tracking-wider text-[8px] block mb-0.5">Secretary Notes</span>
@@ -258,7 +314,17 @@ export default function ManagerServicesPage() {
 
                 {/* Actions Panel */}
                 <div className="flex gap-2 justify-end pt-2">
-                  {bk.status === "Forwarded to Manager" && (
+                  {isSecretary && bk.status === "Pending" && (
+                    <Button
+                      size="sm"
+                      onClick={() => openSecretaryReview(bk)}
+                      className="text-[10px] h-8 rounded-lg gradient-primary text-white border-0 font-bold px-4"
+                    >
+                      Review Booking Request
+                    </Button>
+                  )}
+
+                  {isManager && bk.status === "Forwarded to Manager" && (
                     <>
                       <Button
                         size="sm"
@@ -278,7 +344,7 @@ export default function ManagerServicesPage() {
                     </>
                   )}
 
-                  {bk.status === "Scheduled" && (
+                  {isManager && bk.status === "Scheduled" && (
                     <>
                       <Button
                         size="sm"
@@ -298,7 +364,7 @@ export default function ManagerServicesPage() {
                     </>
                   )}
 
-                  {bk.status === "In Progress" && (
+                  {isManager && bk.status === "In Progress" && (
                     <Button
                       size="sm"
                       onClick={() => handleCompleteService(bk.id)}
@@ -314,15 +380,76 @@ export default function ManagerServicesPage() {
         )}
       </div>
 
+      {/* Secretary Review Modal */}
+      <Dialog open={!!reviewingBooking} onOpenChange={(open) => !open && setReviewingBooking(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl bg-card text-foreground border border-border">
+          <DialogHeader>
+            <DialogTitle className="font-[family-name:var(--font-heading)]">Review Resident Booking Request</DialogTitle>
+            <DialogDescription>
+              Escalate this service request booking to the Operations Manager or decline it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2 text-xs">
+            {reviewingBooking && (
+              <div className="p-3 bg-secondary/35 rounded-xl border text-left space-y-1">
+                <div className="font-bold text-foreground">Requested Service: {reviewingBooking.category}</div>
+                <div className="text-muted-foreground">Requested Slot: {reviewingBooking.bookingDate} at {reviewingBooking.bookingTime}</div>
+                <div className="text-muted-foreground">Flat: {reviewingBooking.address} • Resident: {reviewingBooking.resident?.name}</div>
+              </div>
+            )}
+
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1 text-left">Administrative Remarks / Notes</label>
+              <Textarea
+                value={adminRemarks}
+                onChange={(e) => setAdminRemarks(e.target.value)}
+                placeholder="Remarks for manager escalation or rejection reason..."
+                className="rounded-xl min-h-[70px]"
+              />
+            </div>
+
+            <DialogFooter className="flex flex-row justify-end gap-2 pt-2 border-t mt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setReviewingBooking(null)} 
+                className="rounded-xl h-10 text-xs px-4"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="button" 
+                disabled={reviewLoading} 
+                onClick={() => handleSecretaryAction("Rejected by Secretary")} 
+                className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-10 text-xs font-bold px-4 border-0"
+              >
+                Reject Request
+              </Button>
+              <Button 
+                type="button" 
+                disabled={reviewLoading} 
+                onClick={() => handleSecretaryAction("Forwarded to Manager")} 
+                className="gradient-primary text-white border-0 rounded-xl h-10 text-xs font-bold px-5"
+              >
+                Approve & Escalate
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Schedule Visit Modal */}
       <Dialog open={!!schedulingBooking} onOpenChange={(open) => !open && setSchedulingBooking(null)}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogContent className="sm:max-w-md rounded-2xl bg-card text-foreground border border-border">
           <DialogHeader>
             <DialogTitle className="font-[family-name:var(--font-heading)]">Schedule Technician Visit</DialogTitle>
+            <DialogDescription>
+              Log scheduled technician ETA and operational notes.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleScheduleSubmit} className="space-y-4 mt-2 text-xs">
             <div>
-              <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Expected Arrival Date/Time</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1 text-left">Expected Arrival Date/Time</label>
               <Input
                 value={expectedArrival}
                 onChange={(e) => setExpectedArrival(e.target.value)}
@@ -333,7 +460,7 @@ export default function ManagerServicesPage() {
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Operational Dispatch Notes</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase block mb-1 text-left">Operational Dispatch Notes</label>
               <Input
                 value={operationalNotes}
                 onChange={(e) => setOperationalNotes(e.target.value)}
@@ -342,7 +469,7 @@ export default function ManagerServicesPage() {
               />
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="pt-2 border-t mt-4">
               <Button type="button" variant="outline" onClick={() => setSchedulingBooking(null)} className="rounded-xl h-10">
                 Cancel
               </Button>
