@@ -1251,7 +1251,10 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
                               No complaints awaiting Secretary verification!
                             </div>
                           ) : (
-                            complaints.filter(c => c.portal === "society" && (c.status === "submitted" || c.status === "Under Secretary Review")).map((c) => {
+                            complaints
+                              .filter(c => c.portal === "society" && (c.status === "submitted" || c.status === "Under Secretary Review"))
+                              .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+                              .map((c) => {
                               const priority = reviewPriorities[c.id] || c.priority || "medium";
                               const dept = reviewDepartments[c.id] || "Maintenance";
                               const adminNotesValue = reviewAdminNotes[c.id] || "";

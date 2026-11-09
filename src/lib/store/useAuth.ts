@@ -121,32 +121,37 @@ interface AuthState {
   updateProfile: (details: Partial<User & Record<string, any>>) => Promise<void>;
 }
 
+const getInitialStoredUser = (): (User & Record<string, any>) | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem("homeverse_auth");
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+};
+
+const initialUser = getInitialStoredUser();
+
 export const useAuth = create<AuthState>((set, get) => ({
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
+  user: initialUser,
+  isAuthenticated: !!initialUser,
+  isLoading: false,
 
   initialize: async () => {
     if (typeof window === "undefined") return;
+    const current = get().user;
+    if (current && get().isAuthenticated) {
+      return;
+    }
     try {
       const stored = localStorage.getItem("homeverse_auth");
       if (stored) {
         const parsed = JSON.parse(stored);
         set({ user: parsed, isAuthenticated: true, isLoading: false });
-        
-        // Optionally sync with backend if API route is active
-        try {
-          const res = await fetch("/api/auth/me");
-          if (res.ok) {
-            const data = await res.json();
-            if (data.user) {
-              localStorage.setItem("homeverse_auth", JSON.stringify(data.user));
-              set({ user: data.user, isAuthenticated: true });
-            }
-          }
-        } catch (e) {
-          // Ignore network / missing endpoint errors on static export
-        }
       } else {
         set({ user: null, isAuthenticated: false, isLoading: false });
       }

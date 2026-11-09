@@ -32,8 +32,13 @@ export default function SecretaryApprovalsPage() {
 
   if (!mounted) return null;
 
-  const residentPending = users.filter(u => u.role === "resident" && u.status === "pending");
-  const workerPending = users.filter(u => u.role === "worker" && u.status === "pending");
+  const residentPending = users
+    .filter(u => u.role === "resident" && u.status === "pending")
+    .sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0));
+
+  const workerPending = users
+    .filter(u => u.role === "worker" && u.status === "pending")
+    .sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0));
 
   return (
     <div className="space-y-6">

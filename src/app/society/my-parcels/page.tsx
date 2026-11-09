@@ -30,9 +30,11 @@ export default function MyParcelsPage() {
 
   if (!mounted) return null;
 
-  const myParcels = parcels.filter(
-    (p) => p.portal === "society" && (p.recipientId === user?.id || p.unit === user?.unit)
-  );
+  const myParcels = parcels
+    .filter(
+      (p) => p.portal === "society" && (p.recipientId === user?.id || p.unit === user?.unit)
+    )
+    .sort((a, b) => (new Date(b.receivedAt || 0).getTime() || 0) - (new Date(a.receivedAt || 0).getTime() || 0));
 
   return (
     <div className="space-y-6">

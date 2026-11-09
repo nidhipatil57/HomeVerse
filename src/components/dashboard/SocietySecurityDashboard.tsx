@@ -158,12 +158,26 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
     building: "Tower A"
   });
 
-  // Filter dynamic logs
-  const pendingVisitorApprovals = visitors.filter(v => v.portal === "society" && v.status === "expected");
-  const checkedInVisitors = visitors.filter(v => v.portal === "society" && v.status === "checked-in");
-  const activeDeliveries = visitors.filter(v => v.portal === "society" && v.status === "checked-in" && v.purpose.toLowerCase().includes("delivery"));
-  const pendingParcels = parcels.filter(p => p.portal === "society" && p.status === "received");
-  const activeEmergencies = emergencies.filter(e => e.status !== "resolved");
+  // Filter dynamic logs (most recent first)
+  const pendingVisitorApprovals = visitors
+    .filter(v => v.portal === "society" && v.status === "expected")
+    .sort((a, b) => (new Date(b.expectedAt || b.date || 0).getTime() || 0) - (new Date(a.expectedAt || a.date || 0).getTime() || 0));
+
+  const checkedInVisitors = visitors
+    .filter(v => v.portal === "society" && v.status === "checked-in")
+    .sort((a, b) => (new Date(b.checkInTime || b.expectedAt || b.date || 0).getTime() || 0) - (new Date(a.checkInTime || a.expectedAt || a.date || 0).getTime() || 0));
+
+  const activeDeliveries = visitors
+    .filter(v => v.portal === "society" && v.status === "checked-in" && v.purpose.toLowerCase().includes("delivery"))
+    .sort((a, b) => (new Date(b.checkInTime || b.expectedAt || 0).getTime() || 0) - (new Date(a.checkInTime || a.expectedAt || 0).getTime() || 0));
+
+  const pendingParcels = parcels
+    .filter(p => p.portal === "society" && p.status === "received")
+    .sort((a, b) => (new Date(b.receivedAt || 0).getTime() || 0) - (new Date(a.receivedAt || 0).getTime() || 0));
+
+  const activeEmergencies = emergencies
+    .filter(e => e.status !== "resolved")
+    .sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0));
 
   // Lost & Found counters
   const activeLostReportsCount = lostReports.filter(r => r.portal === "society" && r.status !== "Returned" && r.status !== "Closed").length;
@@ -173,10 +187,12 @@ export function SocietySecurityDashboard({ security }: { security: any }) {
   const unmatchedReportsCount = lostReports.filter(r => r.portal === "society" && r.status === "Searching").length;
 
 
-  // Service Plumbers / Electricians (assigned complaints)
-  const assignedServiceWorkers = complaints.filter(
-    (c) => c.portal === "society" && (c.status === "assigned" || c.status === "in-progress") && c.assignedTo
-  );
+  // Service Plumbers / Electricians (assigned complaints, most recent first)
+  const assignedServiceWorkers = complaints
+    .filter(
+      (c) => c.portal === "society" && (c.status === "assigned" || c.status === "in-progress") && c.assignedTo
+    )
+    .sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0));
 
   const handleOpenDeny = (id: string) => {
     setActiveDenyId(id);

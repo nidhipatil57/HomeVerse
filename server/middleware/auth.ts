@@ -28,6 +28,17 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   }
 }
 
+export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  const token = req.cookies?.token || req.headers.authorization?.split(" ")[1];
+  if (token) {
+    try {
+      const verified = jwt.verify(token, JWT_SECRET) as any;
+      req.user = verified;
+    } catch (err) {}
+  }
+  next();
+}
+
 export function authorizeRoles(...roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {

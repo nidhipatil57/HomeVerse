@@ -110,14 +110,26 @@ export default function SecurityVisitorDeskPage() {
 
   if (!mounted) return null;
 
-  // Filter expected visitors, checked in visitors
-  const expectedQueue = visitors.filter(
-    (v) => v.portal === "society" && (v.status === "approved" || v.status === "expected" || v.status === "pending" || v.status === "at-gate")
-  );
+  // Filter expected visitors, checked in visitors (most recent first)
+  const expectedQueue = visitors
+    .filter(
+      (v) => v.portal === "society" && (v.status === "approved" || v.status === "expected" || v.status === "pending" || v.status === "at-gate")
+    )
+    .sort((a, b) => {
+      const timeB = new Date(b.expectedAt || b.date || 0).getTime() || 0;
+      const timeA = new Date(a.expectedAt || a.date || 0).getTime() || 0;
+      return timeB - timeA;
+    });
   
-  const checkedInQueue = visitors.filter(
-    (v) => v.portal === "society" && (v.status === "checked-in" || v.status === "inside")
-  );
+  const checkedInQueue = visitors
+    .filter(
+      (v) => v.portal === "society" && (v.status === "checked-in" || v.status === "inside")
+    )
+    .sort((a, b) => {
+      const timeB = new Date(b.checkInTime || b.expectedAt || b.date || 0).getTime() || 0;
+      const timeA = new Date(a.checkInTime || a.expectedAt || a.date || 0).getTime() || 0;
+      return timeB - timeA;
+    });
 
   const filteredExpected = expectedQueue.filter((v) =>
     v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -125,10 +137,12 @@ export default function SecurityVisitorDeskPage() {
     (v.otp && v.otp.includes(searchQuery))
   );
 
-  // Worker Entry Sync: query assigned technicians from complaints
-  const activeTechnicians = complaints.filter(
-    (c) => c.portal === "society" && (c.status === "assigned" || c.status === "in-progress") && c.assignedTo
-  );
+  // Worker Entry Sync: query assigned technicians from complaints (most recent first)
+  const activeTechnicians = complaints
+    .filter(
+      (c) => c.portal === "society" && (c.status === "assigned" || c.status === "in-progress") && c.assignedTo
+    )
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
   // Registered helpers (domestic help database list)
   const domesticWorkers = [

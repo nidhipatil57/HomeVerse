@@ -36,7 +36,14 @@ export default function MaintenanceBillsPage() {
   if (!mounted) return null;
 
   const residentBills = maintenanceBills.filter(b => {
-    return b.residentId === user?.id || b.unit === user?.unit;
+    if (b.residentId === user?.id) return true;
+    if (user?.unit) {
+      const cleanUserUnit = user.unit.replace(/^[A-Za-z\s-]+/, '').trim();
+      const cleanBillUnit = (b.unit || '').replace(/^[A-Za-z\s-]+/, '').trim();
+      if (cleanBillUnit && cleanBillUnit === cleanUserUnit) return true;
+      if (b.unit === user.unit) return true;
+    }
+    return false;
   });
 
   const pendingBills = residentBills.filter(b => b.status !== "paid");

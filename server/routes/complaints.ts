@@ -15,7 +15,8 @@ router.get("/", authenticateToken, async (req: any, res) => {
       if (role === "warden") {
         complaints = await prisma.complaint.findMany({
           where: { portal: "hostel" },
-          include: { chat: true, timeline: true, subscribers: true }
+          include: { chat: true, timeline: true, subscribers: true },
+          orderBy: { createdAt: "desc" }
         });
       } else {
         // student: own or subscribed
@@ -27,7 +28,8 @@ router.get("/", authenticateToken, async (req: any, res) => {
               { subscribers: { some: { userId: id } } }
             ]
           },
-          include: { chat: true, timeline: true, subscribers: true }
+          include: { chat: true, timeline: true, subscribers: true },
+          orderBy: { createdAt: "desc" }
         });
       }
     } else {
@@ -35,18 +37,21 @@ router.get("/", authenticateToken, async (req: any, res) => {
       if (role === "secretary" || role === "manager") {
         complaints = await prisma.complaint.findMany({
           where: { portal: "society" },
-          include: { chat: true, timeline: true, subscribers: true }
+          include: { chat: true, timeline: true, subscribers: true },
+          orderBy: { createdAt: "desc" }
         });
       } else if (role === "worker") {
         complaints = await prisma.complaint.findMany({
           where: { portal: "society", assignedToId: id },
-          include: { chat: true, timeline: true, subscribers: true }
+          include: { chat: true, timeline: true, subscribers: true },
+          orderBy: { createdAt: "desc" }
         });
       } else {
         // resident/security sees all society complaints
         complaints = await prisma.complaint.findMany({
           where: { portal: "society" },
-          include: { chat: true, timeline: true, subscribers: true }
+          include: { chat: true, timeline: true, subscribers: true },
+          orderBy: { createdAt: "desc" }
         });
       }
     }

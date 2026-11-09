@@ -5,6 +5,32 @@ import {
   GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord,
   ComplaintPriority, AiAnalysis, ComplaintChatMessage, Helper, HelperAttendance
 } from "@/types";
+import {
+  getPrepopulatedComplaints,
+  getPrepopulatedLeaveRequests,
+  getPrepopulatedVisitors,
+  getPrepopulatedLaundrySlots,
+  getPrepopulatedParcels,
+  getPrepopulatedMarketplaceItems,
+  getPrepopulatedFoundItems,
+  getPrepopulatedClaims,
+  getPrepopulatedLostReports,
+  getPrepopulatedItemMatches,
+  getPrepopulatedMaintenanceBills,
+  getPrepopulatedCommunityEvents,
+  getPrepopulatedNotifications,
+  getPrepopulatedUsers,
+  getPrepopulatedEmergencies,
+  getPrepopulatedGatePasses,
+  getPrepopulatedVehicleLogs,
+  getPrepopulatedIncidents,
+  getPrepopulatedAnnouncements,
+  getPrepopulatedExpenses,
+  getPrepopulatedFlats,
+  getPrepopulatedRentRecords,
+  getPrepopulatedCollections,
+  getPrepopulatedPayments
+} from "@/data/mock-db-seed";
 
 // ==========================================
 // Centralized Database Interfaces
@@ -190,6 +216,7 @@ export interface MaintenanceBill {
   status: "paid" | "pending" | "overdue";
   paidOn?: string;
   breakdown?: { label: string; amount: number }[];
+  lateFee?: number;
 }
 
 export interface EventRegistration {
@@ -553,38 +580,53 @@ interface CommunityState {
   sendPaymentReminder: (id: string) => Promise<void>;
 }
 
+const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem(`homeverse_${key}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed as unknown as T;
+        }
+      }
+    } catch (e) {}
+  }
+  return seedFn();
+};
+
 export const useCommunityStore = create<CommunityState>((set, get) => ({
-  complaints: [],
-  leaveRequests: [],
-  visitors: [],
-  laundrySlots: [],
-  parcels: [],
+  complaints: loadLocalOrSeed("complaints", getPrepopulatedComplaints),
+  leaveRequests: loadLocalOrSeed("leaveRequests", getPrepopulatedLeaveRequests),
+  visitors: loadLocalOrSeed("visitors", getPrepopulatedVisitors),
+  laundrySlots: loadLocalOrSeed("laundrySlots", getPrepopulatedLaundrySlots),
+  parcels: loadLocalOrSeed("parcels", getPrepopulatedParcels),
   facilityBookings: [],
-  marketplaceItems: [],
-  lostFoundItems: [],
-  lostReports: [],
-  itemMatches: [],
-  claims: [],
+  marketplaceItems: loadLocalOrSeed("marketplaceItems", getPrepopulatedMarketplaceItems),
+  lostFoundItems: loadLocalOrSeed("lostFoundItems", getPrepopulatedFoundItems),
+  lostReports: loadLocalOrSeed("lostReports", getPrepopulatedLostReports),
+  itemMatches: loadLocalOrSeed("itemMatches", getPrepopulatedItemMatches),
+  claims: loadLocalOrSeed("claims", getPrepopulatedClaims),
   roomChangeRequests: [],
-  maintenanceBills: [],
-  communityEvents: [],
-  notifications: [],
+  maintenanceBills: loadLocalOrSeed("maintenanceBills", getPrepopulatedMaintenanceBills),
+  communityEvents: loadLocalOrSeed("communityEvents", getPrepopulatedCommunityEvents),
+  notifications: loadLocalOrSeed("notifications", getPrepopulatedNotifications),
   roommatePreferences: [],
-  users: [],
-  emergencies: [],
-  gatePasses: [],
-  vehicleLogs: [],
-  incidents: [],
-  announcements: [],
-  expenses: [],
-  flats: [],
-  rentRecords: [],
+  users: loadLocalOrSeed("users", getPrepopulatedUsers),
+  emergencies: loadLocalOrSeed("emergencies", getPrepopulatedEmergencies),
+  gatePasses: loadLocalOrSeed("gatePasses", getPrepopulatedGatePasses),
+  vehicleLogs: loadLocalOrSeed("vehicleLogs", getPrepopulatedVehicleLogs),
+  incidents: loadLocalOrSeed("incidents", getPrepopulatedIncidents),
+  announcements: loadLocalOrSeed("announcements", getPrepopulatedAnnouncements),
+  expenses: loadLocalOrSeed("expenses", getPrepopulatedExpenses),
+  flats: loadLocalOrSeed("flats", getPrepopulatedFlats),
+  rentRecords: loadLocalOrSeed("rentRecords", getPrepopulatedRentRecords),
   favorites: [],
   helpers: [],
   attendance: [],
   flatAttendance: [],
-  payments: [],
-  collections: [],
+  payments: loadLocalOrSeed("payments", getPrepopulatedPayments),
+  collections: loadLocalOrSeed("collections", getPrepopulatedCollections),
   serviceCategories: [],
   workerProfiles: [],
   workerSkills: [],
@@ -596,6 +638,33 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
   initializeDb: () => {
     if (typeof window === "undefined") return;
+
+    // Load any localStorage data if store currently has empty arrays
+    const state = get();
+    const localUpdates: Partial<CommunityState> = {};
+    const syncKeys = [
+      "payments", "collections", "maintenanceBills", "rentRecords", "expenses",
+      "complaints", "visitors", "parcels", "announcements", "users"
+    ];
+    for (const k of syncKeys) {
+      if (!state[k as keyof CommunityState] || (state[k as keyof CommunityState] as any[]).length === 0) {
+        try {
+          const raw = localStorage.getItem(`homeverse_${k}`);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              localUpdates[k as keyof CommunityState] = parsed as any;
+            }
+          }
+        } catch (e) {}
+      }
+    }
+    if (Object.keys(localUpdates).length > 0) {
+      set(localUpdates as any);
+    }
+
+    if ((globalThis as any).__homeverse_db_initialized) return;
+    (globalThis as any).__homeverse_db_initialized = true;
 
     // 1. Initial REST state fetch
     const fetchInitialState = async () => {
@@ -636,7 +705,97 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           { key: "favoriteWorkers", path: "/api/community-services/favorites" }
         ];
 
-        const promises = endpoints.map(async ({ key, path }) => {
+        const updates: Record<string, any> = {};
+
+        await Promise.all(
+          endpoints.map(async ({ key, path }) => {
+            try {
+              const res = await fetch(path);
+              if (res.ok) {
+                let data = await res.json();
+                if (key === "attendance" && Array.isArray(data)) {
+                  data = data.map((att: any) => ({
+                    ...att,
+                    workerId: att.helperId || att.workerId,
+                    workerName: att.helperName || att.workerName,
+                    workerCategory: att.category || att.workerCategory
+                  }));
+                }
+                if (key === "users" && Array.isArray(data)) {
+                  if (typeof window !== "undefined") {
+                    try {
+                      const localRegs = JSON.parse(localStorage.getItem("homeverse_registered_users") || "[]");
+                      const dbEmails = new Set(data.map((u: any) => u.email.toLowerCase()));
+                      const uniqueLocal = localRegs.filter((u: any) => !dbEmails.has(u.email.toLowerCase()));
+                      data = [...data, ...uniqueLocal];
+                    } catch (e) {}
+                  }
+                }
+
+                // Sort lists so recent items are always on top
+                if (Array.isArray(data)) {
+                  if (key === "complaints") {
+                    data.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+                  } else if (key === "visitors") {
+                    data.sort((a: any, b: any) => {
+                      const tB = new Date(b.checkInTime || b.expectedAt || b.date || 0).getTime() || 0;
+                      const tA = new Date(a.checkInTime || a.expectedAt || a.date || 0).getTime() || 0;
+                      return tB - tA;
+                    });
+                  } else if (key === "announcements" || key === "emergencies" || key === "incidents" || key === "notifications" || key === "leaveRequests") {
+                    data.sort((a: any, b: any) => new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime());
+                  } else if (key === "parcels") {
+                    data.sort((a: any, b: any) => new Date(b.receivedAt || b.createdAt || 0).getTime() - new Date(a.receivedAt || a.createdAt || 0).getTime());
+                  } else if (key === "attendance") {
+                    data.sort((a: any, b: any) => new Date(b.checkInTime || b.date || 0).getTime() - new Date(a.checkInTime || a.date || 0).getTime());
+                  } else if (key === "serviceBookings") {
+                    data.sort((a: any, b: any) => new Date(b.createdAt || b.scheduledDate || 0).getTime() - new Date(a.createdAt || a.scheduledDate || 0).getTime());
+                  }
+                }
+
+                if (Array.isArray(data) && data.length > 0) {
+                  updates[key] = data;
+                  if (typeof window !== "undefined") {
+                    try {
+                      localStorage.setItem(`homeverse_${key}`, JSON.stringify(data));
+                    } catch (e) {}
+                  }
+                }
+              }
+            } catch (e) {}
+          })
+        );
+
+        if (Object.keys(updates).length > 0) {
+          set(updates as any);
+        }
+      } catch (err) {}
+    };
+
+    fetchInitialState();
+
+    // 2. Establish Real-Time WebSocket Connection (Only once)
+    if ((globalThis as any).__homeverse_listeners_active) return;
+    (globalThis as any).__homeverse_listeners_active = true;
+
+    const pollInterval = setInterval(async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+
+      const criticalEndpoints = [
+        { key: "complaints", path: "/api/complaints" },
+        { key: "serviceBookings", path: "/api/community-services/bookings" },
+        { key: "helpers", path: "/api/visitors/helpers" },
+        { key: "attendance", path: "/api/visitors/attendance" },
+        { key: "flatAttendance", path: "/api/visitors/helpers/flat-attendance" },
+        { key: "payments", path: "/api/payments" },
+        { key: "collections", path: "/api/payments/collections" },
+        { key: "users", path: "/api/users" }
+      ];
+
+      const batchUpdates: Record<string, any> = {};
+
+      await Promise.all(
+        criticalEndpoints.map(async ({ key, path }) => {
           try {
             const res = await fetch(path);
             if (res.ok) {
@@ -649,64 +808,29 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                   workerCategory: att.category || att.workerCategory
                 }));
               }
-              if (key === "users" && Array.isArray(data)) {
-                if (typeof window !== "undefined") {
-                  try {
-                    const localRegs = JSON.parse(localStorage.getItem("homeverse_registered_users") || "[]");
-                    const dbEmails = new Set(data.map((u: any) => u.email.toLowerCase()));
-                    const uniqueLocal = localRegs.filter((u: any) => !dbEmails.has(u.email.toLowerCase()));
-                    data = [...data, ...uniqueLocal];
-                  } catch (e) {}
+              if (Array.isArray(data)) {
+                if (key === "complaints") {
+                  data.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+                } else if (key === "serviceBookings") {
+                  data.sort((a: any, b: any) => new Date(b.createdAt || b.scheduledDate || 0).getTime() - new Date(a.createdAt || a.scheduledDate || 0).getTime());
+                } else if (key === "attendance") {
+                  data.sort((a: any, b: any) => new Date(b.checkInTime || b.date || 0).getTime() - new Date(a.checkInTime || a.date || 0).getTime());
                 }
               }
-              set({ [key]: data } as any);
+              const currentStr = JSON.stringify((get() as any)[key]);
+              const nextStr = JSON.stringify(data);
+              if (currentStr !== nextStr) {
+                batchUpdates[key] = data;
+              }
             }
           } catch (e) {}
-        });
+        })
+      );
 
-        await Promise.all(promises);
-      } catch (err) {}
-    };
-
-    fetchInitialState();
-
-    // 2. Establish Real-Time WebSocket Connection (Only once)
-    if ((globalThis as any).__homeverse_listeners_active) return;
-    (globalThis as any).__homeverse_listeners_active = true;
-
-    const pollInterval = setInterval(async () => {
-      const criticalEndpoints = [
-        { key: "complaints", path: "/api/complaints" },
-        { key: "serviceBookings", path: "/api/community-services/bookings" },
-        { key: "helpers", path: "/api/visitors/helpers" },
-        { key: "attendance", path: "/api/visitors/attendance" },
-        { key: "flatAttendance", path: "/api/visitors/helpers/flat-attendance" },
-        { key: "payments", path: "/api/payments" },
-        { key: "collections", path: "/api/payments/collections" },
-        { key: "users", path: "/api/users" }
-      ];
-      criticalEndpoints.forEach(async ({ key, path }) => {
-        try {
-          const res = await fetch(path);
-          if (res.ok) {
-            let data = await res.json();
-            if (key === "attendance" && Array.isArray(data)) {
-              data = data.map((att: any) => ({
-                ...att,
-                workerId: att.helperId || att.workerId,
-                workerName: att.helperName || att.workerName,
-                workerCategory: att.category || att.workerCategory
-              }));
-            }
-            const currentStr = JSON.stringify((get() as any)[key]);
-            const nextStr = JSON.stringify(data);
-            if (currentStr !== nextStr) {
-              set({ [key]: data } as any);
-            }
-          }
-        } catch (e) {}
-      });
-    }, 3000);
+      if (Object.keys(batchUpdates).length > 0) {
+        set(batchUpdates as any);
+      }
+    }, 8000);
 
     (globalThis as any).__homeverse_poll_interval = pollInterval;
     const socket = io("http://localhost:5000", {
@@ -1735,9 +1859,43 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   payMaintenanceBill: async (id) => {
-    await fetch(`/api/maintenance/${id}/pay`, {
-      method: "PUT"
+    const paidDate = new Date().toISOString().split("T")[0];
+    const txnId = `TXN-BILL-${Math.floor(10000 + Math.random() * 90000)}`;
+    set((state) => {
+      const nextBills = state.maintenanceBills.map((b) => {
+        if (b.id === id) {
+          return { ...b, status: "paid" as const, paidOn: paidDate };
+        }
+        return b;
+      });
+
+      const nextPayments = state.payments.map((p) => {
+        if (p.referenceId === id || p.id === id) {
+          return {
+            ...p,
+            status: "paid",
+            paidDate,
+            paymentMethod: "UPI",
+            transactionId: txnId,
+            receiptPath: `/receipts/RCP-${p.id}.pdf`
+          };
+        }
+        return p;
+      });
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(nextBills));
+          localStorage.setItem("homeverse_payments", JSON.stringify(nextPayments));
+        } catch (e) {}
+      }
+
+      return { maintenanceBills: nextBills, payments: nextPayments };
     });
+
+    try {
+      await fetch(`/api/maintenance/${id}/pay`, { method: "PUT" });
+    } catch (e) {}
   },
 
   createEvent: async (ev) => {
@@ -1968,17 +2126,93 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   payRentRecord: async (id) => {
-    await fetch(`/api/rent/${id}/pay`, {
-      method: "PUT"
+    const paidDate = new Date().toISOString().split("T")[0];
+    set((state) => {
+      const nextRent = state.rentRecords.map((r) => {
+        if (r.id === id) {
+          return { ...r, status: "paid" as const, paidOn: paidDate };
+        }
+        return r;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_rentRecords", JSON.stringify(nextRent));
+        } catch (e) {}
+      }
+      return { rentRecords: nextRent };
     });
+
+    try {
+      await fetch(`/api/rent/${id}/pay`, { method: "PUT" });
+    } catch (e) {}
   },
 
   generateBulkMaintenanceBills: async (billDetails) => {
-    await fetch("/api/maintenance/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(billDetails)
+    set((state) => {
+      const residents = state.users.filter((u) => u.role === "resident" && u.portal === "society");
+      const targetResidents = residents.filter((r) => {
+        if (billDetails.applicableTo === "Selected Building" && billDetails.selectedBuilding) {
+          return r.building === billDetails.selectedBuilding;
+        }
+        return true;
+      });
+
+      const newBills = targetResidents.map((r, i) => ({
+        id: `BILL-${Date.now()}-${i}`,
+        residentId: r.id,
+        residentName: r.name,
+        unit: r.unit || "",
+        month: billDetails.month,
+        amount: billDetails.amount,
+        dueDate: billDetails.dueDate || new Date(Date.now() + 15 * 86400000).toISOString().split("T")[0],
+        status: "pending" as const,
+        lateFee: billDetails.lateFee,
+        breakdown: billDetails.breakdown || [
+          { label: "Maintenance", amount: billDetails.amount }
+        ]
+      }));
+
+      const newPayments = newBills.map((b) => ({
+        id: `PAY-BILL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`,
+        residentId: b.residentId,
+        residentName: b.residentName,
+        unit: b.unit,
+        building: "",
+        societyId: "SUN123",
+        paymentType: "Maintenance",
+        amount: b.amount,
+        status: "pending",
+        dueDate: b.dueDate,
+        paidDate: null,
+        receiptPath: null,
+        transactionId: null,
+        paymentMethod: null,
+        referenceId: b.id,
+        createdAt: new Date().toISOString(),
+        description: billDetails.description || `${billDetails.month} Maintenance Charges`,
+        lateFee: billDetails.lateFee
+      }));
+
+      const nextBills = [...newBills, ...state.maintenanceBills];
+      const nextPayments = [...newPayments, ...state.payments];
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(nextBills));
+          localStorage.setItem("homeverse_payments", JSON.stringify(nextPayments));
+        } catch (e) {}
+      }
+
+      return { maintenanceBills: nextBills, payments: nextPayments };
     });
+
+    try {
+      await fetch("/api/maintenance/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(billDetails)
+      });
+    } catch (e) {}
   },
 
   updateWorkerServices: async (workerId, details) => {
@@ -1990,39 +2224,178 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   createCollection: async (details) => {
-    await fetch("/api/payments/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(details)
+    const newCollId = `COLL-${Math.floor(100 + Math.random() * 900)}`;
+    const newColl = {
+      id: newCollId,
+      ...details,
+      status: "active",
+      createdAt: new Date().toISOString(),
+      communityCode: "SUN123"
+    };
+
+    set((state) => {
+      const nextCollections = [newColl, ...state.collections];
+
+      // Generate pending payments for all residents
+      const residents = state.users.filter((u) => u.role === "resident" && u.portal === "society");
+      const targetResidents = residents.filter((r) => {
+        if (details.visibility === "Everyone") return true;
+        if (details.applicableBuildings?.length > 0 && r.building && details.applicableBuildings.includes(r.building)) return true;
+        if (details.applicableFlats?.length > 0 && r.unit && details.applicableFlats.includes(r.unit)) return true;
+        return false;
+      });
+
+      const newPayments = targetResidents.map((r) => ({
+        id: `PAY-COLL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`,
+        residentId: r.id,
+        residentName: r.name,
+        unit: r.unit || "",
+        building: r.building || "",
+        societyId: "SUN123",
+        paymentType: details.title,
+        amount: Number(details.amount),
+        status: "pending",
+        dueDate: details.dueDate,
+        paidDate: null,
+        receiptPath: null,
+        transactionId: null,
+        paymentMethod: null,
+        referenceId: newCollId,
+        createdAt: new Date().toISOString(),
+        description: details.description || ""
+      }));
+
+      const nextPayments = [...newPayments, ...state.payments];
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_collections", JSON.stringify(nextCollections));
+          localStorage.setItem("homeverse_payments", JSON.stringify(nextPayments));
+        } catch (e) {}
+      }
+
+      return { collections: nextCollections, payments: nextPayments };
     });
+
+    try {
+      await fetch("/api/payments/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(details)
+      });
+    } catch (e) {}
   },
 
   editCollection: async (id, details) => {
-    await fetch(`/api/payments/collections/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(details)
+    set((state) => {
+      const nextCollections = state.collections.map((c) => (c.id === id ? { ...c, ...details } : c));
+      const nextPayments = state.payments.map((p) => {
+        if (p.referenceId === id && p.status !== "paid") {
+          return {
+            ...p,
+            paymentType: details.title || p.paymentType,
+            amount: details.amount ? Number(details.amount) : p.amount,
+            dueDate: details.dueDate || p.dueDate
+          };
+        }
+        return p;
+      });
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_collections", JSON.stringify(nextCollections));
+          localStorage.setItem("homeverse_payments", JSON.stringify(nextPayments));
+        } catch (e) {}
+      }
+
+      return { collections: nextCollections, payments: nextPayments };
     });
+
+    try {
+      await fetch(`/api/payments/collections/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(details)
+      });
+    } catch (e) {}
   },
 
   cancelCollection: async (id) => {
-    await fetch(`/api/payments/collections/${id}`, {
-      method: "DELETE"
+    set((state) => {
+      const nextCollections = state.collections.map((c) => (c.id === id ? { ...c, status: "cancelled" } : c));
+      const nextPayments = state.payments.filter((p) => !(p.referenceId === id && p.status !== "paid"));
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_collections", JSON.stringify(nextCollections));
+          localStorage.setItem("homeverse_payments", JSON.stringify(nextPayments));
+        } catch (e) {}
+      }
+
+      return { collections: nextCollections, payments: nextPayments };
     });
+
+    try {
+      await fetch(`/api/payments/collections/${id}`, { method: "DELETE" });
+    } catch (e) {}
   },
 
   payPayment: async (id, paymentMethod) => {
-    await fetch(`/api/payments/${id}/pay`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paymentMethod })
+    const paidDate = new Date().toISOString().split("T")[0];
+    const txnId = `TXN-${paymentMethod || "UPI"}-${Math.floor(10000 + Math.random() * 90000)}`;
+    set((state) => {
+      let refBillId: string | null = null;
+      const nextPayments = state.payments.map((p) => {
+        if (p.id === id) {
+          refBillId = p.referenceId || null;
+          return {
+            ...p,
+            status: "paid",
+            paidDate,
+            paymentMethod: paymentMethod || "UPI",
+            transactionId: txnId,
+            receiptPath: `/receipts/RCP-${p.id}.pdf`
+          };
+        }
+        return p;
+      });
+
+      // Also update linked maintenanceBill if exists
+      let nextBills = state.maintenanceBills;
+      if (refBillId) {
+        nextBills = state.maintenanceBills.map((b) => {
+          if (b.id === refBillId) {
+            return { ...b, status: "paid" as const, paidOn: paidDate };
+          }
+          return b;
+        });
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_payments", JSON.stringify(nextPayments));
+          localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(nextBills));
+        } catch (e) {}
+      }
+
+      return { payments: nextPayments, maintenanceBills: nextBills };
     });
+
+    try {
+      await fetch(`/api/payments/${id}/pay`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentMethod })
+      });
+    } catch (e) {}
   },
 
   sendPaymentReminder: async (id) => {
-    await fetch(`/api/payments/${id}/remind`, {
-      method: "POST"
-    });
+    try {
+      await fetch(`/api/payments/${id}/remind`, {
+        method: "POST"
+      });
+    } catch (e) {}
   },
 
   createBooking: async (bookingData: any) => {

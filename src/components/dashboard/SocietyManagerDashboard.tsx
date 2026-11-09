@@ -104,35 +104,46 @@ export function SocietyManagerDashboard({ manager }: { manager: any }) {
   const recentActivities = useMemo(() => {
     const items: { type: string; title: string; time: string; color: string }[] = [];
 
-    // Add recent helper checkins
-    attendance.slice(0, 3).forEach((a) => {
-      items.push({
-        type: "Helper Check-In",
-        title: `${a.workerName} (${a.workerCategory}) entered gate ${a.entryGate || "Main"}`,
-        time: a.checkInTime ? new Date(a.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Today",
-        color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
+    // Add recent helper checkins (most recent first)
+    [...attendance]
+      .sort((a, b) => new Date(b.checkInTime || b.date || 0).getTime() - new Date(a.checkInTime || a.date || 0).getTime())
+      .slice(0, 3)
+      .forEach((a) => {
+        items.push({
+          type: "Helper Check-In",
+          title: `${a.workerName} (${a.workerCategory}) entered gate ${a.entryGate || "Main"}`,
+          time: a.checkInTime ? new Date(a.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Today",
+          color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
+        });
       });
-    });
 
-    // Add recent complaints
-    complaints.filter(c => c.status === "Forwarded to Manager").slice(0, 3).forEach((c) => {
-      items.push({
-        type: "Complaint Escalated",
-        title: `${c.title} (Flat ${c.unit}) forwarded for delegation`,
-        time: "Just now",
-        color: "text-amber-500 bg-amber-500/10 border-amber-500/20"
+    // Add recent complaints (most recent first)
+    complaints
+      .filter(c => c.status === "Forwarded to Manager")
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, 3)
+      .forEach((c) => {
+        items.push({
+          type: "Complaint Escalated",
+          title: `${c.title} (Flat ${c.unit}) forwarded for delegation`,
+          time: "Just now",
+          color: "text-amber-500 bg-amber-500/10 border-amber-500/20"
+        });
       });
-    });
 
-    // Add recent bookings
-    serviceBookings.filter(b => b.status === "Forwarded to Manager").slice(0, 2).forEach((b) => {
-      items.push({
-        type: "Service Request",
-        title: `Booking request for ${b.category} (Flat ${b.address})`,
-        time: "Pending Schedule",
-        color: "text-blue-500 bg-blue-500/10 border-blue-500/20"
+    // Add recent bookings (most recent first)
+    serviceBookings
+      .filter(b => b.status === "Forwarded to Manager")
+      .sort((a, b) => new Date(b.createdAt || b.scheduledDate || 0).getTime() - new Date(a.createdAt || a.scheduledDate || 0).getTime())
+      .slice(0, 2)
+      .forEach((b) => {
+        items.push({
+          type: "Service Request",
+          title: `Booking request for ${b.category} (Flat ${b.address})`,
+          time: "Pending Schedule",
+          color: "text-blue-500 bg-blue-500/10 border-blue-500/20"
+        });
       });
-    });
 
     return items;
   }, [attendance, complaints, serviceBookings]);

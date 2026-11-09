@@ -38,13 +38,15 @@ export default function EmergencyRequestsPage() {
     return users.filter(u => u.role === "worker");
   }, [users]);
 
-  // Filter complaints to show only emergency/critical items that are active (not completed/resolved)
+  // Filter complaints to show only emergency/critical items that are active (most recent first)
   const activeEmergencies = useMemo(() => {
-    return complaints.filter((c) => {
-      const isUrgent = c.emergency === true || c.priority === "emergency" || c.priority === "critical";
-      const isActive = !["Completed", "Resolved", "Rejected", "closed"].includes(c.status);
-      return isUrgent && isActive;
-    });
+    return complaints
+      .filter((c) => {
+        const isUrgent = c.emergency === true || c.priority === "emergency" || c.priority === "critical";
+        const isActive = !["Completed", "Resolved", "Rejected", "closed"].includes(c.status);
+        return isUrgent && isActive;
+      })
+      .sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0));
   }, [complaints]);
 
   if (!mounted) return null;

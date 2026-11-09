@@ -32,7 +32,7 @@ const HostelWardenDashboard = dynamic(
 );
 
 export default function HostelDashboardPage() {
-  const { user, initialize, logout } = useAuth();
+  const { user, initialize } = useAuth();
   const initializeDb = useCommunityStore(state => state.initializeDb);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
@@ -42,23 +42,6 @@ export default function HostelDashboardPage() {
     initializeDb();
     setMounted(true);
   }, [initialize, initializeDb]);
-
-  useEffect(() => {
-    if (!mounted || !user) return;
-
-    // Push state to block back navigation and capture it
-    window.history.pushState(null, "", window.location.href);
-
-    const handlePopState = () => {
-      logout();
-      router.replace("/login?portal=hostel");
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
-  }, [mounted, user, logout, router]);
 
   if (!mounted) {
     return (

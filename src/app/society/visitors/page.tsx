@@ -13,13 +13,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
 import type { VisitorStatus, Visitor, Helper, HelperAttendance } from "@/types";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeSVG, QRCodeCanvas } from "qrcode.react";
+import {
+  generateVisitorPassBlob,
+  downloadPassBlob,
+  sharePassImageToApps,
+} from "@/lib/visitorPassGenerator";
 
 // Recharts for Secretary Analytics
 import {
@@ -105,6 +110,48 @@ export default function VisitorsPage() {
   // Share Pass States
   const [generatedPass, setGeneratedPass] = useState<Visitor | null>(null);
   const [showPassModal, setShowPassModal] = useState(false);
+  const [isSharingPass, setIsSharingPass] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState<{ type: "success" | "info" | "error"; message: string } | null>(null);
+
+  // Share pass as image to native share sheet (WhatsApp, Telegram, etc.)
+  const handleSharePassImage = async () => {
+    if (!generatedPass) return;
+    setIsSharingPass(true);
+    setShareFeedback(null);
+    try {
+      const res = await sharePassImageToApps(generatedPass, {
+        societyName: user?.societyName || "HomeVerse Society",
+      });
+      if (res.method === "native-share" && res.success) {
+        setShareFeedback({ type: "success", message: "Pass card image shared successfully!" });
+      } else if (res.error) {
+        setShareFeedback({ type: "info", message: res.error });
+      }
+    } catch (err: any) {
+      setShareFeedback({ type: "error", message: err?.message || "Could not share image" });
+    } finally {
+      setIsSharingPass(false);
+    }
+  };
+
+  // Download pass card image
+  const handleDownloadPassImage = async () => {
+    if (!generatedPass) return;
+    setIsSharingPass(true);
+    setShareFeedback(null);
+    try {
+      const blob = await generateVisitorPassBlob(generatedPass, {
+        societyName: user?.societyName || "HomeVerse Society",
+      });
+      const cleanName = generatedPass.name.replace(/[^a-zA-Z0-9]/g, "_");
+      downloadPassBlob(blob, `HomeVerse_GatePass_${cleanName}.png`);
+      setShareFeedback({ type: "success", message: "Pass card image downloaded successfully!" });
+    } catch (err: any) {
+      setShareFeedback({ type: "error", message: "Failed to download image" });
+    } finally {
+      setIsSharingPass(false);
+    }
+  };
 
   // Search filter
   const [search, setSearch] = useState("");
@@ -284,12 +331,18 @@ export default function VisitorsPage() {
     };
   }, [helpers, attendance, flatAttendance]);
 
-  // Filter visitors dynamically based on role
-  const myVisitors = visitors.filter((v) => {
-    if (v.portal !== "society") return false;
-    if (isResident && v.visitingUnit !== user?.unit) return false;
-    return true;
-  });
+  // Filter visitors dynamically based on role (most recent first)
+  const myVisitors = visitors
+    .filter((v) => {
+      if (v.portal !== "society") return false;
+      if (isResident && v.visitingUnit !== user?.unit) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const timeB = new Date(b.checkInTime || b.expectedAt || b.date || 0).getTime() || 0;
+      const timeA = new Date(a.checkInTime || a.expectedAt || a.date || 0).getTime() || 0;
+      return timeB - timeA;
+    });
 
   const filteredHistory = myVisitors.filter((v) => {
     const matchesSearch =
@@ -303,25 +356,25 @@ export default function VisitorsPage() {
     return matchesSearch && matchesStatus && matchesType;
   });
 
-  // Real-time listener for incoming visitor awaiting approval (at-gate or pending)
-  const pendingApprovals = myVisitors.filter(
-    (v) => v.status === "pending" || v.status === "at-gate"
-  );
+  // Real-time listener for incoming visitor awaiting approval (at-gate or pending, most recent first)
+  const pendingApprovals = myVisitors
+    .filter((v) => v.status === "pending" || v.status === "at-gate")
+    .sort((a, b) => (new Date(b.expectedAt || b.date || 0).getTime() || 0) - (new Date(a.expectedAt || a.date || 0).getTime() || 0));
 
-  // Active Inside complex
-  const insideVisitors = myVisitors.filter(
-    (v) => v.status === "checked-in" || v.status === "inside"
-  );
+  // Active Inside complex (most recent check-in first)
+  const insideVisitors = myVisitors
+    .filter((v) => v.status === "checked-in" || v.status === "inside")
+    .sort((a, b) => (new Date(b.checkInTime || b.expectedAt || b.date || 0).getTime() || 0) - (new Date(a.checkInTime || a.expectedAt || a.date || 0).getTime() || 0));
 
-  // Expected/Upcoming Visitors
-  const upcomingVisitors = myVisitors.filter(
-    (v) => v.status === "approved" || v.status === "expected"
-  );
+  // Expected/Upcoming Visitors (most recent first)
+  const upcomingVisitors = myVisitors
+    .filter((v) => v.status === "approved" || v.status === "expected")
+    .sort((a, b) => (new Date(b.expectedAt || b.date || 0).getTime() || 0) - (new Date(a.expectedAt || a.date || 0).getTime() || 0));
 
-  // Checked Out / Left Complex
-  const departedVisitors = myVisitors.filter(
-    (v) => v.status === "checked-out"
-  );
+  // Checked Out / Left Complex (most recent checkout first)
+  const departedVisitors = myVisitors
+    .filter((v) => v.status === "checked-out")
+    .sort((a, b) => (new Date(b.checkOutTime || b.checkInTime || b.date || 0).getTime() || 0) - (new Date(a.checkOutTime || a.checkInTime || a.date || 0).getTime() || 0));
 
   // Favorite list filter
   const myFavorites = favorites.filter(f => f.visitingUnit === user?.unit);
@@ -1602,19 +1655,38 @@ export default function VisitorsPage() {
         </div>
       )}
 
-      {/* 5. PASS DETAILS MODAL PREVIEW (With actual QR SVGs) */}
-      <Dialog open={showPassModal} onOpenChange={setShowPassModal}>
-        <DialogContent className="sm:max-w-md rounded-2xl p-6 bg-card border-primary/20">
+      {/* 5. PASS DETAILS MODAL PREVIEW (With actual QR SVGs & Full Image Card Sharing) */}
+      <Dialog open={showPassModal} onOpenChange={(open) => {
+        setShowPassModal(open);
+        if (!open) setShareFeedback(null);
+      }}>
+        <DialogContent className="sm:max-w-md rounded-2xl p-6 bg-card border-primary/20 max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-[family-name:var(--font-heading)] text-center text-lg font-bold">Visitor Gate Pass 🎟️</DialogTitle>
+            <DialogDescription className="text-center text-xs text-muted-foreground mt-0.5">
+              Share this card image directly to WhatsApp or other apps
+            </DialogDescription>
           </DialogHeader>
           {generatedPass && (
-            <div className="space-y-4 mt-3">
-              <div className="p-5 bg-gradient-to-b from-secondary/50 to-secondary/10 border border-border/60 rounded-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full -mr-8 -mt-8 pointer-events-none" />
+            <div className="space-y-4 mt-2">
+              {/* Pass Card Preview (Matches Exported Image) */}
+              <div className="p-5 bg-gradient-to-b from-secondary/60 via-secondary/30 to-secondary/10 border border-border/70 rounded-2xl relative overflow-hidden shadow-sm">
+                <div className="absolute top-0 right-0 w-28 h-28 bg-primary/10 rounded-full -mr-10 -mt-10 pointer-events-none" />
+
+                {/* Society Header */}
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-border/50 text-[11px] font-semibold text-muted-foreground">
+                  <span className="flex items-center gap-1.5 text-foreground font-bold">
+                    <Shield className="w-3.5 h-3.5 text-primary" /> {user?.societyName || "HomeVerse Society"}
+                  </span>
+                  <span className="text-[10px] bg-primary/10 text-primary px-2.5 py-0.5 rounded-full font-mono font-bold tracking-wide">
+                    PRE-APPROVED
+                  </span>
+                </div>
+
                 <div className="text-center space-y-3">
-                  <div className="bg-card p-3 rounded-2xl inline-block shadow-sm">
+                  <div className="bg-card p-3 rounded-2xl inline-block shadow-sm border border-border/40">
                     <QRCodeSVG
+                      id="visitor-pass-qr-svg"
                       value={`HOMEVERSE-PASS-${generatedPass.id}-${generatedPass.otp}`}
                       size={110}
                       level="M"
@@ -1630,11 +1702,11 @@ export default function VisitorsPage() {
                 <div className="grid grid-cols-2 gap-3 mt-4 text-xs pt-4 border-t border-dashed border-border/60">
                   <div>
                     <span className="text-muted-foreground text-[9px] uppercase tracking-wider block">Visiting Flat</span>
-                    <span className="font-bold text-foreground">{generatedPass.visitingUnit}</span>
+                    <span className="font-bold text-foreground text-sm">{generatedPass.visitingUnit}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground text-[9px] uppercase tracking-wider block">Pass Gate Code OTP</span>
-                    <span className="font-bold text-primary text-sm font-mono">{generatedPass.otp}</span>
+                    <span className="font-bold text-primary text-base font-mono">{generatedPass.otp}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground text-[9px] uppercase tracking-wider block">Scheduled Date</span>
@@ -1645,22 +1717,76 @@ export default function VisitorsPage() {
                     <span className="font-bold text-foreground">One-Day Use</span>
                   </div>
                 </div>
+
+                <div className="mt-4 pt-2.5 text-center text-[10px] text-muted-foreground border-t border-border/40">
+                  Show this QR code or share OTP at security gate for entry
+                </div>
               </div>
 
-              <div className="flex gap-2">
+              {/* Hidden QRCodeCanvas for direct pixel capture into exported image */}
+              <div style={{ position: "absolute", left: "-9999px", top: "-9999px", opacity: 0, pointerEvents: "none" }}>
+                <QRCodeCanvas
+                  id="visitor-pass-qr-canvas"
+                  value={`HOMEVERSE-PASS-${generatedPass.id}-${generatedPass.otp}`}
+                  size={280}
+                  level="M"
+                  includeMargin={false}
+                />
+              </div>
+
+              {/* Status Feedback Alert */}
+              {shareFeedback && (
+                <div
+                  className={`p-3 rounded-xl text-xs font-medium flex items-start gap-2.5 transition-all ${
+                    shareFeedback.type === "success"
+                      ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50"
+                      : shareFeedback.type === "error"
+                      ? "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50"
+                      : "bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50"
+                  }`}
+                >
+                  {shareFeedback.type === "success" ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                  )}
+                  <span className="leading-relaxed">{shareFeedback.message}</span>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-1">
+                <Button
+                  onClick={handleSharePassImage}
+                  disabled={isSharingPass}
+                  className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold h-10 rounded-xl text-xs shadow-md shadow-primary/20 flex items-center justify-center gap-1.5"
+                >
+                  {isSharingPass ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Share2 className="w-4 h-4" />
+                  )}
+                  Share Card Image
+                </Button>
+
+                <Button
+                  onClick={handleDownloadPassImage}
+                  disabled={isSharingPass}
+                  variant="outline"
+                  className="h-10 px-3.5 rounded-xl border-border/60 hover:bg-secondary text-xs font-semibold flex items-center justify-center gap-1.5"
+                  title="Download card image as PNG"
+                >
+                  <Download className="w-3.5 h-3.5 text-muted-foreground" />
+                  Download PNG
+                </Button>
+
                 <Button
                   onClick={() => {
-                    navigator.clipboard.writeText(`Hi! Here is your Gate Pass for HomeVerse Society:\nVisitor: ${generatedPass.name}\nFlat: ${generatedPass.visitingUnit}\nOTP: ${generatedPass.otp}\nPass ID: ${generatedPass.id}`);
-                    alert("Pass details copied to clipboard!");
+                    setShowPassModal(false);
+                    setShareFeedback(null);
                   }}
-                  className="flex-1 bg-primary text-white border-0 h-10 rounded-xl text-xs font-bold shadow-md shadow-primary/20"
-                >
-                  <Share2 className="w-4 h-4 mr-1.5" /> Share Pass Details
-                </Button>
-                <Button
-                  onClick={() => setShowPassModal(false)}
                   variant="outline"
-                  className="h-10 rounded-xl border-border/60 text-xs font-bold"
+                  className="h-10 px-4 rounded-xl border-border/60 text-xs font-bold"
                 >
                   Done
                 </Button>

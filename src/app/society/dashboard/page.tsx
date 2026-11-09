@@ -56,7 +56,7 @@ const SocietySecretaryDashboard = dynamic(
 );
 
 export default function SocietyDashboardPage() {
-  const { user, initialize, logout } = useAuth();
+  const { user, initialize } = useAuth();
   const initializeDb = useCommunityStore(state => state.initializeDb);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
@@ -66,23 +66,6 @@ export default function SocietyDashboardPage() {
     initializeDb();
     setMounted(true);
   }, [initialize, initializeDb]);
-
-  useEffect(() => {
-    if (!mounted || !user) return;
-
-    // Push state to block back navigation and capture it
-    window.history.pushState(null, "", window.location.href);
-
-    const handlePopState = () => {
-      logout();
-      router.replace("/login?portal=society");
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
-  }, [mounted, user, logout, router]);
 
   if (!mounted) {
     return (

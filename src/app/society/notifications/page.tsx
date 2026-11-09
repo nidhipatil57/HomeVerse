@@ -32,9 +32,11 @@ export default function SocietyNotificationsPage() {
 
   if (!mounted) return null;
 
-  const myNotifications = notifications.filter(
-    (n) => n.userId === user?.id || n.userId === "all_residents"
-  );
+  const myNotifications = notifications
+    .filter(
+      (n) => n.userId === user?.id || n.userId === "all_residents"
+    )
+    .sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0));
 
   const unreadCount = myNotifications.filter(n => !n.read).length;
 

@@ -17,16 +17,23 @@ const getAllowedPaths = (role: string): string[] => {
         "/society/visitors",
         "/society/daily-checkins",
         "/society/payments",
+        "/society/maintenance",
+        "/society/maintenance-bills",
+        "/society/payment-history",
         "/society/utility-usage",
         "/society/events",
         "/society/lost-found",
         "/society/find-local-help",
         "/society/buy-sell",
+        "/society/marketplace",
         "/society/local-businesses",
         "/society/resident-directory",
         "/society/book-borrowing",
         "/society/facility-booking",
+        "/society/community",
         "/society/my-parcels",
+        "/society/announcements",
+        "/society/emergency",
         "/society/notifications",
         "/society/settings"
       ];
@@ -39,8 +46,16 @@ const getAllowedPaths = (role: string): string[] => {
         "/society/workers",
         "/society/schedules",
         "/society/daily-operations",
+        "/society/daily-checkins",
         "/society/emergency",
         "/society/analytics",
+        "/society/visitors",
+        "/society/parcel-management",
+        "/society/helpers-entry",
+        "/society/maintenance",
+        "/society/maintenance-bills-mgmt",
+        "/society/events",
+        "/society/announcements",
         "/society/notifications",
         "/society/settings"
       ];
@@ -48,43 +63,39 @@ const getAllowedPaths = (role: string): string[] => {
       return [
         "/society/dashboard",
         "/society/visitor-desk",
+        "/society/visitors",
         "/society/parcel-management",
         "/society/helpers-entry",
         "/society/vehicle-logs",
         "/society/gate-logs",
         "/society/security-lost-found",
+        "/society/lost-found",
         "/society/incident-reports",
         "/society/cctv",
+        "/society/emergency",
         "/society/announcements",
         "/society/notifications",
-        "/society/settings"
+        "/society/settings",
+        "/society/events"
       ];
     case "secretary":
       return [
+        "/society"
+      ];
+    case "worker":
+      return [
         "/society/dashboard",
-        "/society/ai-assistant",
-        "/society/residents",
-        "/society/buildings",
-        "/society/flats",
-        "/society/workers",
-        "/society/security-staff",
         "/society/complaints",
-        "/society/visitors",
-        "/society/maintenance-bills-mgmt",
-        "/society/payments",
-        "/society/expenses",
-        "/society/financial-reports",
-        "/society/analytics",
-        "/society/announcements",
-        "/society/events-mgmt",
-        "/society/facility-management",
-        "/society/approvals",
         "/society/services",
+        "/society/workers",
+        "/society/schedules",
+        "/society/availability",
+        "/society/daily-operations",
         "/society/notifications",
         "/society/settings"
       ];
     default:
-      return [];
+      return ["/society/dashboard"];
   }
 };
 
@@ -93,7 +104,7 @@ export default function SocietyLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isAuthenticated, initialize, logout, isLoading } = useAuth();
+  const { user, isAuthenticated, initialize, isLoading } = useAuth();
   const initializeDb = useCommunityStore(state => state.initializeDb);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
@@ -111,15 +122,13 @@ export default function SocietyLayout({
 
     // 1. Unauthenticated or wrong session
     if (!isAuthenticated || !user) {
-      logout();
       router.replace("/login?portal=society");
       return;
     }
 
     // 2. Wrong Portal check
     if (user.portal !== "society") {
-      logout();
-      router.replace("/login?portal=society");
+      router.replace(user.portal === "hostel" ? "/hostel/dashboard" : "/login?portal=society");
       return;
     }
 
@@ -127,10 +136,9 @@ export default function SocietyLayout({
     const allowedPaths = getAllowedPaths(user.role);
     const isAllowed = allowedPaths.some(path => pathname.startsWith(path));
     if (!isAllowed) {
-      logout();
-      router.replace("/login?portal=society");
+      router.replace("/society/dashboard");
     }
-  }, [mounted, user, isAuthenticated, isLoading, pathname, router, logout]);
+  }, [mounted, user, isAuthenticated, isLoading, pathname, router]);
 
   // Show loading spinner during session checks
   if (!mounted || isLoading || !isAuthenticated || !user || user.portal !== "society") {

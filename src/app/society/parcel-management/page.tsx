@@ -46,7 +46,9 @@ export default function SecurityParcelManagementPage() {
 
   if (!mounted) return null;
 
-  const pendingParcels = parcels.filter(p => p.portal === "society" && p.status === "received");
+  const pendingParcels = parcels
+    .filter(p => p.portal === "society" && p.status === "received")
+    .sort((a, b) => (new Date(b.receivedAt || 0).getTime() || 0) - (new Date(a.receivedAt || 0).getTime() || 0));
 
   const handleAddParcelSubmit = (e: React.FormEvent) => {
     e.preventDefault();

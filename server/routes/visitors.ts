@@ -24,6 +24,11 @@ router.get("/", authenticateToken, async (req: any, res) => {
         visitors = await prisma.visitor.findMany({ where: { portal: "society", visitingUnit: unit } });
       }
     }
+    visitors.sort((a: any, b: any) => {
+      const timeB = new Date(b.checkInTime || b.expectedAt || b.date || 0).getTime() || 0;
+      const timeA = new Date(a.checkInTime || a.expectedAt || a.date || 0).getTime() || 0;
+      return timeB - timeA;
+    });
     res.json(visitors);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch visitors" });

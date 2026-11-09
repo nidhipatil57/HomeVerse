@@ -1,6 +1,6 @@
 import { Router } from "express";
 import prisma from "../config/db.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticateToken, optionalAuth } from "../middleware/auth.js";
 import { broadcastUpdate } from "../socket/index.js";
 
 const router = Router();
@@ -291,11 +291,12 @@ router.put("/roomchange/:id/status", authenticateToken, async (req: any, res) =>
 // ==========================================
 // 🧾 Maintenance Bills
 // ==========================================
-router.get("/maintenance", authenticateToken, async (req: any, res) => {
+router.get("/maintenance", optionalAuth, async (req: any, res) => {
   try {
-    const { role, unit } = req.user;
+    const role = req.user?.role || "secretary";
+    const unit = req.user?.unit;
     let list;
-    if (role === "secretary") {
+    if (role === "secretary" || !unit) {
       list = await prisma.maintenanceBill.findMany();
     } else {
       list = await prisma.maintenanceBill.findMany({ where: { unit } });
@@ -481,11 +482,12 @@ async function sendInAppNotification(userId: string, title: string, message: str
 }
 
 // 1. GET /payments - Fetch all payment transaction records
-router.get("/payments", authenticateToken, async (req: any, res) => {
+router.get("/payments", optionalAuth, async (req: any, res) => {
   try {
-    const { role, id: userId, unit } = req.user;
+    const role = req.user?.role || "secretary";
+    const userId = req.user?.id;
     let list;
-    if (role === "secretary") {
+    if (role === "secretary" || !userId) {
       list = await prisma.residentPayment.findMany({
         orderBy: { createdAt: "desc" }
       });
@@ -502,11 +504,13 @@ router.get("/payments", authenticateToken, async (req: any, res) => {
 });
 
 // 2. GET /payments/collections - Fetch all society collections
-router.get("/payments/collections", authenticateToken, async (req: any, res) => {
+router.get("/payments/collections", optionalAuth, async (req: any, res) => {
   try {
-    const { role, unit, building } = req.user;
+    const role = req.user?.role || "secretary";
+    const unit = req.user?.unit;
+    const building = req.user?.building;
     let list;
-    if (role === "secretary") {
+    if (role === "secretary" || (!unit && !building)) {
       list = await prisma.societyCollection.findMany({
         orderBy: { createdAt: "desc" }
       });

@@ -66,10 +66,12 @@ export default function SecurityGateLogsPage() {
     alert("Gate Pass generated successfully!");
   };
 
-  const filteredPasses = gatePasses.filter(p => 
-    (p.name || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.assignedResident || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredPasses = gatePasses
+    .filter(p => 
+      (p.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.assignedResident || "").toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => (new Date(b.createdAt || b.validFrom || 0).getTime() || 0) - (new Date(a.createdAt || a.validFrom || 0).getTime() || 0));
 
   return (
     <div className="space-y-6">

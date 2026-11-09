@@ -326,7 +326,7 @@ export default function ComplaintsPage() {
       }
 
       return true;
-    });
+    }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }, [complaints, isResident, isWorker, isSecurity, isSecretary, isManager, user, residentTab, secretaryTab, managerTab]);
 
   // Set default selection
@@ -345,12 +345,14 @@ export default function ComplaintsPage() {
     return complaints.find(c => c.id === selectedComplaintId) || null;
   }, [complaints, selectedComplaintId]);
 
-  // Community Active Complaints
+  // Community Active Complaints (most recent first)
   const activeComplexComplaints = useMemo(() => {
-    return complaints.filter(c => 
-      c.portal === "society" && 
-      !["completed", "Completed", "resolved", "closed"].includes(c.status)
-    );
+    return complaints
+      .filter(c => 
+        c.portal === "society" && 
+        !["completed", "Completed", "resolved", "closed"].includes(c.status)
+      )
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }, [complaints]);
 
   // Dynamic Suggestion checking during creation
@@ -451,9 +453,11 @@ export default function ComplaintsPage() {
     };
   }, [filteredComplaints, complaints]);
 
-  // Duplicate group notification alert for Secretary
+  // Duplicate group notification alert for Secretary (most recent first)
   const duplicateAlerts = useMemo(() => {
-    return complaints.filter(c => c.status !== "closed" && c.aiAnalysis?.isDuplicate && c.aiAnalysis?.possibleDuplicateOf);
+    return complaints
+      .filter(c => c.status !== "closed" && c.aiAnalysis?.isDuplicate && c.aiAnalysis?.possibleDuplicateOf)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }, [complaints]);
 
   // Direct chat permissions: Resident + Manager + Secretary (view-only)

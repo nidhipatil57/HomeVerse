@@ -117,7 +117,9 @@ export default function SecurityIncidentReportsPage() {
                 No incidents logged in the current shift.
               </div>
             ) : (
-              incidents.map((inc) => (
+              [...incidents]
+                .sort((a, b) => (new Date(`${b.date} ${b.time || ""}`).getTime() || 0) - (new Date(`${a.date} ${a.time || ""}`).getTime() || 0))
+                .map((inc) => (
                 <div key={inc.id} className="p-3.5 rounded-xl border border-border/50 bg-secondary/15 flex flex-col gap-2 text-xs hover:bg-secondary/25 transition-colors">
                   <div className="flex justify-between items-start">
                     <div>

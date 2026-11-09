@@ -98,7 +98,16 @@ export default function PaymentsPage() {
     if (user.role === "secretary") {
       return payments;
     }
-    return payments.filter(p => p.residentId === user.id);
+    return payments.filter(p => {
+      if (p.residentId === user.id) return true;
+      if (user.unit) {
+        const cleanUserUnit = user.unit.replace(/^[A-Za-z\s-]+/, '').trim();
+        const cleanPUnit = (p.unit || '').replace(/^[A-Za-z\s-]+/, '').trim();
+        if (cleanPUnit && cleanPUnit === cleanUserUnit) return true;
+        if (p.unit === user.unit) return true;
+      }
+      return false;
+    });
   }, [payments, user]);
 
   const activeCollections = useMemo(() => {

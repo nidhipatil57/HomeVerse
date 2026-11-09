@@ -29,23 +29,10 @@ const getAllowedPaths = (role: string): string[] => {
       ];
     case "warden":
       return [
-        "/hostel/dashboard",
-        "/hostel/students",
-        "/hostel/rooms",
-        "/hostel/attendance-mgmt",
-        "/hostel/complaints",
-        "/hostel/mess-management",
-        "/hostel/laundry-management",
-        "/hostel/visitors",
-        "/hostel/parcel-management",
-        "/hostel/announcements",
-        "/hostel/reports",
-        "/hostel/analytics",
-        "/hostel/notifications",
-        "/hostel/settings"
+        "/hostel"
       ];
     default:
-      return [];
+      return ["/hostel/dashboard"];
   }
 };
 
@@ -54,7 +41,7 @@ export default function HostelLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isAuthenticated, initialize, logout, isLoading } = useAuth();
+  const { user, isAuthenticated, initialize, isLoading } = useAuth();
   const initializeDb = useCommunityStore(state => state.initializeDb);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
@@ -72,15 +59,13 @@ export default function HostelLayout({
 
     // 1. Unauthenticated or wrong session
     if (!isAuthenticated || !user) {
-      logout();
       router.replace("/login?portal=hostel");
       return;
     }
 
     // 2. Wrong Portal check
     if (user.portal !== "hostel") {
-      logout();
-      router.replace("/login?portal=hostel");
+      router.replace(user.portal === "society" ? "/society/dashboard" : "/login?portal=hostel");
       return;
     }
 
@@ -88,10 +73,9 @@ export default function HostelLayout({
     const allowedPaths = getAllowedPaths(user.role);
     const isAllowed = allowedPaths.some(path => pathname.startsWith(path));
     if (!isAllowed) {
-      logout();
-      router.replace("/login?portal=hostel");
+      router.replace("/hostel/dashboard");
     }
-  }, [mounted, user, isAuthenticated, isLoading, pathname, router, logout]);
+  }, [mounted, user, isAuthenticated, isLoading, pathname, router]);
 
   // Show loading spinner during session checks
   if (!mounted || isLoading || !isAuthenticated || !user || user.portal !== "hostel") {

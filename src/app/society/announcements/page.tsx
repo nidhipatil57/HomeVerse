@@ -95,7 +95,9 @@ export default function AnnouncementsPage() {
             No active announcements found for this complex.
           </div>
         ) : (
-          announcements.map((ann) => (
+          [...announcements]
+            .sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0))
+            .map((ann) => (
             <motion.div key={ann.id} variants={fadeInUp}>
               <Card className="border-border/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
                 <CardContent className="p-6">

@@ -51,15 +51,28 @@ export function SocietyResidentDashboard({ resident }: { resident: any }) {
     }))
   );
 
-  // Dynamic calculations from central database
-  const myComplaints = complaints.filter(c => c.raisedBy === resident?.id || (c.portal === "society" && c.unit === resident?.unit));
+  // Dynamic calculations from central database (most recent first)
+  const myComplaints = complaints
+    .filter(c => c.raisedBy === resident?.id || (c.portal === "society" && c.unit === resident?.unit))
+    .sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0));
   const pendingComplaintsCount = myComplaints.filter(c => c.status !== "resolved" && c.status !== "closed").length;
 
-  const myBills = maintenanceBills.filter(b => b.residentId === resident?.id || b.unit === resident?.unit);
+  const myBills = maintenanceBills.filter(b => {
+    if (b.residentId === resident?.id) return true;
+    if (resident?.unit) {
+      const cleanResidentUnit = resident.unit.replace(/^[A-Za-z\s-]+/, '').trim();
+      const cleanBillUnit = (b.unit || '').replace(/^[A-Za-z\s-]+/, '').trim();
+      if (cleanBillUnit && cleanBillUnit === cleanResidentUnit) return true;
+      if (b.unit === resident.unit) return true;
+    }
+    return false;
+  });
   const pendingBill = myBills.find(b => b.status === "pending" || b.status === "overdue");
   const duesStr = pendingBill ? `₹${pendingBill.amount}` : "Nil";
 
-  const myVisitors = visitors.filter(v => v.visitingUnit === resident?.unit);
+  const myVisitors = visitors
+    .filter(v => v.visitingUnit === resident?.unit)
+    .sort((a, b) => (new Date(b.checkInTime || b.expectedAt || b.date || 0).getTime() || 0) - (new Date(a.checkInTime || a.expectedAt || a.date || 0).getTime() || 0));
   const visitorsTodayCount = myVisitors.filter(v => v.status === "checked-in" || v.status === "expected").length;
 
   const myParcels = parcels.filter(p => p.recipientId === resident?.id && p.status === "received");
@@ -385,7 +398,9 @@ export function SocietyResidentDashboard({ resident }: { resident: any }) {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {announcements.map((ann) => (
+            {[...announcements]
+              .sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0))
+              .map((ann) => (
               <div
                 key={ann.id}
                 className="p-3 rounded-xl border border-border/50 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5"

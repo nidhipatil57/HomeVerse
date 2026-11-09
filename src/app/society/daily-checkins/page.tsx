@@ -388,7 +388,10 @@ export default function DailyCheckInsPage() {
                     }
                   }
 
-                  const helperAttendanceHistory = attendance.filter(a => a.workerId === helper.id && a.id !== todayLog?.id).slice(-4);
+                  const helperAttendanceHistory = attendance
+                    .filter(a => a.workerId === helper.id && a.id !== todayLog?.id)
+                    .sort((a, b) => (new Date(b.date || 0).getTime() || 0) - (new Date(a.date || 0).getTime() || 0))
+                    .slice(0, 4);
 
                   // Create timeline milestones for today
                   const milestones = [];
