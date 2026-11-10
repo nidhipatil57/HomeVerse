@@ -180,6 +180,36 @@ export default function PaymentsPage() {
     };
   }, [payments]);
 
+  // Secretary Ledger Invoices: only current month's maintenance bills (pending October payments)
+  // or new occasion ones for that month if any, sorted in wing & flat order.
+  const secretaryLedgerInvoices = useMemo(() => {
+    return payments
+      .filter(p => {
+        const isCurrentMaintenance = p.paymentType === "Maintenance" && 
+          (p.status.toLowerCase() === "pending" || (p.description || "").includes("October 2026") || (p.dueDate && p.dueDate.startsWith("2026-10")));
+        const isCurrentOccasion = p.paymentType !== "Maintenance" &&
+          p.status.toLowerCase() === "pending" &&
+          p.dueDate && (p.dueDate.startsWith("2026-10") || p.dueDate.startsWith("2026-11"));
+        return isCurrentMaintenance || isCurrentOccasion;
+      })
+      .filter(p => {
+        if (!search) return true;
+        const q = search.toLowerCase();
+        return (p.unit && p.unit.toLowerCase().includes(q)) ||
+               (p.residentName && p.residentName.toLowerCase().includes(q)) ||
+               (p.building && p.building.toLowerCase().includes(q)) ||
+               (p.paymentType && p.paymentType.toLowerCase().includes(q));
+      })
+      .sort((a, b) => {
+        const wingA = (a.building || "").toUpperCase();
+        const wingB = (b.building || "").toUpperCase();
+        if (wingA !== wingB) return wingA.localeCompare(wingB);
+        const numA = parseInt((a.unit || "").replace(/\D/g, ""), 10) || 0;
+        const numB = parseInt((b.unit || "").replace(/\D/g, ""), 10) || 0;
+        return numA - numB;
+      });
+  }, [payments, search]);
+
   // Receipt download
   const handleDownloadReceipt = (payment: any) => {
     const printWindow = window.open("", "_blank");
@@ -522,41 +552,41 @@ export default function PaymentsPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="divide-y divide-border/30 max-h-[480px] overflow-y-auto">
-                    {paymentsHistory
-                      .filter(p => p.paymentType === "Maintenance")
-                      .map((p) => (
-                        <div key={p.id} className="p-4 flex items-center justify-between hover:bg-secondary/15 transition-colors text-xs">
-                          <div>
-                            <h4 className="font-bold">Flat {p.unit} ({p.residentName})</h4>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">Due date: {p.dueDate}</p>
-                            {p.status.toLowerCase() === "paid" && p.paidDate && (
-                              <p className="text-[9px] text-green-500 mt-0.5">Paid On: {p.paidDate} ({p.paymentMethod || "Card"})</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-bold">₹{p.amount}</span>
-                            <Badge variant={p.status.toLowerCase() === "paid" ? "default" : "destructive"} className="text-[9px] font-bold">
-                              {p.status}
-                            </Badge>
-                            {p.status.toLowerCase() === "pending" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  sendPaymentReminder(p.id);
-                                  alert("Reminder notification dispatched to resident.");
-                                }}
-                                className="h-7 text-[9px] px-2 rounded-lg"
-                              >
-                                <Send className="w-3 h-3 mr-1" /> Remind
-                              </Button>
-                            )}
-                          </div>
+                    {secretaryLedgerInvoices.map((p) => (
+                      <div key={p.id} className="p-4 flex items-center justify-between hover:bg-secondary/15 transition-colors text-xs">
+                        <div>
+                          <h4 className="font-bold">Flat {p.unit} ({p.residentName})</h4>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {p.building || "Sunshine Complex"} • {p.paymentType} • Due date: {p.dueDate}
+                          </p>
+                          {p.status.toLowerCase() === "paid" && p.paidDate && (
+                            <p className="text-[9px] text-green-500 mt-0.5">Paid On: {p.paidDate} ({p.paymentMethod || "Card"})</p>
+                          )}
                         </div>
-                      ))}
-                    {paymentsHistory.filter(p => p.paymentType === "Maintenance").length === 0 && (
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold">₹{p.amount.toLocaleString()}</span>
+                          <Badge variant={p.status.toLowerCase() === "paid" ? "default" : "destructive"} className="text-[9px] font-bold">
+                            {p.status}
+                          </Badge>
+                          {p.status.toLowerCase() === "pending" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                sendPaymentReminder(p.id);
+                                alert(`Reminder notification dispatched to ${p.residentName} (Flat ${p.unit}).`);
+                              }}
+                              className="h-7 text-[9px] px-2 rounded-lg"
+                            >
+                              <Send className="w-3 h-3 mr-1" /> Remind
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {secretaryLedgerInvoices.length === 0 && (
                       <div className="text-center py-20 text-muted-foreground text-xs">
-                        No maintenance ledgers found.
+                        No maintenance ledgers found for this billing period.
                       </div>
                     )}
                   </div>
@@ -1164,7 +1194,7 @@ export default function PaymentsPage() {
                 {pendingMaintenanceBills.map((bill) => (
                   <div key={bill.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                      <h4 className="font-bold text-sm text-foreground">Monthly Maintenance Bill</h4>
+                      <h4 className="font-bold text-sm text-foreground">{bill.description?.split("(")[0]?.trim() || "October 2026 Society Maintenance"}</h4>
                       <p className="text-[10px] text-muted-foreground mt-0.5">Due date: {bill.dueDate}</p>
                       <div className="flex gap-2 mt-2">
                         <Badge variant="outline" className="text-[9px] border-amber-500/20 text-amber-500 bg-amber-500/5 font-bold uppercase">

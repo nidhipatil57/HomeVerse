@@ -14,11 +14,11 @@ import { staggerContainer, fadeInUp } from "@/lib/animations";
 export default function PaymentHistoryPage() {
   const { user, initialize } = useAuth();
   const {
-    maintenanceBills,
+    payments,
     initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
-      maintenanceBills: state.maintenanceBills || [],
+      payments: state.payments || [],
       initializeDb: state.initializeDb,
     }))
   );
@@ -33,18 +33,19 @@ export default function PaymentHistoryPage() {
 
   if (!mounted) return null;
 
-  const residentBills = maintenanceBills.filter(b => {
-    if (b.residentId === user?.id) return true;
-    if (user?.unit) {
-      const cleanUserUnit = user.unit.replace(/^[A-Za-z\s-]+/, '').trim();
-      const cleanBillUnit = (b.unit || '').replace(/^[A-Za-z\s-]+/, '').trim();
-      if (cleanBillUnit && cleanBillUnit === cleanUserUnit) return true;
-      if (b.unit === user.unit) return true;
-    }
-    return false;
-  });
-
-  const paidBills = residentBills.filter(b => b.status === "paid");
+  const paidTransactions = payments
+    .filter(p => {
+      if (p.status?.toLowerCase() !== "paid") return false;
+      if (p.residentId === user?.id) return true;
+      if (user?.unit) {
+        const cleanUserUnit = user.unit.replace(/^[A-Za-z\s-]+/, '').trim();
+        const cleanPUnit = (p.unit || '').replace(/^[A-Za-z\s-]+/, '').trim();
+        if (cleanPUnit && cleanPUnit === cleanUserUnit) return true;
+        if (p.unit === user.unit) return true;
+      }
+      return false;
+    })
+    .sort((a, b) => new Date(b.paidDate || 0).getTime() - new Date(a.paidDate || 0).getTime());
 
   return (
     <div className="space-y-6">
@@ -58,7 +59,7 @@ export default function PaymentHistoryPage() {
         </p>
       </div>
 
-      {/* Paid Bills List */}
+      {/* Paid Invoices List */}
       <Card className="border-border/50">
         <CardHeader>
           <CardTitle className="text-base font-bold flex items-center gap-1.5">
@@ -68,19 +69,25 @@ export default function PaymentHistoryPage() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border/30">
-            {paidBills.map((b) => (
-              <div key={b.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-secondary/10 transition-colors">
+            {paidTransactions.map((p) => (
+              <div key={p.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-secondary/10 transition-colors">
                 <div className="flex items-start gap-3">
                   <Receipt className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
                   <div className="text-xs">
-                    <h4 className="font-bold text-foreground">{b.month} Maintenance Payment</h4>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Paid On: {b.paidOn || "July 01, 2026"} • Reference ID: Pay-{b.id}</p>
+                    <h4 className="font-bold text-foreground">
+                      {p.paymentType === "Maintenance"
+                        ? (p.description?.split("(")[0]?.trim() || "Monthly Maintenance Payment")
+                        : p.paymentType}
+                    </h4>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Paid On: {p.paidDate || "Recent"} • Reference: {p.transactionId || p.id}
+                    </p>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between sm:justify-end gap-4 self-stretch sm:self-center">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-foreground">₹{b.amount}</span>
+                    <span className="text-sm font-bold text-foreground">₹{p.amount.toLocaleString()}</span>
                     <Badge className="bg-green-500/15 text-green-600 border border-green-500/20 text-[9px] font-bold">
                       Settled
                     </Badge>
@@ -88,7 +95,7 @@ export default function PaymentHistoryPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => alert(`Downloading payment receipt for ${b.month} Bill Cycle (Reference Pay-${b.id})...`)}
+                    onClick={() => alert(`Downloading payment receipt for ${p.paymentType} (Reference: ${p.transactionId || p.id})...`)}
                     className="h-8 text-[10px] rounded-lg flex items-center justify-center gap-1 border-primary/20 text-primary hover:bg-primary/5"
                   >
                     <Download className="w-3.5 h-3.5 mr-1" /> Receipt
@@ -96,7 +103,7 @@ export default function PaymentHistoryPage() {
                 </div>
               </div>
             ))}
-            {paidBills.length === 0 && (
+            {paidTransactions.length === 0 && (
               <div className="text-center py-20 text-muted-foreground text-xs">
                 No past payment records found.
               </div>

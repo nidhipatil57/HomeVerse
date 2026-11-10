@@ -23,7 +23,7 @@ export const getPrepopulatedComplaints = (): Complaint[] => [
     priority: "high",
     raisedBy: "user-resident-1",
     raisedByName: "Sara Shah",
-    unit: "A-204",
+    unit: "A-202",
     building: "A Wing",
     portal: "society",
     createdAt: "2026-07-03T10:00:00",
@@ -46,7 +46,7 @@ export const getPrepopulatedComplaints = (): Complaint[] => [
     priority: "critical",
     raisedBy: "user-resident-2",
     raisedByName: "Nidhi Kumar",
-    unit: "A-301",
+    unit: "A-101",
     building: "A Wing",
     portal: "society",
     createdAt: "2026-07-02T14:00:00",
@@ -156,7 +156,7 @@ export const getPrepopulatedVisitors = (): Visitor[] => [
     name: "Vikram Kumar",
     phone: "+91 98111 22233",
     purpose: "Personal Guest",
-    visitingUnit: "A-301",
+    visitingUnit: "A-101",
     visitingResident: "Nidhi Kumar",
     status: "expected",
     expectedAt: "2026-07-05T18:00:00",
@@ -169,7 +169,7 @@ export const getPrepopulatedVisitors = (): Visitor[] => [
     name: "Rohit Sharma",
     phone: "+91 98333 44444",
     purpose: "Delivery Agent / Setup Assistant",
-    visitingUnit: "A-204",
+    visitingUnit: "A-202",
     visitingResident: "Sara Shah",
     status: "checked-out",
     expectedAt: "2026-07-04T11:00:00",
@@ -286,7 +286,7 @@ export const getPrepopulatedParcels = (): Parcel[] => [
     id: "PRC-004",
     recipientId: "user-resident-1",
     recipientName: "Sara Shah",
-    unit: "A-204",
+    unit: "A-202",
     courier: "Delhivery",
     description: "Home decor items package",
     otp: "9988",
@@ -500,669 +500,3902 @@ export const getPrepopulatedClaims = (): Claim[] => [
 
 export const getPrepopulatedMaintenanceBills = (): MaintenanceBill[] => [
   {
-    id: "BILL-001",
-    residentId: "user-resident-2",
-    residentName: "Nidhi Kumar",
-    unit: "A-301",
-    month: "July 2026",
-    amount: 4500,
-    dueDate: "2026-07-10",
-    status: "paid",
-    paidOn: "2026-07-08",
-    breakdown: [
-      { label: "Society Maintenance", amount: 3000 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 600 },
-      { label: "Parking Slot", amount: 400 }
+    "id": "BILL-JUL-A101",
+    "residentId": "user-resident-2",
+    "residentName": "Nidhi Kumar",
+    "unit": "101",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-002",
-    residentId: "user-resident-1",
-    residentName: "Sara Shah",
-    unit: "A-204",
-    month: "July 2026",
-    amount: 4500,
-    dueDate: "2026-07-10",
-    status: "paid",
-    paidOn: "2026-07-03",
-    breakdown: [
-      { label: "Society Maintenance", amount: 3000 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 600 },
-      { label: "Parking Slot", amount: 400 }
+    "id": "BILL-AUG-A101",
+    "residentId": "user-resident-2",
+    "residentName": "Nidhi Kumar",
+    "unit": "101",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-003",
-    residentId: "user-resident-3",
-    residentName: "Sunita Rao",
-    unit: "A-201",
-    month: "June 2026",
-    amount: 4500,
-    dueDate: "2026-06-10",
-    status: "paid",
-    paidOn: "2026-06-15",
-    breakdown: [
-      { label: "Society Maintenance", amount: 3000 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 600 },
-      { label: "Parking Slot", amount: 400 }
+    "id": "BILL-SEP-A101",
+    "residentId": "user-resident-2",
+    "residentName": "Nidhi Kumar",
+    "unit": "101",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-004",
-    residentId: "user-resident-4",
-    residentName: "Kishore Kumar",
-    unit: "B-101",
-    month: "July 2026",
-    amount: 4000,
-    dueDate: "2026-07-10",
-    status: "paid",
-    paidOn: "2026-07-05",
-    breakdown: [
-      { label: "Society Maintenance", amount: 2800 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 400 },
-      { label: "Parking Slot", amount: 300 }
+    "id": "BILL-OCT-A101",
+    "residentId": "user-resident-2",
+    "residentName": "Nidhi Kumar",
+    "unit": "101",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-005",
-    residentId: "user-resident-5",
-    residentName: "Amit Shah",
-    unit: "101",
-    month: "July 2026",
-    amount: 4200,
-    dueDate: "2026-07-10",
-    status: "paid",
-    paidOn: "2026-07-02",
-    breakdown: [
-      { label: "Society Maintenance", amount: 2900 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 500 },
-      { label: "Parking Slot", amount: 300 }
+    "id": "BILL-JUL-A102",
+    "residentId": "user-resident-10",
+    "residentName": "Gaurav Sen",
+    "unit": "102",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-006",
-    residentId: "user-resident-1",
-    residentName: "Sara Shah",
-    unit: "A-204",
-    month: "August 2026",
-    amount: 4500,
-    dueDate: "2026-08-15",
-    status: "pending",
-    lateFee: 200,
-    breakdown: [
-      { label: "Society Maintenance", amount: 3000 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 600 },
-      { label: "Parking Slot", amount: 400 }
+    "id": "BILL-AUG-A102",
+    "residentId": "user-resident-10",
+    "residentName": "Gaurav Sen",
+    "unit": "102",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-007",
-    residentId: "user-resident-2",
-    residentName: "Nidhi Kumar",
-    unit: "A-301",
-    month: "August 2026",
-    amount: 4500,
-    dueDate: "2026-08-15",
-    status: "pending",
-    breakdown: [
-      { label: "Society Maintenance", amount: 3000 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 600 },
-      { label: "Parking Slot", amount: 400 }
+    "id": "BILL-SEP-A102",
+    "residentId": "user-resident-10",
+    "residentName": "Gaurav Sen",
+    "unit": "102",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-008",
-    residentId: "user-resident-3",
-    residentName: "Sunita Rao",
-    unit: "A-201",
-    month: "July 2026",
-    amount: 4500,
-    dueDate: "2026-07-10",
-    status: "paid",
-    paidOn: "2026-07-09",
-    breakdown: [
-      { label: "Society Maintenance", amount: 3000 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 600 },
-      { label: "Parking Slot", amount: 400 }
+    "id": "BILL-OCT-A102",
+    "residentId": "user-resident-10",
+    "residentName": "Gaurav Sen",
+    "unit": "102",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-009",
-    residentId: "user-resident-3",
-    residentName: "Sunita Rao",
-    unit: "A-201",
-    month: "August 2026",
-    amount: 4500,
-    dueDate: "2026-08-15",
-    status: "pending",
-    breakdown: [
-      { label: "Society Maintenance", amount: 3000 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 600 },
-      { label: "Parking Slot", amount: 400 }
+    "id": "BILL-JUL-A201",
+    "residentId": "user-resident-3",
+    "residentName": "Sunita Rao",
+    "unit": "201",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-010",
-    residentId: "user-resident-4",
-    residentName: "Kishore Kumar",
-    unit: "B-101",
-    month: "August 2026",
-    amount: 4000,
-    dueDate: "2026-08-15",
-    status: "pending",
-    breakdown: [
-      { label: "Society Maintenance", amount: 2800 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 400 },
-      { label: "Parking Slot", amount: 300 }
+    "id": "BILL-AUG-A201",
+    "residentId": "user-resident-3",
+    "residentName": "Sunita Rao",
+    "unit": "201",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-011",
-    residentId: "user-resident-5",
-    residentName: "Amit Shah",
-    unit: "101",
-    month: "August 2026",
-    amount: 4200,
-    dueDate: "2026-08-15",
-    status: "paid",
-    paidOn: "2026-08-02",
-    breakdown: [
-      { label: "Society Maintenance", amount: 2900 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 500 },
-      { label: "Parking Slot", amount: 300 }
+    "id": "BILL-SEP-A201",
+    "residentId": "user-resident-3",
+    "residentName": "Sunita Rao",
+    "unit": "201",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-012",
-    residentId: "user-secretary-1",
-    residentName: "Rahul Verma",
-    unit: "302",
-    month: "July 2026",
-    amount: 4500,
-    dueDate: "2026-07-10",
-    status: "paid",
-    paidOn: "2026-07-01",
-    breakdown: [
-      { label: "Society Maintenance", amount: 3000 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 600 },
-      { label: "Parking Slot", amount: 400 }
+    "id": "BILL-OCT-A201",
+    "residentId": "user-resident-3",
+    "residentName": "Sunita Rao",
+    "unit": "201",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   },
   {
-    id: "BILL-013",
-    residentId: "user-secretary-1",
-    residentName: "Rahul Verma",
-    unit: "302",
-    month: "August 2026",
-    amount: 4500,
-    dueDate: "2026-08-15",
-    status: "pending",
-    breakdown: [
-      { label: "Society Maintenance", amount: 3000 },
-      { label: "Water Charges", amount: 500 },
-      { label: "Electricity Charges", amount: 600 },
-      { label: "Parking Slot", amount: 400 }
+    "id": "BILL-JUL-A202",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "unit": "202",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-A202",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "unit": "202",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-A202",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "unit": "202",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-A202",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "unit": "202",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-A301",
+    "residentId": "user-secretary-1",
+    "residentName": "Rahul Verma",
+    "unit": "301",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-A301",
+    "residentId": "user-secretary-1",
+    "residentName": "Rahul Verma",
+    "unit": "301",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-A301",
+    "residentId": "user-secretary-1",
+    "residentName": "Rahul Verma",
+    "unit": "301",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-A301",
+    "residentId": "user-secretary-1",
+    "residentName": "Rahul Verma",
+    "unit": "301",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-A302",
+    "residentId": "user-resident-6",
+    "residentName": "Rahul Mehta",
+    "unit": "302",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-A302",
+    "residentId": "user-resident-6",
+    "residentName": "Rahul Mehta",
+    "unit": "302",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-A302",
+    "residentId": "user-resident-6",
+    "residentName": "Rahul Mehta",
+    "unit": "302",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-A302",
+    "residentId": "user-resident-6",
+    "residentName": "Rahul Mehta",
+    "unit": "302",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-B101",
+    "residentId": "user-resident-4",
+    "residentName": "Kishore Kumar",
+    "unit": "101",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-B101",
+    "residentId": "user-resident-4",
+    "residentName": "Kishore Kumar",
+    "unit": "101",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-B101",
+    "residentId": "user-resident-4",
+    "residentName": "Kishore Kumar",
+    "unit": "101",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-B101",
+    "residentId": "user-resident-4",
+    "residentName": "Kishore Kumar",
+    "unit": "101",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-B102",
+    "residentId": "user-resident-7",
+    "residentName": "Anjali Patil",
+    "unit": "102",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-B102",
+    "residentId": "user-resident-7",
+    "residentName": "Anjali Patil",
+    "unit": "102",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-B102",
+    "residentId": "user-resident-7",
+    "residentName": "Anjali Patil",
+    "unit": "102",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-B102",
+    "residentId": "user-resident-7",
+    "residentName": "Anjali Patil",
+    "unit": "102",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-B201",
+    "residentId": "user-resident-8",
+    "residentName": "Rohan Kulkarni",
+    "unit": "201",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-B201",
+    "residentId": "user-resident-8",
+    "residentName": "Rohan Kulkarni",
+    "unit": "201",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-B201",
+    "residentId": "user-resident-8",
+    "residentName": "Rohan Kulkarni",
+    "unit": "201",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-B201",
+    "residentId": "user-resident-8",
+    "residentName": "Rohan Kulkarni",
+    "unit": "201",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-B202",
+    "residentId": "user-resident-11",
+    "residentName": "Vikram Malhotra",
+    "unit": "202",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-B202",
+    "residentId": "user-resident-11",
+    "residentName": "Vikram Malhotra",
+    "unit": "202",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-B202",
+    "residentId": "user-resident-11",
+    "residentName": "Vikram Malhotra",
+    "unit": "202",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-B202",
+    "residentId": "user-resident-11",
+    "residentName": "Vikram Malhotra",
+    "unit": "202",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-B301",
+    "residentId": "user-resident-12",
+    "residentName": "Sneha Reddy",
+    "unit": "301",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-B301",
+    "residentId": "user-resident-12",
+    "residentName": "Sneha Reddy",
+    "unit": "301",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-B301",
+    "residentId": "user-resident-12",
+    "residentName": "Sneha Reddy",
+    "unit": "301",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-B301",
+    "residentId": "user-resident-12",
+    "residentName": "Sneha Reddy",
+    "unit": "301",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-B302",
+    "residentId": "user-resident-13",
+    "residentName": "Manish Sharma",
+    "unit": "302",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-B302",
+    "residentId": "user-resident-13",
+    "residentName": "Manish Sharma",
+    "unit": "302",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-B302",
+    "residentId": "user-resident-13",
+    "residentName": "Manish Sharma",
+    "unit": "302",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-B302",
+    "residentId": "user-resident-13",
+    "residentName": "Manish Sharma",
+    "unit": "302",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-C101",
+    "residentId": "user-resident-5",
+    "residentName": "Amit Joshi",
+    "unit": "101",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-C101",
+    "residentId": "user-resident-5",
+    "residentName": "Amit Joshi",
+    "unit": "101",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-C101",
+    "residentId": "user-resident-5",
+    "residentName": "Amit Joshi",
+    "unit": "101",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-C101",
+    "residentId": "user-resident-5",
+    "residentName": "Amit Joshi",
+    "unit": "101",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-C102",
+    "residentId": "user-resident-14",
+    "residentName": "Deepak Patel",
+    "unit": "102",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-C102",
+    "residentId": "user-resident-14",
+    "residentName": "Deepak Patel",
+    "unit": "102",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-C102",
+    "residentId": "user-resident-14",
+    "residentName": "Deepak Patel",
+    "unit": "102",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-C102",
+    "residentId": "user-resident-14",
+    "residentName": "Deepak Patel",
+    "unit": "102",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-C201",
+    "residentId": "user-resident-9",
+    "residentName": "Priya Desai",
+    "unit": "201",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-C201",
+    "residentId": "user-resident-9",
+    "residentName": "Priya Desai",
+    "unit": "201",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-C201",
+    "residentId": "user-resident-9",
+    "residentName": "Priya Desai",
+    "unit": "201",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-C201",
+    "residentId": "user-resident-9",
+    "residentName": "Priya Desai",
+    "unit": "201",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-C202",
+    "residentId": "user-resident-15",
+    "residentName": "Meera Iyer",
+    "unit": "202",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-C202",
+    "residentId": "user-resident-15",
+    "residentName": "Meera Iyer",
+    "unit": "202",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-C202",
+    "residentId": "user-resident-15",
+    "residentName": "Meera Iyer",
+    "unit": "202",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-C202",
+    "residentId": "user-resident-15",
+    "residentName": "Meera Iyer",
+    "unit": "202",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-JUL-C301",
+    "residentId": "user-resident-16",
+    "residentName": "Suresh Nair",
+    "unit": "301",
+    "month": "July 2026",
+    "amount": 4500,
+    "dueDate": "2026-07-10",
+    "status": "paid",
+    "paidOn": "2026-07-04",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-AUG-C301",
+    "residentId": "user-resident-16",
+    "residentName": "Suresh Nair",
+    "unit": "301",
+    "month": "August 2026",
+    "amount": 4500,
+    "dueDate": "2026-08-15",
+    "status": "paid",
+    "paidOn": "2026-08-08",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-SEP-C301",
+    "residentId": "user-resident-16",
+    "residentName": "Suresh Nair",
+    "unit": "301",
+    "month": "September 2026",
+    "amount": 4500,
+    "dueDate": "2026-09-15",
+    "status": "paid",
+    "paidOn": "2026-09-06",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
+    ]
+  },
+  {
+    "id": "BILL-OCT-C301",
+    "residentId": "user-resident-16",
+    "residentName": "Suresh Nair",
+    "unit": "301",
+    "month": "October 2026",
+    "amount": 4500,
+    "dueDate": "2026-10-15",
+    "status": "pending",
+    "breakdown": [
+      {
+        "label": "Society Maintenance",
+        "amount": 3000
+      },
+      {
+        "label": "Water Charges",
+        "amount": 500
+      },
+      {
+        "label": "Electricity Charges",
+        "amount": 600
+      },
+      {
+        "label": "Parking Slot",
+        "amount": 400
+      }
     ]
   }
 ];
 
-export const getPrepopulatedCollections = (): any[] => [
-  {
-    id: "COLL-001",
-    title: "Ganesh Festival Contribution 2026",
-    description: "Special contribution for 10-day society Ganesh Utsav pandal, cultural performances, daily aarti, and prasadam.",
-    amount: 1500,
-    type: "Mandatory",
-    dueDate: "2026-08-25",
-    applicableBuildings: [],
-    applicableFlats: [],
-    visibility: "Everyone",
-    status: "active",
-    createdAt: "2026-07-20T10:00:00.000Z",
-    communityCode: "SUN123"
-  },
-  {
-    id: "COLL-002",
-    title: "Wing A & B Lift Modernization",
-    description: "Elevator sensor overhaul, automatic rescue device installation, and aesthetic cabin renovation.",
-    amount: 5000,
-    type: "Mandatory",
-    dueDate: "2026-09-15",
-    applicableBuildings: ["A Wing", "B Wing", "Wing A", "Wing B"],
-    applicableFlats: [],
-    visibility: "Selected Buildings",
-    status: "active",
-    createdAt: "2026-07-15T12:00:00.000Z",
-    communityCode: "SUN123"
-  },
-  {
-    id: "COLL-003",
-    title: "Independence Day High Tea & Flag Hoisting",
-    description: "Flag hoisting ceremony, high tea, sweets distribution, and kids sports prizes.",
-    amount: 500,
-    type: "Voluntary",
-    dueDate: "2026-08-14",
-    applicableBuildings: [],
-    applicableFlats: [],
-    visibility: "Everyone",
-    status: "active",
-    createdAt: "2026-07-28T09:00:00.000Z",
-    communityCode: "SUN123"
-  }
-];
+export const getPrepopulatedCollections = (): any[] => [];
 
 export const getPrepopulatedPayments = (): any[] => [
   {
-    id: "PAY-BILL-001",
-    residentId: "user-resident-1",
-    residentName: "Sara Shah",
-    unit: "204",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4500,
-    status: "paid",
-    dueDate: "2026-07-10",
-    paidDate: "2026-07-03",
-    receiptPath: "/receipts/RCP-BILL-002.pdf",
-    transactionId: "TXN-UPI-98213-904",
-    paymentMethod: "UPI",
-    referenceId: "BILL-002",
-    createdAt: "2026-07-01T00:00:00.000Z",
-    description: "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
-    lateFee: 0
+    "id": "PAY-JUL-A101",
+    "residentId": "user-resident-2",
+    "residentName": "Nidhi Kumar",
+    "unit": "101",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-A101.pdf",
+    "transactionId": "TXN-UPI-JUL-90185",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-A101",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-002",
-    residentId: "user-resident-1",
-    residentName: "Sara Shah",
-    unit: "204",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4500,
-    status: "pending",
-    dueDate: "2026-08-15",
-    paidDate: null,
-    receiptPath: null,
-    transactionId: null,
-    paymentMethod: null,
-    referenceId: "BILL-006",
-    createdAt: "2026-08-01T00:00:00.000Z",
-    description: "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
-    lateFee: 200
+    "id": "PAY-AUG-A101",
+    "residentId": "user-resident-2",
+    "residentName": "Nidhi Kumar",
+    "unit": "101",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-A101.pdf",
+    "transactionId": "TXN-UPI-AUG-94650",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-A101",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-COLL-001",
-    residentId: "user-resident-1",
-    residentName: "Sara Shah",
-    unit: "204",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Ganesh Festival Contribution 2026",
-    amount: 1500,
-    status: "pending",
-    dueDate: "2026-08-25",
-    paidDate: null,
-    receiptPath: null,
-    transactionId: null,
-    paymentMethod: null,
-    referenceId: "COLL-001",
-    createdAt: "2026-07-20T10:00:00.000Z",
-    description: "10-day society Ganesh Utsav pandal, cultural performances, and prasadam",
-    lateFee: 0
+    "id": "PAY-SEP-A101",
+    "residentId": "user-resident-2",
+    "residentName": "Nidhi Kumar",
+    "unit": "101",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-A101.pdf",
+    "transactionId": "TXN-UPI-SEP-96364",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-A101",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-COLL-002",
-    residentId: "user-resident-1",
-    residentName: "Sara Shah",
-    unit: "204",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Wing A & B Lift Modernization",
-    amount: 5000,
-    status: "pending",
-    dueDate: "2026-09-15",
-    paidDate: null,
-    receiptPath: null,
-    transactionId: null,
-    paymentMethod: null,
-    referenceId: "COLL-002",
-    createdAt: "2026-07-15T12:00:00.000Z",
-    description: "Elevator sensor overhaul, automatic rescue device installation, and cabin renovation",
-    lateFee: 0
+    "id": "PAY-GANESH-A101",
+    "residentId": "user-resident-2",
+    "residentName": "Nidhi Kumar",
+    "unit": "101",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-A101.pdf",
+    "transactionId": "TXN-UPI-GANESH-68418",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-003",
-    residentId: "user-resident-2",
-    residentName: "Nidhi Kumar",
-    unit: "A-301",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4500,
-    status: "paid",
-    dueDate: "2026-07-10",
-    paidDate: "2026-07-08",
-    receiptPath: "/receipts/RCP-BILL-001.pdf",
-    transactionId: "TXN-CARD-4491-002",
-    paymentMethod: "Card",
-    referenceId: "BILL-001",
-    createdAt: "2026-07-01T00:00:00.000Z",
-    description: "July 2026 Society Maintenance",
-    lateFee: 0
+    "id": "PAY-NAV-A101",
+    "residentId": "user-resident-2",
+    "residentName": "Nidhi Kumar",
+    "unit": "101",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-A101.pdf",
+    "transactionId": "TXN-UPI-NAV-47466",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-004",
-    residentId: "user-resident-2",
-    residentName: "Nidhi Kumar",
-    unit: "A-301",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4500,
-    status: "pending",
-    dueDate: "2026-08-15",
-    paidDate: null,
-    receiptPath: null,
-    transactionId: null,
-    paymentMethod: null,
-    referenceId: "BILL-007",
-    createdAt: "2026-08-01T00:00:00.000Z",
-    description: "August 2026 Society Maintenance",
-    lateFee: 0
+    "id": "PAY-OCT-A101",
+    "residentId": "user-resident-2",
+    "residentName": "Nidhi Kumar",
+    "unit": "101",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-A101",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-COLL-003",
-    residentId: "user-resident-2",
-    residentName: "Nidhi Kumar",
-    unit: "A-301",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Ganesh Festival Contribution 2026",
-    amount: 1500,
-    status: "paid",
-    dueDate: "2026-08-25",
-    paidDate: "2026-07-25",
-    receiptPath: "/receipts/RCP-GANESH-301.pdf",
-    transactionId: "TXN-UPI-1102-491",
-    paymentMethod: "UPI",
-    referenceId: "COLL-001",
-    createdAt: "2026-07-20T10:00:00.000Z",
-    description: "Special contribution for 10-day society Ganesh Utsav pandal",
-    lateFee: 0
+    "id": "PAY-JUL-A102",
+    "residentId": "user-resident-10",
+    "residentName": "Gaurav Sen",
+    "unit": "102",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-A102.pdf",
+    "transactionId": "TXN-UPI-JUL-41844",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-A102",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-COLL-004",
-    residentId: "user-resident-2",
-    residentName: "Nidhi Kumar",
-    unit: "A-301",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Independence Day High Tea & Flag Hoisting",
-    amount: 500,
-    status: "paid",
-    dueDate: "2026-08-14",
-    paidDate: "2026-08-01",
-    receiptPath: "/receipts/RCP-AUG15-301.pdf",
-    transactionId: "TXN-UPI-9921",
-    paymentMethod: "UPI",
-    referenceId: "COLL-003",
-    createdAt: "2026-07-28T09:00:00.000Z",
-    description: "Flag hoisting ceremony, high tea, sweets distribution",
-    lateFee: 0
+    "id": "PAY-AUG-A102",
+    "residentId": "user-resident-10",
+    "residentName": "Gaurav Sen",
+    "unit": "102",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-A102.pdf",
+    "transactionId": "TXN-UPI-AUG-88225",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-A102",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-005",
-    residentId: "user-resident-3",
-    residentName: "Sunita Rao",
-    unit: "A-201",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4500,
-    status: "paid",
-    dueDate: "2026-06-10",
-    paidDate: "2026-06-15",
-    receiptPath: "/receipts/RCP-BILL-003.pdf",
-    transactionId: "TXN-NB-1029",
-    paymentMethod: "NetBanking",
-    referenceId: "BILL-003",
-    createdAt: "2026-06-01T00:00:00.000Z",
-    description: "June 2026 Society Maintenance",
-    lateFee: 0
+    "id": "PAY-SEP-A102",
+    "residentId": "user-resident-10",
+    "residentName": "Gaurav Sen",
+    "unit": "102",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-A102.pdf",
+    "transactionId": "TXN-UPI-SEP-58514",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-A102",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-006",
-    residentId: "user-resident-3",
-    residentName: "Sunita Rao",
-    unit: "A-201",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4500,
-    status: "paid",
-    dueDate: "2026-07-10",
-    paidDate: "2026-07-09",
-    receiptPath: "/receipts/RCP-BILL-008.pdf",
-    transactionId: "TXN-NB-2039",
-    paymentMethod: "NetBanking",
-    referenceId: "BILL-008",
-    createdAt: "2026-07-01T00:00:00.000Z",
-    description: "July 2026 Society Maintenance",
-    lateFee: 0
+    "id": "PAY-GANESH-A102",
+    "residentId": "user-resident-10",
+    "residentName": "Gaurav Sen",
+    "unit": "102",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-A102.pdf",
+    "transactionId": "TXN-UPI-GANESH-84000",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-007",
-    residentId: "user-resident-3",
-    residentName: "Sunita Rao",
-    unit: "A-201",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4500,
-    status: "pending",
-    dueDate: "2026-08-15",
-    paidDate: null,
-    receiptPath: null,
-    transactionId: null,
-    paymentMethod: null,
-    referenceId: "BILL-009",
-    createdAt: "2026-08-01T00:00:00.000Z",
-    description: "August 2026 Society Maintenance",
-    lateFee: 0
+    "id": "PAY-NAV-A102",
+    "residentId": "user-resident-10",
+    "residentName": "Gaurav Sen",
+    "unit": "102",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-A102.pdf",
+    "transactionId": "TXN-UPI-NAV-56872",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
   },
   {
-    id: "PAY-COLL-005",
-    residentId: "user-resident-3",
-    residentName: "Sunita Rao",
-    unit: "A-201",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Wing A & B Lift Modernization",
-    amount: 5000,
-    status: "pending",
-    dueDate: "2026-09-15",
-    paidDate: null,
-    receiptPath: null,
-    transactionId: null,
-    paymentMethod: null,
-    referenceId: "COLL-002",
-    createdAt: "2026-07-15T12:00:00.000Z",
-    description: "Elevator sensor overhaul, automatic rescue device installation",
-    lateFee: 0
+    "id": "PAY-OCT-A102",
+    "residentId": "user-resident-10",
+    "residentName": "Gaurav Sen",
+    "unit": "102",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-A102",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-008",
-    residentId: "user-resident-4",
-    residentName: "Kishore Kumar",
-    unit: "B-101",
-    building: "B Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4000,
-    status: "paid",
-    dueDate: "2026-07-10",
-    paidDate: "2026-07-05",
-    receiptPath: "/receipts/RCP-BILL-004.pdf",
-    transactionId: "TXN-CARD-9912",
-    paymentMethod: "Card",
-    referenceId: "BILL-004",
-    createdAt: "2026-07-01T00:00:00.000Z",
-    description: "July 2026 Society Maintenance",
-    lateFee: 0
+    "id": "PAY-JUL-A201",
+    "residentId": "user-resident-3",
+    "residentName": "Sunita Rao",
+    "unit": "201",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-A201.pdf",
+    "transactionId": "TXN-UPI-JUL-74968",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-A201",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-009",
-    residentId: "user-resident-4",
-    residentName: "Kishore Kumar",
-    unit: "B-101",
-    building: "B Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4000,
-    status: "pending",
-    dueDate: "2026-08-15",
-    paidDate: null,
-    receiptPath: null,
-    transactionId: null,
-    paymentMethod: null,
-    referenceId: "BILL-010",
-    createdAt: "2026-08-01T00:00:00.000Z",
-    description: "August 2026 Society Maintenance",
-    lateFee: 0
+    "id": "PAY-AUG-A201",
+    "residentId": "user-resident-3",
+    "residentName": "Sunita Rao",
+    "unit": "201",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-A201.pdf",
+    "transactionId": "TXN-UPI-AUG-21991",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-A201",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-COLL-006",
-    residentId: "user-resident-4",
-    residentName: "Kishore Kumar",
-    unit: "B-101",
-    building: "B Wing",
-    societyId: "SUN123",
-    paymentType: "Wing A & B Lift Modernization",
-    amount: 5000,
-    status: "paid",
-    dueDate: "2026-09-15",
-    paidDate: "2026-07-29",
-    receiptPath: "/receipts/RCP-LIFT-101.pdf",
-    transactionId: "TXN-CARD-8831",
-    paymentMethod: "Card",
-    referenceId: "COLL-002",
-    createdAt: "2026-07-15T12:00:00.000Z",
-    description: "Elevator sensor overhaul, automatic rescue device installation",
-    lateFee: 0
+    "id": "PAY-SEP-A201",
+    "residentId": "user-resident-3",
+    "residentName": "Sunita Rao",
+    "unit": "201",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-A201.pdf",
+    "transactionId": "TXN-UPI-SEP-17368",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-A201",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-010",
-    residentId: "user-resident-5",
-    residentName: "Amit Shah",
-    unit: "101",
-    building: "C Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4200,
-    status: "paid",
-    dueDate: "2026-07-10",
-    paidDate: "2026-07-02",
-    receiptPath: "/receipts/RCP-BILL-005.pdf",
-    transactionId: "TXN-NB-3321",
-    paymentMethod: "NetBanking",
-    referenceId: "BILL-005",
-    createdAt: "2026-07-01T00:00:00.000Z",
-    description: "July 2026 Society Maintenance",
-    lateFee: 0
+    "id": "PAY-GANESH-A201",
+    "residentId": "user-resident-3",
+    "residentName": "Sunita Rao",
+    "unit": "201",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-A201.pdf",
+    "transactionId": "TXN-UPI-GANESH-38997",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-011",
-    residentId: "user-resident-5",
-    residentName: "Amit Shah",
-    unit: "101",
-    building: "C Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4200,
-    status: "paid",
-    dueDate: "2026-08-15",
-    paidDate: "2026-08-02",
-    receiptPath: "/receipts/RCP-BILL-011.pdf",
-    transactionId: "TXN-NB-4412",
-    paymentMethod: "NetBanking",
-    referenceId: "BILL-011",
-    createdAt: "2026-08-01T00:00:00.000Z",
-    description: "August 2026 Society Maintenance",
-    lateFee: 0
+    "id": "PAY-NAV-A201",
+    "residentId": "user-resident-3",
+    "residentName": "Sunita Rao",
+    "unit": "201",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-A201.pdf",
+    "transactionId": "TXN-UPI-NAV-87581",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
   },
   {
-    id: "PAY-COLL-007",
-    residentId: "user-resident-5",
-    residentName: "Amit Shah",
-    unit: "101",
-    building: "C Wing",
-    societyId: "SUN123",
-    paymentType: "Ganesh Festival Contribution 2026",
-    amount: 1500,
-    status: "paid",
-    dueDate: "2026-08-25",
-    paidDate: "2026-07-24",
-    receiptPath: "/receipts/RCP-GANESH-101.pdf",
-    transactionId: "TXN-UPI-5511",
-    paymentMethod: "UPI",
-    referenceId: "COLL-001",
-    createdAt: "2026-07-20T10:00:00.000Z",
-    description: "Special contribution for 10-day society Ganesh Utsav pandal",
-    lateFee: 0
+    "id": "PAY-OCT-A201",
+    "residentId": "user-resident-3",
+    "residentName": "Sunita Rao",
+    "unit": "201",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-A201",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-012",
-    residentId: "user-secretary-1",
-    residentName: "Rahul Verma",
-    unit: "302",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4500,
-    status: "paid",
-    dueDate: "2026-07-10",
-    paidDate: "2026-07-01",
-    receiptPath: "/receipts/RCP-BILL-012.pdf",
-    transactionId: "TXN-UPI-0011",
-    paymentMethod: "UPI",
-    referenceId: "BILL-012",
-    createdAt: "2026-07-01T00:00:00.000Z",
-    description: "July 2026 Society Maintenance",
-    lateFee: 0
+    "id": "PAY-JUL-A202",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "unit": "202",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-A202.pdf",
+    "transactionId": "TXN-UPI-JUL-71379",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-A202",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   },
   {
-    id: "PAY-BILL-013",
-    residentId: "user-secretary-1",
-    residentName: "Rahul Verma",
-    unit: "302",
-    building: "A Wing",
-    societyId: "SUN123",
-    paymentType: "Maintenance",
-    amount: 4500,
-    status: "pending",
-    dueDate: "2026-08-15",
-    paidDate: null,
-    receiptPath: null,
-    transactionId: null,
-    paymentMethod: null,
-    referenceId: "BILL-013",
-    createdAt: "2026-08-01T00:00:00.000Z",
-    description: "August 2026 Society Maintenance",
-    lateFee: 0
+    "id": "PAY-AUG-A202",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "unit": "202",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-A202.pdf",
+    "transactionId": "TXN-UPI-AUG-35358",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-A202",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-A202",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "unit": "202",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-A202.pdf",
+    "transactionId": "TXN-UPI-SEP-50822",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-A202",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-A202",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "unit": "202",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-A202.pdf",
+    "transactionId": "TXN-UPI-GANESH-46437",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-A202",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "unit": "202",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-A202.pdf",
+    "transactionId": "TXN-UPI-NAV-59973",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-A202",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "unit": "202",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-A202",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-A301",
+    "residentId": "user-secretary-1",
+    "residentName": "Rahul Verma",
+    "unit": "301",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-A301.pdf",
+    "transactionId": "TXN-UPI-JUL-77255",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-A301",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-A301",
+    "residentId": "user-secretary-1",
+    "residentName": "Rahul Verma",
+    "unit": "301",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-A301.pdf",
+    "transactionId": "TXN-UPI-AUG-59136",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-A301",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-A301",
+    "residentId": "user-secretary-1",
+    "residentName": "Rahul Verma",
+    "unit": "301",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-A301.pdf",
+    "transactionId": "TXN-UPI-SEP-41652",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-A301",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-A301",
+    "residentId": "user-secretary-1",
+    "residentName": "Rahul Verma",
+    "unit": "301",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-A301.pdf",
+    "transactionId": "TXN-UPI-GANESH-37855",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-A301",
+    "residentId": "user-secretary-1",
+    "residentName": "Rahul Verma",
+    "unit": "301",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-A301.pdf",
+    "transactionId": "TXN-UPI-NAV-58211",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-A301",
+    "residentId": "user-secretary-1",
+    "residentName": "Rahul Verma",
+    "unit": "301",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-A301",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-A302",
+    "residentId": "user-resident-6",
+    "residentName": "Rahul Mehta",
+    "unit": "302",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-A302.pdf",
+    "transactionId": "TXN-UPI-JUL-56077",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-A302",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-A302",
+    "residentId": "user-resident-6",
+    "residentName": "Rahul Mehta",
+    "unit": "302",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-A302.pdf",
+    "transactionId": "TXN-UPI-AUG-65695",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-A302",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-A302",
+    "residentId": "user-resident-6",
+    "residentName": "Rahul Mehta",
+    "unit": "302",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-A302.pdf",
+    "transactionId": "TXN-UPI-SEP-69998",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-A302",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-A302",
+    "residentId": "user-resident-6",
+    "residentName": "Rahul Mehta",
+    "unit": "302",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-A302.pdf",
+    "transactionId": "TXN-UPI-GANESH-44837",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-A302",
+    "residentId": "user-resident-6",
+    "residentName": "Rahul Mehta",
+    "unit": "302",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-A302.pdf",
+    "transactionId": "TXN-UPI-NAV-55328",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-A302",
+    "residentId": "user-resident-6",
+    "residentName": "Rahul Mehta",
+    "unit": "302",
+    "building": "A Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-A302",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-B101",
+    "residentId": "user-resident-4",
+    "residentName": "Kishore Kumar",
+    "unit": "101",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-B101.pdf",
+    "transactionId": "TXN-UPI-JUL-94023",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-B101",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-B101",
+    "residentId": "user-resident-4",
+    "residentName": "Kishore Kumar",
+    "unit": "101",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-B101.pdf",
+    "transactionId": "TXN-UPI-AUG-92254",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-B101",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-B101",
+    "residentId": "user-resident-4",
+    "residentName": "Kishore Kumar",
+    "unit": "101",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-B101.pdf",
+    "transactionId": "TXN-UPI-SEP-57607",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-B101",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-B101",
+    "residentId": "user-resident-4",
+    "residentName": "Kishore Kumar",
+    "unit": "101",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-B101.pdf",
+    "transactionId": "TXN-UPI-GANESH-90635",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-B101",
+    "residentId": "user-resident-4",
+    "residentName": "Kishore Kumar",
+    "unit": "101",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-B101.pdf",
+    "transactionId": "TXN-UPI-NAV-59398",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-B101",
+    "residentId": "user-resident-4",
+    "residentName": "Kishore Kumar",
+    "unit": "101",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-B101",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-B102",
+    "residentId": "user-resident-7",
+    "residentName": "Anjali Patil",
+    "unit": "102",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-B102.pdf",
+    "transactionId": "TXN-UPI-JUL-25208",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-B102",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-B102",
+    "residentId": "user-resident-7",
+    "residentName": "Anjali Patil",
+    "unit": "102",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-B102.pdf",
+    "transactionId": "TXN-UPI-AUG-16443",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-B102",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-B102",
+    "residentId": "user-resident-7",
+    "residentName": "Anjali Patil",
+    "unit": "102",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-B102.pdf",
+    "transactionId": "TXN-UPI-SEP-98309",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-B102",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-B102",
+    "residentId": "user-resident-7",
+    "residentName": "Anjali Patil",
+    "unit": "102",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-B102.pdf",
+    "transactionId": "TXN-UPI-GANESH-67145",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-B102",
+    "residentId": "user-resident-7",
+    "residentName": "Anjali Patil",
+    "unit": "102",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-B102.pdf",
+    "transactionId": "TXN-UPI-NAV-76405",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-B102",
+    "residentId": "user-resident-7",
+    "residentName": "Anjali Patil",
+    "unit": "102",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-B102",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-B201",
+    "residentId": "user-resident-8",
+    "residentName": "Rohan Kulkarni",
+    "unit": "201",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-B201.pdf",
+    "transactionId": "TXN-UPI-JUL-90102",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-B201",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-B201",
+    "residentId": "user-resident-8",
+    "residentName": "Rohan Kulkarni",
+    "unit": "201",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-B201.pdf",
+    "transactionId": "TXN-UPI-AUG-75190",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-B201",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-B201",
+    "residentId": "user-resident-8",
+    "residentName": "Rohan Kulkarni",
+    "unit": "201",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-B201.pdf",
+    "transactionId": "TXN-UPI-SEP-16925",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-B201",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-B201",
+    "residentId": "user-resident-8",
+    "residentName": "Rohan Kulkarni",
+    "unit": "201",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-B201.pdf",
+    "transactionId": "TXN-UPI-GANESH-57790",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-B201",
+    "residentId": "user-resident-8",
+    "residentName": "Rohan Kulkarni",
+    "unit": "201",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-B201.pdf",
+    "transactionId": "TXN-UPI-NAV-42795",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-B201",
+    "residentId": "user-resident-8",
+    "residentName": "Rohan Kulkarni",
+    "unit": "201",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-B201",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-B202",
+    "residentId": "user-resident-11",
+    "residentName": "Vikram Malhotra",
+    "unit": "202",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-B202.pdf",
+    "transactionId": "TXN-UPI-JUL-24833",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-B202",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-B202",
+    "residentId": "user-resident-11",
+    "residentName": "Vikram Malhotra",
+    "unit": "202",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-B202.pdf",
+    "transactionId": "TXN-UPI-AUG-62923",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-B202",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-B202",
+    "residentId": "user-resident-11",
+    "residentName": "Vikram Malhotra",
+    "unit": "202",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-B202.pdf",
+    "transactionId": "TXN-UPI-SEP-50959",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-B202",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-B202",
+    "residentId": "user-resident-11",
+    "residentName": "Vikram Malhotra",
+    "unit": "202",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-B202.pdf",
+    "transactionId": "TXN-UPI-GANESH-83226",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-B202",
+    "residentId": "user-resident-11",
+    "residentName": "Vikram Malhotra",
+    "unit": "202",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-B202.pdf",
+    "transactionId": "TXN-UPI-NAV-50469",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-B202",
+    "residentId": "user-resident-11",
+    "residentName": "Vikram Malhotra",
+    "unit": "202",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-B202",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-B301",
+    "residentId": "user-resident-12",
+    "residentName": "Sneha Reddy",
+    "unit": "301",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-B301.pdf",
+    "transactionId": "TXN-UPI-JUL-41465",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-B301",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-B301",
+    "residentId": "user-resident-12",
+    "residentName": "Sneha Reddy",
+    "unit": "301",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-B301.pdf",
+    "transactionId": "TXN-UPI-AUG-11011",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-B301",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-B301",
+    "residentId": "user-resident-12",
+    "residentName": "Sneha Reddy",
+    "unit": "301",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-B301.pdf",
+    "transactionId": "TXN-UPI-SEP-78146",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-B301",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-B301",
+    "residentId": "user-resident-12",
+    "residentName": "Sneha Reddy",
+    "unit": "301",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-B301.pdf",
+    "transactionId": "TXN-UPI-GANESH-53938",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-B301",
+    "residentId": "user-resident-12",
+    "residentName": "Sneha Reddy",
+    "unit": "301",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-B301.pdf",
+    "transactionId": "TXN-UPI-NAV-78781",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-B301",
+    "residentId": "user-resident-12",
+    "residentName": "Sneha Reddy",
+    "unit": "301",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-B301",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-B302",
+    "residentId": "user-resident-13",
+    "residentName": "Manish Sharma",
+    "unit": "302",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-B302.pdf",
+    "transactionId": "TXN-UPI-JUL-93322",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-B302",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-B302",
+    "residentId": "user-resident-13",
+    "residentName": "Manish Sharma",
+    "unit": "302",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-B302.pdf",
+    "transactionId": "TXN-UPI-AUG-81624",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-B302",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-B302",
+    "residentId": "user-resident-13",
+    "residentName": "Manish Sharma",
+    "unit": "302",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-B302.pdf",
+    "transactionId": "TXN-UPI-SEP-49861",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-B302",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-B302",
+    "residentId": "user-resident-13",
+    "residentName": "Manish Sharma",
+    "unit": "302",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-B302.pdf",
+    "transactionId": "TXN-UPI-GANESH-28905",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-B302",
+    "residentId": "user-resident-13",
+    "residentName": "Manish Sharma",
+    "unit": "302",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-B302.pdf",
+    "transactionId": "TXN-UPI-NAV-53640",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-B302",
+    "residentId": "user-resident-13",
+    "residentName": "Manish Sharma",
+    "unit": "302",
+    "building": "B Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-B302",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-C101",
+    "residentId": "user-resident-5",
+    "residentName": "Amit Joshi",
+    "unit": "101",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-C101.pdf",
+    "transactionId": "TXN-UPI-JUL-67847",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-C101",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-C101",
+    "residentId": "user-resident-5",
+    "residentName": "Amit Joshi",
+    "unit": "101",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-C101.pdf",
+    "transactionId": "TXN-UPI-AUG-60152",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-C101",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-C101",
+    "residentId": "user-resident-5",
+    "residentName": "Amit Joshi",
+    "unit": "101",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-C101.pdf",
+    "transactionId": "TXN-UPI-SEP-93032",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-C101",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-C101",
+    "residentId": "user-resident-5",
+    "residentName": "Amit Joshi",
+    "unit": "101",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-C101.pdf",
+    "transactionId": "TXN-UPI-GANESH-12263",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-C101",
+    "residentId": "user-resident-5",
+    "residentName": "Amit Joshi",
+    "unit": "101",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-C101.pdf",
+    "transactionId": "TXN-UPI-NAV-59019",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-C101",
+    "residentId": "user-resident-5",
+    "residentName": "Amit Joshi",
+    "unit": "101",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-C101",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-C102",
+    "residentId": "user-resident-14",
+    "residentName": "Deepak Patel",
+    "unit": "102",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-C102.pdf",
+    "transactionId": "TXN-UPI-JUL-97389",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-C102",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-C102",
+    "residentId": "user-resident-14",
+    "residentName": "Deepak Patel",
+    "unit": "102",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-C102.pdf",
+    "transactionId": "TXN-UPI-AUG-78563",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-C102",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-C102",
+    "residentId": "user-resident-14",
+    "residentName": "Deepak Patel",
+    "unit": "102",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-C102.pdf",
+    "transactionId": "TXN-UPI-SEP-38997",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-C102",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-C102",
+    "residentId": "user-resident-14",
+    "residentName": "Deepak Patel",
+    "unit": "102",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-C102.pdf",
+    "transactionId": "TXN-UPI-GANESH-85846",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-C102",
+    "residentId": "user-resident-14",
+    "residentName": "Deepak Patel",
+    "unit": "102",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-C102.pdf",
+    "transactionId": "TXN-UPI-NAV-13557",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-C102",
+    "residentId": "user-resident-14",
+    "residentName": "Deepak Patel",
+    "unit": "102",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-C102",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-C201",
+    "residentId": "user-resident-9",
+    "residentName": "Priya Desai",
+    "unit": "201",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-C201.pdf",
+    "transactionId": "TXN-UPI-JUL-16156",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-C201",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-C201",
+    "residentId": "user-resident-9",
+    "residentName": "Priya Desai",
+    "unit": "201",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-C201.pdf",
+    "transactionId": "TXN-UPI-AUG-23013",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-C201",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-C201",
+    "residentId": "user-resident-9",
+    "residentName": "Priya Desai",
+    "unit": "201",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-C201.pdf",
+    "transactionId": "TXN-UPI-SEP-33307",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-C201",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-C201",
+    "residentId": "user-resident-9",
+    "residentName": "Priya Desai",
+    "unit": "201",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-C201.pdf",
+    "transactionId": "TXN-UPI-GANESH-38649",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-C201",
+    "residentId": "user-resident-9",
+    "residentName": "Priya Desai",
+    "unit": "201",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-C201.pdf",
+    "transactionId": "TXN-UPI-NAV-62990",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-C201",
+    "residentId": "user-resident-9",
+    "residentName": "Priya Desai",
+    "unit": "201",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-C201",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-C202",
+    "residentId": "user-resident-15",
+    "residentName": "Meera Iyer",
+    "unit": "202",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-C202.pdf",
+    "transactionId": "TXN-UPI-JUL-26403",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-C202",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-C202",
+    "residentId": "user-resident-15",
+    "residentName": "Meera Iyer",
+    "unit": "202",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-C202.pdf",
+    "transactionId": "TXN-UPI-AUG-16640",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-C202",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-C202",
+    "residentId": "user-resident-15",
+    "residentName": "Meera Iyer",
+    "unit": "202",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-C202.pdf",
+    "transactionId": "TXN-UPI-SEP-83180",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-C202",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-C202",
+    "residentId": "user-resident-15",
+    "residentName": "Meera Iyer",
+    "unit": "202",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-C202.pdf",
+    "transactionId": "TXN-UPI-GANESH-11727",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-C202",
+    "residentId": "user-resident-15",
+    "residentName": "Meera Iyer",
+    "unit": "202",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-C202.pdf",
+    "transactionId": "TXN-UPI-NAV-19766",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-C202",
+    "residentId": "user-resident-15",
+    "residentName": "Meera Iyer",
+    "unit": "202",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-C202",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-JUL-C301",
+    "residentId": "user-resident-16",
+    "residentName": "Suresh Nair",
+    "unit": "301",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-07-10",
+    "paidDate": "2026-07-04",
+    "receiptPath": "/receipts/RCP-JUL-C301.pdf",
+    "transactionId": "TXN-UPI-JUL-71956",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-JUL-C301",
+    "createdAt": "2026-07-01T00:00:00.000Z",
+    "description": "July 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-AUG-C301",
+    "residentId": "user-resident-16",
+    "residentName": "Suresh Nair",
+    "unit": "301",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-08-15",
+    "paidDate": "2026-08-08",
+    "receiptPath": "/receipts/RCP-AUG-C301.pdf",
+    "transactionId": "TXN-UPI-AUG-28516",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-AUG-C301",
+    "createdAt": "2026-08-01T00:00:00.000Z",
+    "description": "August 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-SEP-C301",
+    "residentId": "user-resident-16",
+    "residentName": "Suresh Nair",
+    "unit": "301",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "paid",
+    "dueDate": "2026-09-15",
+    "paidDate": "2026-09-06",
+    "receiptPath": "/receipts/RCP-SEP-C301.pdf",
+    "transactionId": "TXN-UPI-SEP-91165",
+    "paymentMethod": "UPI",
+    "referenceId": "BILL-SEP-C301",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "description": "September 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-GANESH-C301",
+    "residentId": "user-resident-16",
+    "residentName": "Suresh Nair",
+    "unit": "301",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Ganesh Festival Contribution",
+    "amount": 1000,
+    "status": "paid",
+    "dueDate": "2026-07-30",
+    "paidDate": "2026-07-28",
+    "receiptPath": "/receipts/RCP-GANESH-C301.pdf",
+    "transactionId": "TXN-UPI-GANESH-40783",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-07-20T00:00:00.000Z",
+    "description": "Ganesh Festival 2026 Society Contribution & Puja Fund",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-NAV-C301",
+    "residentId": "user-resident-16",
+    "residentName": "Suresh Nair",
+    "unit": "301",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Navratri Festival Contribution",
+    "amount": 499,
+    "status": "paid",
+    "dueDate": "2026-10-25",
+    "paidDate": "2026-10-18",
+    "receiptPath": "/receipts/RCP-NAV-C301.pdf",
+    "transactionId": "TXN-UPI-NAV-62978",
+    "paymentMethod": "UPI",
+    "createdAt": "2026-10-10T00:00:00.000Z",
+    "description": "Navratri 2026 Garba Night & Cultural Evening Pass",
+    "lateFee": 0
+  },
+  {
+    "id": "PAY-OCT-C301",
+    "residentId": "user-resident-16",
+    "residentName": "Suresh Nair",
+    "unit": "301",
+    "building": "C Wing",
+    "societyId": "SUN123",
+    "paymentType": "Maintenance",
+    "amount": 4500,
+    "status": "pending",
+    "dueDate": "2026-10-15",
+    "referenceId": "BILL-OCT-C301",
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "October 2026 Society Maintenance (Maintenance: ₹3000, Water: ₹500, Electricity: ₹600, Parking: ₹400)",
+    "lateFee": 0
   }
 ];
 
@@ -1289,7 +4522,7 @@ export const getPrepopulatedNotifications = (): Notification[] => [
     id: "NTF-006",
     userId: "user-worker-2",
     title: "New Job Assigned",
-    message: "You have been assigned to: Kitchen Pipe Water Leakage in Flat A-204.",
+    message: "You have been assigned to: Kitchen Pipe Water Leakage in Flat A-202.",
     type: "info",
     read: false,
     createdAt: "2026-07-03T10:15:00"
@@ -1299,7 +4532,7 @@ export const getPrepopulatedNotifications = (): Notification[] => [
     id: "NTF-007",
     userId: "user-secretary-1",
     title: "Maintenance Bill Paid",
-    message: "Resident Sara Shah (A-204) has paid the July maintenance bill.",
+    message: "Resident Sara Shah (A-202) has paid the July maintenance bill.",
     type: "success",
     read: false,
     createdAt: "2026-07-03T12:30:00"
@@ -1390,7 +4623,7 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     phone: "+91 98765 11111",
     role: "secretary",
     portal: "society",
-    unit: "302",
+    unit: "301",
     building: "A Wing",
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
@@ -1418,7 +4651,55 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     status: "approved",
     password: "Raj@123"
   },
-  // --- RESIDENTS (10 unique flats) ---
+  // --- RESIDENTS (16 Units across A, B, C Wings) ---
+  {
+    id: "user-resident-2",
+    name: "Nidhi Kumar",
+    email: "nidhi@sunshinecomplex.com",
+    phone: "+91 98765 43216",
+    role: "resident",
+    portal: "society",
+    unit: "101",
+    building: "A Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Owner",
+    joinedAt: "2026-01-15",
+    status: "approved",
+    password: "Nidhi@123"
+  },
+  {
+    id: "user-resident-10",
+    name: "Gaurav Sen",
+    email: "gaurav@sunshinecomplex.com",
+    phone: "+91 98765 43219",
+    role: "resident",
+    portal: "society",
+    unit: "102",
+    building: "A Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Tenant",
+    joinedAt: "2026-01-15",
+    status: "approved",
+    password: "Gaurav@123"
+  },
+  {
+    id: "user-resident-3",
+    name: "Sunita Rao",
+    email: "sunita@sunshinecomplex.com",
+    phone: "+91 98765 43218",
+    role: "resident",
+    portal: "society",
+    unit: "201",
+    building: "A Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Owner",
+    joinedAt: "2026-01-15",
+    status: "approved",
+    password: "Sunita@123"
+  },
   {
     id: "user-resident-1",
     name: "Sara Shah",
@@ -1426,12 +4707,12 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     phone: "+91 98765 43210",
     role: "resident",
     portal: "society",
-    unit: "204",
+    unit: "202",
     building: "A Wing",
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
     ownerOrTenant: "Owner",
-    joinedAt: "2026-01-10",
+    joinedAt: "2026-01-15",
     status: "approved",
     password: "Sara@123"
   },
@@ -1447,9 +4728,25 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
     ownerOrTenant: "Owner",
-    joinedAt: "2026-01-12",
+    joinedAt: "2026-01-15",
     status: "approved",
     password: "Rahul@123"
+  },
+  {
+    id: "user-resident-4",
+    name: "Kishore Kumar",
+    email: "kishore@sunshinecomplex.com",
+    phone: "+91 98765 43217",
+    role: "resident",
+    portal: "society",
+    unit: "101",
+    building: "B Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Tenant",
+    joinedAt: "2026-01-15",
+    status: "approved",
+    password: "Kishore@123"
   },
   {
     id: "user-resident-7",
@@ -1458,7 +4755,7 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     phone: "+91 98765 43212",
     role: "resident",
     portal: "society",
-    unit: "105",
+    unit: "102",
     building: "B Wing",
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
@@ -1474,14 +4771,94 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     phone: "+91 98765 43213",
     role: "resident",
     portal: "society",
-    unit: "503",
+    unit: "201",
     building: "B Wing",
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
     ownerOrTenant: "Owner",
-    joinedAt: "2026-01-20",
+    joinedAt: "2026-01-15",
     status: "approved",
     password: "Rohan@123"
+  },
+  {
+    id: "user-resident-11",
+    name: "Vikram Malhotra",
+    email: "vikram.m@sunshinecomplex.com",
+    phone: "+91 98765 43220",
+    role: "resident",
+    portal: "society",
+    unit: "202",
+    building: "B Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Owner",
+    joinedAt: "2026-10-01",
+    status: "approved",
+    password: "Vikram@123"
+  },
+  {
+    id: "user-resident-12",
+    name: "Sneha Reddy",
+    email: "sneha.r@sunshinecomplex.com",
+    phone: "+91 98765 43221",
+    role: "resident",
+    portal: "society",
+    unit: "301",
+    building: "B Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Owner",
+    joinedAt: "2026-10-01",
+    status: "approved",
+    password: "Sneha@123"
+  },
+  {
+    id: "user-resident-13",
+    name: "Manish Sharma",
+    email: "manish.s@sunshinecomplex.com",
+    phone: "+91 98765 43222",
+    role: "resident",
+    portal: "society",
+    unit: "302",
+    building: "B Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Tenant",
+    joinedAt: "2026-10-01",
+    status: "approved",
+    password: "Manish@123"
+  },
+  {
+    id: "user-resident-5",
+    name: "Amit Joshi",
+    email: "amit.j@sunshinecomplex.com",
+    phone: "+91 98765 43215",
+    role: "resident",
+    portal: "society",
+    unit: "101",
+    building: "C Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Tenant",
+    joinedAt: "2026-01-15",
+    status: "approved",
+    password: "Amit@123"
+  },
+  {
+    id: "user-resident-14",
+    name: "Deepak Patel",
+    email: "deepak.p@sunshinecomplex.com",
+    phone: "+91 98765 43223",
+    role: "resident",
+    portal: "society",
+    unit: "102",
+    building: "C Wing",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    ownerOrTenant: "Owner",
+    joinedAt: "2026-10-01",
+    status: "approved",
+    password: "Deepak@123"
   },
   {
     id: "user-resident-9",
@@ -1495,89 +4872,41 @@ export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
     ownerOrTenant: "Owner",
-    joinedAt: "2026-01-25",
+    joinedAt: "2026-01-15",
     status: "approved",
     password: "Priya@123"
   },
   {
-    id: "user-resident-5",
-    name: "Amit Joshi",
-    email: "amit.j@sunshinecomplex.com",
-    phone: "+91 98765 43215",
+    id: "user-resident-15",
+    name: "Meera Iyer",
+    email: "meera.i@sunshinecomplex.com",
+    phone: "+91 98765 43224",
     role: "resident",
     portal: "society",
-    unit: "404",
+    unit: "202",
     building: "C Wing",
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
-    ownerOrTenant: "Tenant",
-    joinedAt: "2026-02-05",
+    ownerOrTenant: "Owner",
+    joinedAt: "2026-10-01",
     status: "approved",
-    password: "Amit@123"
+    password: "Meera@123"
   },
   {
-    id: "user-resident-2",
-    name: "Nidhi Kumar",
-    email: "nidhi@sunshinecomplex.com",
-    phone: "+91 98765 43216",
+    id: "user-resident-16",
+    name: "Suresh Nair",
+    email: "suresh.n@sunshinecomplex.com",
+    phone: "+91 98765 43225",
     role: "resident",
     portal: "society",
     unit: "301",
-    building: "A Wing",
+    building: "C Wing",
     societyName: "Sunshine Complex",
     communityCode: "SUN123",
     ownerOrTenant: "Owner",
-    joinedAt: "2026-01-10",
+    joinedAt: "2026-10-01",
     status: "approved",
-    password: "Nidhi@123"
-  },
-  {
-    id: "user-resident-4",
-    name: "Kishore Kumar",
-    email: "kishore@sunshinecomplex.com",
-    phone: "+91 98765 43217",
-    role: "resident",
-    portal: "society",
-    unit: "101",
-    building: "B Wing",
-    societyName: "Sunshine Complex",
-    communityCode: "SUN123",
-    ownerOrTenant: "Tenant",
-    joinedAt: "2026-04-15",
-    status: "approved",
-    password: "Kishore@123"
-  },
-  {
-    id: "user-resident-3",
-    name: "Sunita Rao",
-    email: "sunita@sunshinecomplex.com",
-    phone: "+91 98765 43218",
-    role: "resident",
-    portal: "society",
-    unit: "201",
-    building: "A Wing",
-    societyName: "Sunshine Complex",
-    communityCode: "SUN123",
-    ownerOrTenant: "Owner",
-    joinedAt: "2026-02-18",
-    status: "approved",
-    password: "Sunita@123"
-  },
-  {
-    id: "user-resident-10",
-    name: "Gaurav Sen",
-    email: "gaurav@sunshinecomplex.com",
-    phone: "+91 98765 43219",
-    role: "resident",
-    portal: "society",
-    unit: "102",
-    building: "A Wing",
-    societyName: "Sunshine Complex",
-    communityCode: "SUN123",
-    ownerOrTenant: "Tenant",
-    joinedAt: "2026-07-02",
-    status: "approved",
-    password: "Gaurav@123"
+    password: "Suresh@123"
   },
   // --- WORKERS ---
   {
@@ -1952,7 +5281,7 @@ export const getPrepopulatedEmergencies = (): EmergencyAlert[] => [
     id: "EMG-001",
     residentId: "user-resident-2",
     residentName: "Nidhi Kumar",
-    unit: "301",
+    unit: "101",
     building: "A Wing",
     phone: "+91 98765 43210",
     emergencyType: "Medical",
@@ -1971,7 +5300,7 @@ export const getPrepopulatedGatePasses = (): GatePass[] => [
     validFrom: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
     validTo: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
     assignedResident: "Nidhi Kumar",
-    unit: "301",
+    unit: "101",
     building: "A Wing",
     status: "active",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
@@ -1984,7 +5313,7 @@ export const getPrepopulatedVehicleLogs = (): VehicleLog[] => [
     vehicleNumber: "MH-12-AB-1234",
     ownerName: "Nidhi Kumar",
     ownerType: "resident",
-    unit: "301",
+    unit: "101",
     building: "A Wing",
     entryTime: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
     status: "inside"
@@ -2066,14 +5395,28 @@ export const getPrepopulatedExpenses = (): SocietyExpense[] => [
 ];
 
 export const getPrepopulatedFlats = (): FlatInfo[] => [
-  { id: "FL-A101", building: "A Wing", wing: "A", floor: 1, flatNumber: "101", status: "occupied", residentId: "user-resident-5", residentName: "Amit Shah" },
-  { id: "FL-A102", building: "A Wing", wing: "A", floor: 1, flatNumber: "102", status: "occupied", residentId: "user-resident-6", residentName: "Gaurav Sen" },
+  // A Wing (6 flats)
+  { id: "FL-A101", building: "A Wing", wing: "A", floor: 1, flatNumber: "101", status: "occupied", residentId: "user-resident-2", residentName: "Nidhi Kumar" },
+  { id: "FL-A102", building: "A Wing", wing: "A", floor: 1, flatNumber: "102", status: "occupied", residentId: "user-resident-10", residentName: "Gaurav Sen" },
   { id: "FL-A201", building: "A Wing", wing: "A", floor: 2, flatNumber: "201", status: "occupied", residentId: "user-resident-3", residentName: "Sunita Rao" },
-  { id: "FL-A204", building: "A Wing", wing: "A", floor: 2, flatNumber: "204", status: "occupied", residentId: "user-resident-1", residentName: "Sara Shah" },
-  { id: "FL-A301", building: "A Wing", wing: "A", floor: 3, flatNumber: "301", status: "occupied", residentId: "user-resident-2", residentName: "Nidhi Kumar" },
-  { id: "FL-A302", building: "A Wing", wing: "A", floor: 3, flatNumber: "302", status: "occupied", residentId: "user-secretary-1", residentName: "Rahul Verma" },
+  { id: "FL-A202", building: "A Wing", wing: "A", floor: 2, flatNumber: "202", status: "occupied", residentId: "user-resident-1", residentName: "Sara Shah" },
+  { id: "FL-A301", building: "A Wing", wing: "A", floor: 3, flatNumber: "301", status: "occupied", residentId: "user-secretary-1", residentName: "Rahul Verma (Secretary)" },
+  { id: "FL-A302", building: "A Wing", wing: "A", floor: 3, flatNumber: "302", status: "occupied", residentId: "user-resident-6", residentName: "Rahul Mehta" },
+
+  // B Wing (6 flats)
   { id: "FL-B101", building: "B Wing", wing: "B", floor: 1, flatNumber: "101", status: "occupied", residentId: "user-resident-4", residentName: "Kishore Kumar" },
-  { id: "FL-C101", building: "C Wing", wing: "C", floor: 1, flatNumber: "101", status: "vacant" }
+  { id: "FL-B102", building: "B Wing", wing: "B", floor: 1, flatNumber: "102", status: "occupied", residentId: "user-resident-7", residentName: "Anjali Patil" },
+  { id: "FL-B201", building: "B Wing", wing: "B", floor: 2, flatNumber: "201", status: "occupied", residentId: "user-resident-8", residentName: "Rohan Kulkarni" },
+  { id: "FL-B202", building: "B Wing", wing: "B", floor: 2, flatNumber: "202", status: "occupied", residentId: "user-resident-11", residentName: "Vikram Malhotra" },
+  { id: "FL-B301", building: "B Wing", wing: "B", floor: 3, flatNumber: "301", status: "occupied", residentId: "user-resident-12", residentName: "Sneha Reddy" },
+  { id: "FL-B302", building: "B Wing", wing: "B", floor: 3, flatNumber: "302", status: "occupied", residentId: "user-resident-13", residentName: "Manish Sharma" },
+
+  // C Wing (5 flats)
+  { id: "FL-C101", building: "C Wing", wing: "C", floor: 1, flatNumber: "101", status: "occupied", residentId: "user-resident-5", residentName: "Amit Joshi" },
+  { id: "FL-C102", building: "C Wing", wing: "C", floor: 1, flatNumber: "102", status: "occupied", residentId: "user-resident-14", residentName: "Deepak Patel" },
+  { id: "FL-C201", building: "C Wing", wing: "C", floor: 2, flatNumber: "201", status: "occupied", residentId: "user-resident-9", residentName: "Priya Desai" },
+  { id: "FL-C202", building: "C Wing", wing: "C", floor: 2, flatNumber: "202", status: "occupied", residentId: "user-resident-15", residentName: "Meera Iyer" },
+  { id: "FL-C301", building: "C Wing", wing: "C", floor: 3, flatNumber: "301", status: "occupied", residentId: "user-resident-16", residentName: "Suresh Nair" }
 ];
 
 export const getPrepopulatedRentRecords = (): RentRecord[] => [

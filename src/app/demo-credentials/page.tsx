@@ -80,7 +80,18 @@ function DemoCredentialsContent() {
   const hostelUsers = users.filter(u => u.portal === "hostel");
 
   // Society subdivisions
-  const societyResidents = societyUsers.filter(u => u.role === "resident");
+  const societyResidents = useMemo(() => {
+    return societyUsers
+      .filter(u => u.role === "resident")
+      .sort((a, b) => {
+        const wingA = (a.building || "").toUpperCase();
+        const wingB = (b.building || "").toUpperCase();
+        if (wingA !== wingB) return wingA.localeCompare(wingB);
+        const numA = parseInt((a.unit || "").replace(/\D/g, ""), 10) || 0;
+        const numB = parseInt((b.unit || "").replace(/\D/g, ""), 10) || 0;
+        return numA - numB;
+      });
+  }, [societyUsers]);
   const societySecretary = societyUsers.filter(u => u.role === "secretary");
   const societySecurity = societyUsers.filter(u => u.role === "security");
   const societyWorker = societyUsers.filter(u => u.role === "worker");

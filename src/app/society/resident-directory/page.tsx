@@ -32,9 +32,18 @@ export default function ResidentDirectoryPage() {
 
   if (!mounted) return null;
 
-  const approvedResidents = users.filter(
-    (u) => u.role === "resident" && u.status === "approved" && u.communityCode === user?.communityCode
-  );
+  const approvedResidents = users
+    .filter(
+      (u) => (u.role === "resident" || u.role === "secretary") && u.status === "approved" && (!user?.communityCode || u.communityCode === user.communityCode)
+    )
+    .sort((a, b) => {
+      const wingA = (a.building || "").toUpperCase();
+      const wingB = (b.building || "").toUpperCase();
+      if (wingA !== wingB) return wingA.localeCompare(wingB);
+      const numA = parseInt((a.unit || "").replace(/\D/g, ""), 10) || 0;
+      const numB = parseInt((b.unit || "").replace(/\D/g, ""), 10) || 0;
+      return numA - numB;
+    });
 
   const filteredResidents = approvedResidents.filter((r) => {
     return r.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -83,7 +92,7 @@ export default function ResidentDirectoryPage() {
 
                 <div className="flex gap-2">
                   <Badge variant="outline" className="text-[9px] capitalize py-0.5 bg-secondary/50">
-                    {r.ownerOrTenant || "Resident"}
+                    {r.role === "secretary" ? "Secretary" : (r.ownerOrTenant || "Resident")}
                   </Badge>
                   <Badge variant="outline" className="text-[9px] py-0.5 bg-emerald-500/10 text-emerald-500 border-emerald-500/25">
                     Verified Active

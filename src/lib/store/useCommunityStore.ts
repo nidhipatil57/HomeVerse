@@ -583,11 +583,68 @@ interface CommunityState {
 const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
   if (typeof window !== "undefined") {
     try {
+      if (key === "collections") {
+        localStorage.removeItem("homeverse_collections");
+        return [] as unknown as T;
+      }
       const stored = localStorage.getItem(`homeverse_${key}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed as unknown as T;
+        if (Array.isArray(parsed)) {
+          if (key === "users") {
+            const seeds = seedFn() as any[];
+            const hasNewUser = parsed.some((u: any) => u.id === "user-resident-16");
+            const secIn301 = parsed.some((u: any) => u.id === "user-secretary-1" && u.unit === "301");
+            if (!hasNewUser || !secIn301) {
+              localStorage.setItem("homeverse_users", JSON.stringify(seeds));
+              return seeds as unknown as T;
+            }
+          }
+          if (key === "flats") {
+            const seeds = seedFn() as any[];
+            const hasC301 = parsed.some((f: any) => f.id === "FL-C301");
+            if (!hasC301 || parsed.length < seeds.length) {
+              localStorage.setItem("homeverse_flats", JSON.stringify(seeds));
+              return seeds as unknown as T;
+            }
+          }
+          if (key === "payments") {
+            const seeds = seedFn() as any[];
+            const hasNewUserOct = parsed.some((p: any) => p.residentId === "user-resident-16" && p.id?.includes("OCT"));
+            if (!hasNewUserOct) {
+              localStorage.setItem("homeverse_payments", JSON.stringify(seeds));
+              return seeds as unknown as T;
+            }
+            const cleaned = parsed.filter(
+              (p: any) =>
+                (p.paymentType === "Maintenance" ||
+                 p.paymentType?.includes("Ganesh") ||
+                 p.paymentType?.includes("Navratri")) &&
+                !(p.paymentType !== "Maintenance" && p.status === "pending")
+            );
+            const hasOctober = cleaned.some((p: any) => p.id?.includes("OCT") || (p.description || "").includes("October 2026"));
+            const hasNavratri = cleaned.some((p: any) => p.paymentType?.includes("Navratri") && p.status === "paid");
+            const hasSeptember = cleaned.some((p: any) => (p.description || "").includes("September 2026"));
+            const finalPayments = (hasOctober && hasNavratri && hasSeptember) ? cleaned : seeds;
+            localStorage.setItem("homeverse_payments", JSON.stringify(finalPayments));
+            return finalPayments as unknown as T;
+          }
+          if (key === "maintenanceBills") {
+            const seeds = seedFn() as any[];
+            const hasNewUserOct = parsed.some((b: any) => b.residentId === "user-resident-16" && b.month === "October 2026");
+            if (!hasNewUserOct) {
+              localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(seeds));
+              return seeds as unknown as T;
+            }
+            const hasOctober = parsed.some((b: any) => b.id?.includes("OCT") || b.month === "October 2026");
+            const hasSeptember = parsed.some((b: any) => b.month === "September 2026" && b.status === "paid");
+            const finalBills = (hasOctober && hasSeptember) ? parsed : seeds;
+            localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(finalBills));
+            return finalBills as unknown as T;
+          }
+          if (parsed.length > 0) {
+            return parsed as unknown as T;
+          }
         }
       }
     } catch (e) {}
@@ -642,6 +699,86 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     // Load any localStorage data if store currently has empty arrays
     const state = get();
     const localUpdates: Partial<CommunityState> = {};
+
+    // Purge legacy special occasion payments/collections and ensure October bills are active
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("homeverse_collections");
+        localUpdates.collections = [];
+
+        const storedPayments = localStorage.getItem("homeverse_payments");
+        let finalPayments = getPrepopulatedPayments();
+        if (storedPayments) {
+          try {
+            const parsed = JSON.parse(storedPayments);
+            if (Array.isArray(parsed)) {
+              const cleaned = parsed.filter(
+                (p: any) =>
+                  (p.paymentType === "Maintenance" ||
+                   p.paymentType?.includes("Ganesh") ||
+                   p.paymentType?.includes("Navratri")) &&
+                  !(p.paymentType !== "Maintenance" && p.status === "pending")
+              );
+              const hasNav = cleaned.some((p: any) => p.paymentType?.includes("Navratri") && p.status === "paid");
+              const hasSep = cleaned.some((p: any) => (p.description || "").includes("September 2026"));
+              const hasOct = cleaned.some((p: any) => (p.description || "").includes("October 2026") || p.id?.includes("OCT"));
+              const hasNewUserOct = cleaned.some((p: any) => p.residentId === "user-resident-16" && p.id?.includes("OCT"));
+              if (hasNav && hasSep && hasOct && hasNewUserOct) {
+                finalPayments = cleaned;
+              }
+            }
+          } catch (e) {}
+        }
+        localStorage.setItem("homeverse_payments", JSON.stringify(finalPayments));
+        localUpdates.payments = finalPayments;
+
+        const storedBills = localStorage.getItem("homeverse_maintenanceBills");
+        let finalBills = getPrepopulatedMaintenanceBills();
+        if (storedBills) {
+          try {
+            const parsed = JSON.parse(storedBills);
+            if (Array.isArray(parsed)) {
+              const hasSep = parsed.some((b: any) => b.month === "September 2026" && b.status === "paid");
+              const hasOct = parsed.some((b: any) => b.month === "October 2026" && b.status === "pending");
+              const hasNewUserOct = parsed.some((b: any) => b.residentId === "user-resident-16" && b.month === "October 2026");
+              if (hasSep && hasOct && hasNewUserOct) {
+                finalBills = parsed;
+              }
+            }
+          } catch (e) {}
+        }
+        localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(finalBills));
+        localUpdates.maintenanceBills = finalBills;
+
+        // Ensure users and flats are updated
+        const storedUsers = localStorage.getItem("homeverse_users");
+        let finalUsers = getPrepopulatedUsers();
+        if (storedUsers) {
+          try {
+            const parsed = JSON.parse(storedUsers);
+            if (Array.isArray(parsed) && parsed.some((u: any) => u.id === "user-resident-16") && parsed.some((u: any) => u.id === "user-secretary-1" && u.unit === "301")) {
+              finalUsers = parsed;
+            }
+          } catch (e) {}
+        }
+        localStorage.setItem("homeverse_users", JSON.stringify(finalUsers));
+        localUpdates.users = finalUsers;
+
+        const storedFlats = localStorage.getItem("homeverse_flats");
+        let finalFlats = getPrepopulatedFlats();
+        if (storedFlats) {
+          try {
+            const parsed = JSON.parse(storedFlats);
+            if (Array.isArray(parsed) && parsed.some((f: any) => f.id === "FL-C301") && parsed.length >= 17) {
+              finalFlats = parsed;
+            }
+          } catch (e) {}
+        }
+        localStorage.setItem("homeverse_flats", JSON.stringify(finalFlats));
+        localUpdates.flats = finalFlats;
+      } catch (e) {}
+    }
+
     const syncKeys = [
       "payments", "collections", "maintenanceBills", "rentRecords", "expenses",
       "complaints", "visitors", "parcels", "announcements", "users"
