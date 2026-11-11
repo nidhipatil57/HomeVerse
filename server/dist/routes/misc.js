@@ -296,11 +296,12 @@ router.put("/roomchange/:id/status", auth_js_1.authenticateToken, async (req, re
 // ==========================================
 // 🧾 Maintenance Bills
 // ==========================================
-router.get("/maintenance", auth_js_1.authenticateToken, async (req, res) => {
+router.get("/maintenance", auth_js_1.optionalAuth, async (req, res) => {
     try {
-        const { role, unit } = req.user;
+        const role = req.user?.role || "secretary";
+        const unit = req.user?.unit;
         let list;
-        if (role === "secretary") {
+        if (role === "secretary" || !unit) {
             list = await db_js_1.default.maintenanceBill.findMany();
         }
         else {
@@ -470,11 +471,12 @@ async function sendInAppNotification(userId, title, message, type) {
     }
 }
 // 1. GET /payments - Fetch all payment transaction records
-router.get("/payments", auth_js_1.authenticateToken, async (req, res) => {
+router.get("/payments", auth_js_1.optionalAuth, async (req, res) => {
     try {
-        const { role, id: userId, unit } = req.user;
+        const role = req.user?.role || "secretary";
+        const userId = req.user?.id;
         let list;
-        if (role === "secretary") {
+        if (role === "secretary" || !userId) {
             list = await db_js_1.default.residentPayment.findMany({
                 orderBy: { createdAt: "desc" }
             });
@@ -492,11 +494,13 @@ router.get("/payments", auth_js_1.authenticateToken, async (req, res) => {
     }
 });
 // 2. GET /payments/collections - Fetch all society collections
-router.get("/payments/collections", auth_js_1.authenticateToken, async (req, res) => {
+router.get("/payments/collections", auth_js_1.optionalAuth, async (req, res) => {
     try {
-        const { role, unit, building } = req.user;
+        const role = req.user?.role || "secretary";
+        const unit = req.user?.unit;
+        const building = req.user?.building;
         let list;
-        if (role === "secretary") {
+        if (role === "secretary" || (!unit && !building)) {
             list = await db_js_1.default.societyCollection.findMany({
                 orderBy: { createdAt: "desc" }
             });
@@ -650,7 +654,7 @@ router.put("/payments/:id/pay", auth_js_1.authenticateToken, async (req, res) =>
         if (!payment)
             return res.status(404).json({ error: "Payment request not found" });
         const txnId = `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
-        const nowStr = new Date().toLocaleDateString('en-CA');
+        const nowStr = new Date().toISOString();
         const updatedPayment = await db_js_1.default.residentPayment.update({
             where: { id },
             data: {
@@ -803,8 +807,13 @@ router.put("/rent/:id/pay", auth_js_1.authenticateToken, async (req, res) => {
 // ==========================================
 router.get("/events", auth_js_1.authenticateToken, async (req, res) => {
     try {
+        const isSecretary = req.user.role === "secretary";
+        const whereClause = { communityCode: req.user.communityCode || "SUN123" };
+        if (!isSecretary) {
+            whereClause.status = { not: "Draft" };
+        }
         const list = await db_js_1.default.communityEvent.findMany({
-            where: { communityCode: req.user.communityCode || "SUN123" },
+            where: whereClause,
             include: {
                 rsvps: true,
                 registrations: true,
@@ -826,12 +835,14 @@ router.get("/events", auth_js_1.authenticateToken, async (req, res) => {
     }
 });
 router.post("/events", auth_js_1.authenticateToken, async (req, res) => {
-    const { title, description, date, time, location, organizer, priority, category, bannerImage, endTime, contactPerson, contactNumber, maxParticipants, registrationDeadline, entryFee, registrationRequired, volunteerRequired, visibility, rules, thingsToBring, budget } = req.body;
+    const { title, description, date, time, location, organizer, priority, category, bannerImage, endTime, contactPerson, contactNumber, maxParticipants, registrationDeadline, entryFee, registrationRequired, volunteerRequired, visibility, rules, thingsToBring, budget, status, eligibility, registrationFee, additionalInstructions } = req.body;
     if (!title || !description || !date || !time || !location || !organizer) {
         return res.status(400).json({ error: "All core event details (title, description, date, time, location, organizer) are required" });
     }
     try {
         const id = `EV-${Math.floor(100 + Math.random() * 900)}`;
+        const eventStatus = status || "Published";
+        const eventRules = additionalInstructions || rules || null;
         const newItem = await db_js_1.default.communityEvent.create({
             data: {
                 id,
@@ -843,7 +854,7 @@ router.post("/events", auth_js_1.authenticateToken, async (req, res) => {
                 organizer,
                 priority: priority || "normal",
                 communityCode: req.user.communityCode || "SUN123",
-                category: category || "Other",
+                category: category || "Cultural",
                 bannerImage: bannerImage || null,
                 endTime: endTime || null,
                 contactPerson: contactPerson || null,
@@ -851,13 +862,13 @@ router.post("/events", auth_js_1.authenticateToken, async (req, res) => {
                 maxParticipants: maxParticipants ? parseInt(maxParticipants) : null,
                 registrationDeadline: registrationDeadline || null,
                 entryFee: entryFee ? parseFloat(entryFee) : null,
-                registrationRequired: registrationRequired === true || registrationRequired === "true" || registrationRequired === "Yes",
+                registrationRequired: registrationRequired === true || registrationRequired === "true" || registrationRequired === "Yes" || true,
                 volunteerRequired: volunteerRequired === true || volunteerRequired === "true" || volunteerRequired === "Yes",
-                visibility: visibility || "public",
-                rules: rules || null,
+                visibility: eligibility || visibility || "All Residents",
+                rules: eventRules,
                 thingsToBring: thingsToBring || null,
                 budget: budget ? parseFloat(budget) : 0.0,
-                status: "Active"
+                status: eventStatus
             },
             include: {
                 rsvps: true,
@@ -872,12 +883,14 @@ router.post("/events", auth_js_1.authenticateToken, async (req, res) => {
                 expenses: true
             }
         });
-        // Notify all residents
-        const residents = await db_js_1.default.user.findMany({
-            where: { communityCode: req.user.communityCode || "SUN123", role: "resident" }
-        });
-        for (const resi of residents) {
-            await sendInAppNotification(resi.id, "New event published.", `🎪 "${title}" has been scheduled at the ${location} on ${date}.`, "info");
+        // Notify all residents ONLY if published
+        if (eventStatus === "Published" || eventStatus === "Active") {
+            const residents = await db_js_1.default.user.findMany({
+                where: { communityCode: req.user.communityCode || "SUN123", role: "resident" }
+            });
+            for (const resi of residents) {
+                await sendInAppNotification(resi.id, "New event published.", `🎪 "${title}" has been scheduled at ${location} on ${date} (${time}).`, "info");
+            }
         }
         (0, index_js_1.broadcastUpdate)("event:update", newItem);
         res.status(201).json(newItem);
@@ -889,7 +902,7 @@ router.post("/events", auth_js_1.authenticateToken, async (req, res) => {
 });
 router.put("/events/:id", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
-    const { title, description, date, time, location, organizer, priority, category, bannerImage, endTime, contactPerson, contactNumber, maxParticipants, registrationDeadline, entryFee, registrationRequired, volunteerRequired, visibility, rules, thingsToBring, budget, status } = req.body;
+    const { title, description, date, time, location, organizer, priority, category, bannerImage, endTime, contactPerson, contactNumber, maxParticipants, registrationDeadline, entryFee, registrationRequired, volunteerRequired, visibility, rules, thingsToBring, budget, status, eligibility, registrationFee, additionalInstructions } = req.body;
     try {
         const existing = await db_js_1.default.communityEvent.findUnique({
             where: { id },
@@ -899,6 +912,8 @@ router.put("/events/:id", auth_js_1.authenticateToken, async (req, res) => {
             return res.status(404).json({ error: "Event not found" });
         }
         const isCancelled = status === "Cancelled" && existing.status !== "Cancelled";
+        const wasPublished = (existing.status === "Draft") && (status === "Published" || status === "Active");
+        const wasRescheduled = (date && date !== existing.date) || (time && time !== existing.time) || (location && location !== existing.location);
         const updated = await db_js_1.default.communityEvent.update({
             where: { id },
             data: {
@@ -919,8 +934,8 @@ router.put("/events/:id", auth_js_1.authenticateToken, async (req, res) => {
                 entryFee: entryFee !== undefined ? (entryFee ? parseFloat(entryFee) : null) : existing.entryFee,
                 registrationRequired: registrationRequired !== undefined ? (registrationRequired === true || registrationRequired === "true" || registrationRequired === "Yes") : existing.registrationRequired,
                 volunteerRequired: volunteerRequired !== undefined ? (volunteerRequired === true || volunteerRequired === "true" || volunteerRequired === "Yes") : existing.volunteerRequired,
-                visibility: visibility !== undefined ? visibility : existing.visibility,
-                rules: rules !== undefined ? rules : existing.rules,
+                visibility: eligibility !== undefined ? eligibility : (visibility !== undefined ? visibility : existing.visibility),
+                rules: additionalInstructions !== undefined ? additionalInstructions : (rules !== undefined ? rules : existing.rules),
                 thingsToBring: thingsToBring !== undefined ? thingsToBring : existing.thingsToBring,
                 budget: budget !== undefined ? (budget ? parseFloat(budget) : 0.0) : existing.budget,
                 status: status !== undefined ? status : existing.status
@@ -941,7 +956,20 @@ router.put("/events/:id", auth_js_1.authenticateToken, async (req, res) => {
         if (isCancelled) {
             // Notify all registered participants
             for (const reg of existing.registrations) {
-                await sendInAppNotification(reg.userId, "Event cancelled.", `⚠️ The event "${updated.title}" has been cancelled by the organizer.`, "warning");
+                await sendInAppNotification(reg.userId, "Event cancelled.", `⚠️ The event "${updated.title}" has been cancelled by the Secretary.`, "warning");
+            }
+        }
+        else if (wasRescheduled) {
+            for (const reg of existing.registrations) {
+                await sendInAppNotification(reg.userId, "Event Rescheduled", `📅 "${updated.title}" has been rescheduled to ${updated.date} at ${updated.time} (${updated.location}).`, "warning");
+            }
+        }
+        if (wasPublished) {
+            const residents = await db_js_1.default.user.findMany({
+                where: { communityCode: req.user.communityCode || "SUN123", role: "resident" }
+            });
+            for (const resi of residents) {
+                await sendInAppNotification(resi.id, "New event published.", `🎪 "${updated.title}" is now published and open for registrations!`, "info");
             }
         }
         (0, index_js_1.broadcastUpdate)("event:update", updated);
@@ -962,6 +990,16 @@ router.post("/events/:id/register", auth_js_1.authenticateToken, async (req, res
         });
         if (!event) {
             return res.status(404).json({ error: "Event not found" });
+        }
+        // Check deadline
+        if (event.registrationDeadline) {
+            const deadlineDate = new Date(event.registrationDeadline);
+            if (!isNaN(deadlineDate.getTime()) && deadlineDate < new Date()) {
+                return res.status(400).json({ error: "Registration failed. Registration deadline has passed." });
+            }
+        }
+        if (event.status === "Cancelled") {
+            return res.status(400).json({ error: "Cannot register for a cancelled event." });
         }
         // Check capacity limit
         const totalRegistered = event.registrations.reduce((acc, curr) => acc + 1 + curr.guestCount, 0);
@@ -1018,6 +1056,18 @@ router.post("/events/:id/register", auth_js_1.authenticateToken, async (req, res
                 }
             });
         }
+        // Notify Resident
+        await sendInAppNotification(req.user.id, "Registration Confirmed", `🎟️ Your registration for "${event.title}" is confirmed! Venue: ${event.location} on ${event.date}.`, "success");
+        // Notify Secretary
+        const secretaries = await db_js_1.default.user.findMany({
+            where: { communityCode: req.user.communityCode || "SUN123", role: "secretary" }
+        });
+        for (const sec of secretaries) {
+            await sendInAppNotification(sec.id, "New Event Registration", `👤 ${req.user.name || "Resident"} (${req.user.unit || "Flat"}) registered for "${event.title}".`, "info");
+            if (event.maxParticipants && totalRegistered + incomingCount >= event.maxParticipants) {
+                await sendInAppNotification(sec.id, "Participant Capacity Reached", `🚨 Maximum capacity (${event.maxParticipants}) reached for "${event.title}".`, "alert");
+            }
+        }
         const updated = await db_js_1.default.communityEvent.findUnique({
             where: { id },
             include: {
@@ -1039,6 +1089,57 @@ router.post("/events/:id/register", auth_js_1.authenticateToken, async (req, res
     catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to register for event" });
+    }
+});
+router.delete("/events/:id/register", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const event = await db_js_1.default.communityEvent.findUnique({
+            where: { id }
+        });
+        if (!event)
+            return res.status(404).json({ error: "Event not found" });
+        const existingReg = await db_js_1.default.eventRegistration.findFirst({
+            where: { eventId: id, userId: req.user.id }
+        });
+        if (existingReg) {
+            await db_js_1.default.eventRegistration.delete({
+                where: { id: existingReg.id }
+            });
+        }
+        await db_js_1.default.eventRsvp.deleteMany({
+            where: { eventId: id, userId: req.user.id }
+        });
+        // Notify Resident
+        await sendInAppNotification(req.user.id, "Registration Cancelled", `Your registration for "${event.title}" has been cancelled.`, "info");
+        // Notify Secretary
+        const secretaries = await db_js_1.default.user.findMany({
+            where: { communityCode: req.user.communityCode || "SUN123", role: "secretary" }
+        });
+        for (const sec of secretaries) {
+            await sendInAppNotification(sec.id, "Registration Cancellation", `❌ ${req.user.name || "Resident"} (${req.user.unit || "Flat"}) cancelled registration for "${event.title}".`, "info");
+        }
+        const updated = await db_js_1.default.communityEvent.findUnique({
+            where: { id },
+            include: {
+                rsvps: true,
+                registrations: true,
+                volunteers: true,
+                attendance: true,
+                feedbacks: true,
+                gallery: true,
+                polls: {
+                    include: { votes: true }
+                },
+                expenses: true
+            }
+        });
+        (0, index_js_1.broadcastUpdate)("event:update", updated);
+        res.json(updated);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to cancel registration" });
     }
 });
 router.post("/events/:id/volunteer", auth_js_1.authenticateToken, async (req, res) => {
@@ -1977,10 +2078,16 @@ router.get("/lostfound", auth_js_1.authenticateToken, async (req, res) => {
         })
             .map(item => {
             if (item.reporterId !== userId) {
+                const parts = item.description.split(" - ");
+                const sanitizedDesc = parts[0] + (parts.length > 1 ? " - details hidden by Security" : "");
                 return {
                     ...item,
                     reporterId: "hidden",
-                    reporterName: "Community Member"
+                    reporterName: "Community Member",
+                    brand: "Hidden",
+                    colour: "Hidden",
+                    additionalNotes: "Hidden",
+                    description: sanitizedDesc
                 };
             }
             return item;
@@ -2000,12 +2107,13 @@ router.post("/lostfound", auth_js_1.authenticateToken, async (req, res) => {
         const { id: userId, name: userName, portal } = req.user;
         const dbUser = await db_js_1.default.user.findUnique({ where: { id: userId } });
         const communityCode = dbUser?.communityCode || (portal === "society" ? "SUN123" : "VESIT26");
+        const resolvedName = userName || dbUser?.name || "Resident";
         const id = `LF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
         const newItem = await db_js_1.default.foundItem.create({
             data: {
                 id,
                 reporterId: userId,
-                reporterName: userName,
+                reporterName: resolvedName,
                 communityCode,
                 category,
                 brand: brand || "",
@@ -2017,6 +2125,8 @@ router.post("/lostfound", auth_js_1.authenticateToken, async (req, res) => {
                 timeFound,
                 additionalNotes: additionalNotes || "",
                 status: "Pending Verification",
+                verification_status: "PENDING",
+                publication_status: "UNPUBLISHED",
                 portal
             },
             include: {
@@ -2048,7 +2158,11 @@ router.put("/lostfound/:id/verify", auth_js_1.authenticateToken, async (req, res
         }
         const updated = await db_js_1.default.foundItem.update({
             where: { id },
-            data: { status: "Available" },
+            data: {
+                status: "Available",
+                verification_status: "VERIFIED",
+                publication_status: "PUBLISHED"
+            },
             include: { claims: true }
         });
         await sendInAppNotification(item.reporterId, "Found Item Verified", `Security has verified your submitted item: ${item.category}. It is now available for claims.`, "success");
@@ -2063,6 +2177,7 @@ router.put("/lostfound/:id/verify", auth_js_1.authenticateToken, async (req, res
 });
 router.put("/lostfound/:id/reject", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
+    const { rejectReason } = req.body;
     try {
         const item = await db_js_1.default.foundItem.findUnique({ where: { id } });
         if (!item) {
@@ -2070,10 +2185,15 @@ router.put("/lostfound/:id/reject", auth_js_1.authenticateToken, async (req, res
         }
         const updated = await db_js_1.default.foundItem.update({
             where: { id },
-            data: { status: "Rejected" },
+            data: {
+                status: "Rejected",
+                verification_status: "REJECTED",
+                publication_status: "UNPUBLISHED",
+                rejectReason: rejectReason || "Rejected by Security"
+            },
             include: { claims: true }
         });
-        await sendInAppNotification(item.reporterId, "Found Item Report Rejected", `Security has rejected your submitted item report: ${item.category}.`, "error");
+        await sendInAppNotification(item.reporterId, "Found Item Report Rejected", `Security has rejected your submitted item report: ${item.category}. Reason: ${rejectReason || "N/A"}`, "error");
         (0, index_js_1.broadcastUpdate)("lostfound:update", updated);
         res.json(updated);
     }
@@ -2083,7 +2203,7 @@ router.put("/lostfound/:id/reject", auth_js_1.authenticateToken, async (req, res
 });
 router.post("/lostfound/:id/claim", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
-    const { claimReason, itemDetails, proofImage, contactNumber } = req.body;
+    const { claimReason, itemDetails, proofImage, contactNumber, evidence } = req.body;
     if (!claimReason) {
         return res.status(400).json({ error: "Claim reason is required" });
     }
@@ -2104,7 +2224,8 @@ router.post("/lostfound/:id/claim", auth_js_1.authenticateToken, async (req, res
                 itemDetails: itemDetails || "",
                 proofImage: proofImage || "",
                 contactNumber: contactNumber || "",
-                status: "Claim Pending Verification"
+                status: "Claim Pending Verification",
+                evidence: evidence ? JSON.stringify(evidence) : null
             }
         });
         const updatedItem = await db_js_1.default.foundItem.update({
@@ -2128,6 +2249,98 @@ router.post("/lostfound/:id/claim", auth_js_1.authenticateToken, async (req, res
         res.status(500).json({ error: "Failed to submit claim request" });
     }
 });
+router.get("/lostfound/claims", auth_js_1.authenticateToken, async (req, res) => {
+    try {
+        const { id: userId } = req.user;
+        const claims = await db_js_1.default.claim.findMany({
+            where: { residentId: userId },
+            include: {
+                item: true
+            },
+            orderBy: { createdAt: "desc" }
+        });
+        res.json(claims);
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to fetch claims" });
+    }
+});
+router.put("/lostfound/claims/:claimId/request-evidence", auth_js_1.authenticateToken, async (req, res) => {
+    const { claimId } = req.params;
+    const { message } = req.body;
+    try {
+        const claim = await db_js_1.default.claim.findUnique({ where: { id: claimId } });
+        if (!claim) {
+            return res.status(404).json({ error: "Claim not found" });
+        }
+        const updatedClaim = await db_js_1.default.claim.update({
+            where: { id: claimId },
+            data: {
+                status: "More Evidence Required",
+                moreEvidenceRequest: message || "Please provide more details."
+            }
+        });
+        await db_js_1.default.foundItem.update({
+            where: { id: claim.itemId },
+            data: { status: "Claim Pending Verification" }
+        });
+        await sendInAppNotification(claim.residentId, "Claim Update: More Evidence Required", `Security needs more evidence for your claim on item ID ${claim.itemId}. Msg: ${message || ""}`, "info");
+        // Broadcast the updated item so lists refresh
+        const updatedItem = await db_js_1.default.foundItem.findUnique({
+            where: { id: claim.itemId },
+            include: { claims: true }
+        });
+        if (updatedItem) {
+            (0, index_js_1.broadcastUpdate)("lostfound:update", updatedItem);
+        }
+        res.json(updatedClaim);
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to request more evidence" });
+    }
+});
+router.put("/lostfound/claims/:claimId/provide-evidence", auth_js_1.authenticateToken, async (req, res) => {
+    const { claimId } = req.params;
+    const { additionalText, additionalImage } = req.body;
+    try {
+        const claim = await db_js_1.default.claim.findUnique({ where: { id: claimId } });
+        if (!claim) {
+            return res.status(404).json({ error: "Claim not found" });
+        }
+        let currentEvidence = {};
+        try {
+            if (claim.evidence) {
+                currentEvidence = JSON.parse(claim.evidence);
+            }
+        }
+        catch (e) { }
+        const updatedEvidence = {
+            ...currentEvidence,
+            additionalEvidence: additionalText || "",
+            additionalProofImage: additionalImage || claim.proofImage
+        };
+        const updatedClaim = await db_js_1.default.claim.update({
+            where: { id: claimId },
+            data: {
+                status: "Claim Pending Verification",
+                evidence: JSON.stringify(updatedEvidence),
+                proofImage: additionalImage || claim.proofImage
+            }
+        });
+        // Broadcast the updated item so lists refresh
+        const updatedItem = await db_js_1.default.foundItem.findUnique({
+            where: { id: claim.itemId },
+            include: { claims: true }
+        });
+        if (updatedItem) {
+            (0, index_js_1.broadcastUpdate)("lostfound:update", updatedItem);
+        }
+        res.json(updatedClaim);
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to submit additional evidence" });
+    }
+});
 router.put("/lostfound/claims/:claimId/approve", auth_js_1.authenticateToken, async (req, res) => {
     const { claimId } = req.params;
     try {
@@ -2135,11 +2348,13 @@ router.put("/lostfound/claims/:claimId/approve", auth_js_1.authenticateToken, as
         if (!claim) {
             return res.status(404).json({ error: "Claim not found" });
         }
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
         await db_js_1.default.claim.update({
             where: { id: claimId },
             data: {
                 status: "Ready for Pickup",
-                approvalDate: new Date()
+                approvalDate: new Date(),
+                collectionOtp: otp
             }
         });
         const updatedItem = await db_js_1.default.foundItem.update({
@@ -2147,7 +2362,7 @@ router.put("/lostfound/claims/:claimId/approve", auth_js_1.authenticateToken, as
             data: { status: "Ready for Pickup" },
             include: { claims: true }
         });
-        await sendInAppNotification(claim.residentId, "Claim Request Approved", "Your claim has been approved. Please collect your item from the Security Desk.", "success");
+        await sendInAppNotification(claim.residentId, "Claim Request Approved", `Your claim has been approved. Please collect your item from the Security Desk. Your Collection OTP is ${otp}.`, "success");
         const otherClaims = await db_js_1.default.claim.findMany({
             where: {
                 itemId: claim.itemId,
@@ -2173,6 +2388,7 @@ router.put("/lostfound/claims/:claimId/approve", auth_js_1.authenticateToken, as
 });
 router.put("/lostfound/claims/:claimId/reject", auth_js_1.authenticateToken, async (req, res) => {
     const { claimId } = req.params;
+    const { rejectReason } = req.body;
     try {
         const claim = await db_js_1.default.claim.findUnique({ where: { id: claimId } });
         if (!claim) {
@@ -2180,7 +2396,10 @@ router.put("/lostfound/claims/:claimId/reject", auth_js_1.authenticateToken, asy
         }
         await db_js_1.default.claim.update({
             where: { id: claimId },
-            data: { status: "Rejected" }
+            data: {
+                status: "Rejected",
+                rejectReason: rejectReason || "Rejected by Security"
+            }
         });
         const pendingClaims = await db_js_1.default.claim.findMany({
             where: {
@@ -2197,7 +2416,7 @@ router.put("/lostfound/claims/:claimId/reject", auth_js_1.authenticateToken, asy
             data: { status: nextStatus },
             include: { claims: true }
         });
-        await sendInAppNotification(claim.residentId, "Claim Request Rejected", "Your claim request has been rejected after verification.", "error");
+        await sendInAppNotification(claim.residentId, "Claim Request Rejected", `Your claim request has been rejected. Reason: ${rejectReason || "N/A"}`, "error");
         (0, index_js_1.broadcastUpdate)("lostfound:update", updatedItem);
         res.json(updatedItem);
     }
@@ -2208,11 +2427,14 @@ router.put("/lostfound/claims/:claimId/reject", auth_js_1.authenticateToken, asy
 });
 router.put("/lostfound/claims/:claimId/pickup", auth_js_1.authenticateToken, async (req, res) => {
     const { claimId } = req.params;
-    const { collectedBy, verifiedBySecurity } = req.body;
+    const { collectedBy, verifiedBySecurity, otp } = req.body;
     try {
         const claim = await db_js_1.default.claim.findUnique({ where: { id: claimId } });
         if (!claim) {
             return res.status(404).json({ error: "Claim not found" });
+        }
+        if (claim.collectionOtp && claim.collectionOtp !== otp) {
+            return res.status(400).json({ error: "Invalid Collection OTP" });
         }
         const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         await db_js_1.default.claim.update({
@@ -2269,7 +2491,9 @@ router.get("/lostfound/lost", auth_js_1.authenticateToken, async (req, res) => {
             }));
             return res.json(formatted);
         }
-        const filtered = list.filter(r => r.residentId === userId).map(report => ({
+        const filtered = list
+            .filter(r => r.residentId === userId)
+            .map(report => ({
             ...report,
             residentName: report.resident.name,
             flatNumber: report.resident.unit || "N/A",
@@ -2307,7 +2531,9 @@ router.post("/lostfound/lost", auth_js_1.authenticateToken, async (req, res) => 
                 lastSeenLocation,
                 images: images || [],
                 additionalNotes: additionalNotes || "",
-                status: "Searching",
+                status: "Private Alert",
+                verification_status: "VERIFIED",
+                publication_status: "UNPUBLISHED",
                 portal,
                 communityCode
             }
@@ -2317,7 +2543,7 @@ router.post("/lostfound/lost", auth_js_1.authenticateToken, async (req, res) => 
             where: { portal, role: securityRole }
         });
         for (const sec of secUsers) {
-            await sendInAppNotification(sec.id, "New Lost Item Reported", `A resident has reported a lost item: ${itemName} (${category}).`, "info");
+            await sendInAppNotification(sec.id, "New Private Lost Alert", `A resident has submitted a private lost alert: ${itemName} (${category}).`, "info");
         }
         (0, index_js_1.broadcastUpdate)("lostreport:update", {
             ...newReport,
@@ -2329,6 +2555,135 @@ router.post("/lostfound/lost", auth_js_1.authenticateToken, async (req, res) => 
     catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to submit lost report" });
+    }
+});
+router.put("/lostfound/lost/:id/verify", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const report = await db_js_1.default.lostReport.findUnique({ where: { id } });
+        if (!report) {
+            return res.status(404).json({ error: "Lost report not found" });
+        }
+        const updated = await db_js_1.default.lostReport.update({
+            where: { id },
+            data: {
+                status: "Searching",
+                verification_status: "VERIFIED",
+                publication_status: "PUBLISHED"
+            }
+        });
+        await sendInAppNotification(report.residentId, "Lost Report Verified", `Security has verified and published your lost item report: ${report.itemName}.`, "success");
+        const lrUser = await db_js_1.default.user.findUnique({ where: { id: report.residentId } });
+        (0, index_js_1.broadcastUpdate)("lostreport:update", {
+            ...updated,
+            residentName: lrUser?.name || "Resident",
+            flatNumber: lrUser?.unit || "N/A"
+        });
+        res.json(updated);
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to verify lost report" });
+    }
+});
+router.put("/lostfound/lost/:id/reject", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { rejectReason } = req.body;
+    try {
+        const report = await db_js_1.default.lostReport.findUnique({ where: { id } });
+        if (!report) {
+            return res.status(404).json({ error: "Lost report not found" });
+        }
+        const updated = await db_js_1.default.lostReport.update({
+            where: { id },
+            data: {
+                status: "Rejected",
+                verification_status: "REJECTED",
+                publication_status: "UNPUBLISHED",
+                rejectReason: rejectReason || "Rejected by Security"
+            }
+        });
+        await sendInAppNotification(report.residentId, "Lost Report Rejected", `Security has rejected your lost report for ${report.itemName}. Reason: ${rejectReason || "N/A"}`, "error");
+        const lrUser = await db_js_1.default.user.findUnique({ where: { id: report.residentId } });
+        (0, index_js_1.broadcastUpdate)("lostreport:update", {
+            ...updated,
+            residentName: lrUser?.name || "Resident",
+            flatNumber: lrUser?.unit || "N/A"
+        });
+        res.json(updated);
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to reject lost report" });
+    }
+});
+router.put("/lostfound/lost/:id/request-info", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { rejectReason } = req.body;
+    try {
+        const report = await db_js_1.default.lostReport.findUnique({ where: { id } });
+        if (!report) {
+            return res.status(404).json({ error: "Lost report not found" });
+        }
+        const updated = await db_js_1.default.lostReport.update({
+            where: { id },
+            data: {
+                status: "More Info Requested",
+                verification_status: "MORE_INFO_REQUESTED",
+                rejectReason: rejectReason || "Additional details needed."
+            }
+        });
+        await sendInAppNotification(report.residentId, "Lost Report: More Info Requested", `Security needs more info for report: ${report.itemName}. Msg: ${rejectReason || ""}`, "info");
+        const lrUser = await db_js_1.default.user.findUnique({ where: { id: report.residentId } });
+        (0, index_js_1.broadcastUpdate)("lostreport:update", {
+            ...updated,
+            residentName: lrUser?.name || "Resident",
+            flatNumber: lrUser?.unit || "N/A"
+        });
+        res.json(updated);
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to request info for lost report" });
+    }
+});
+router.put("/lostfound/lost/:id", auth_js_1.authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { itemName, category, brand, colour, description, distinguishingFeatures, dateLost, timeLost, lastSeenLocation, images, additionalNotes } = req.body;
+    try {
+        const report = await db_js_1.default.lostReport.findUnique({ where: { id } });
+        if (!report) {
+            return res.status(404).json({ error: "Lost report not found" });
+        }
+        if (report.residentId !== req.user.id) {
+            return res.status(403).json({ error: "Unauthorized to edit this report" });
+        }
+        const updated = await db_js_1.default.lostReport.update({
+            where: { id },
+            data: {
+                itemName: itemName || report.itemName,
+                category: category || report.category,
+                brand: brand !== undefined ? brand : report.brand,
+                colour: colour !== undefined ? colour : report.colour,
+                description: description || report.description,
+                distinguishingFeatures: distinguishingFeatures !== undefined ? distinguishingFeatures : report.distinguishingFeatures,
+                dateLost: dateLost || report.dateLost,
+                timeLost: timeLost !== undefined ? timeLost : report.timeLost,
+                lastSeenLocation: lastSeenLocation || report.lastSeenLocation,
+                images: images !== undefined ? images : report.images,
+                additionalNotes: additionalNotes !== undefined ? additionalNotes : report.additionalNotes,
+                status: "Pending Verification",
+                verification_status: "PENDING",
+                publication_status: "UNPUBLISHED"
+            }
+        });
+        const lrUser = await db_js_1.default.user.findUnique({ where: { id: report.residentId } });
+        (0, index_js_1.broadcastUpdate)("lostreport:update", {
+            ...updated,
+            residentName: lrUser?.name || "Resident",
+            flatNumber: lrUser?.unit || "N/A"
+        });
+        res.json(updated);
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to edit lost report" });
     }
 });
 router.get("/lostfound/matches", auth_js_1.authenticateToken, async (req, res) => {

@@ -29,6 +29,11 @@ router.get("/", auth_js_1.authenticateToken, async (req, res) => {
                 visitors = await db_js_1.default.visitor.findMany({ where: { portal: "society", visitingUnit: unit } });
             }
         }
+        visitors.sort((a, b) => {
+            const timeB = new Date(b.checkInTime || b.expectedAt || b.date || 0).getTime() || 0;
+            const timeA = new Date(a.checkInTime || a.expectedAt || a.date || 0).getTime() || 0;
+            return timeB - timeA;
+        });
         res.json(visitors);
     }
     catch (error) {

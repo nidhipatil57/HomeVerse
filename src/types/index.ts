@@ -252,10 +252,37 @@ export interface CommunityEvent {
   time: string;
   location: string;
   organizer: string;
-  type: 'festival' | 'meeting' | 'workshop' | 'competition' | 'social' | 'sports';
-  rsvpCount: number;
+  type?: 'festival' | 'meeting' | 'workshop' | 'competition' | 'social' | 'sports' | string;
+  category?: string;
+  bannerImage?: string;
+  endTime?: string;
+  contactPerson?: string;
+  contactNumber?: string;
+  maxParticipants?: number;
+  registrationDeadline?: string;
+  entryFee?: number;
+  registrationFee?: 'Free' | 'Paid';
+  eligibility?: string;
+  additionalInstructions?: string;
+  registrationRequired?: boolean;
+  volunteerRequired?: boolean;
+  visibility?: string;
+  rules?: string;
+  thingsToBring?: string;
+  budget?: number;
+  status?: string;
+  createdAt?: string;
+  rsvpCount?: number;
   maxCapacity?: number;
   image?: string;
+  rsvps?: any[];
+  registrations?: any[];
+  volunteers?: any[];
+  attendance?: any[];
+  feedbacks?: any[];
+  gallery?: any[];
+  polls?: any[];
+  expenses?: any[];
 }
 
 // --- Announcements ---

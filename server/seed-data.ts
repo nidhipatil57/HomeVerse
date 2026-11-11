@@ -588,74 +588,7 @@ export const getPrepopulatedMaintenanceBills = (): any[] => [
   }
 ];
 
-export const getPrepopulatedCommunityEvents = (): any[] => [
-  {
-    id: "EV-001",
-    title: "Society Annual General Meeting (AGM)",
-    description: "Annual meeting to discuss society audit, upcoming budgets, security guidelines and vendor contracts.",
-    date: "2026-08-10",
-    time: "10:00 AM - 01:00 PM",
-    location: "Clubhouse Hall",
-    organizer: "Society Committee",
-    priority: "important",
-    rsvps: []
-  },
-  {
-    id: "EV-002",
-    title: "Independence Day Cultural Fest",
-    description: "Traditional music, dance events, flag hoisting ceremony and evening high tea at the main clubhouse lawn.",
-    date: "2026-08-15",
-    time: "09:00 AM - 07:00 PM",
-    location: "Main Clubhouse Lawn",
-    organizer: "Cultural Committee",
-    priority: "urgent",
-    rsvps: []
-  },
-  {
-    id: "EV-003",
-    title: "Weekend Yoga & Wellness Camp",
-    description: "Guided meditation and yoga sessions by professional trainers. Open to all residents.",
-    date: "2026-07-20",
-    time: "06:00 AM - 08:00 AM",
-    location: "Society Park",
-    organizer: "Fitness Committee",
-    priority: "normal",
-    rsvps: []
-  },
-  {
-    id: "EV-004",
-    title: "VESIT Annual Hostel Coding Hackathon",
-    description: "12-hour coding marathon. Teams of 2. Exciting cash prizes and certificates for all participants.",
-    date: "2026-07-25",
-    time: "09:00 AM - 09:00 PM",
-    location: "Hostel Common Room",
-    organizer: "Warden Office",
-    priority: "normal",
-    rsvps: []
-  },
-  {
-    id: "EV-005",
-    title: "Hostel Freshers Welcoming Meetup",
-    description: "Welcome party for the first-year student batch. Dinner, music, and interactive sessions.",
-    date: "2026-07-15",
-    time: "06:00 PM - 09:00 PM",
-    location: "Hostel Dining Hall",
-    organizer: "Senior Students Committee",
-    priority: "important",
-    rsvps: []
-  },
-  {
-    id: "EV-006",
-    title: "Table Tennis & Chess Tournament",
-    description: "Indoor sports tournament inside the hostel gaming zone. Registrations open now.",
-    date: "2026-07-30",
-    time: "10:00 AM - 05:00 PM",
-    location: "Hostel Recreation Room",
-    organizer: "Sports Committee",
-    priority: "normal",
-    rsvps: []
-  }
-];
+export const getPrepopulatedCommunityEvents = (): any[] => [];
 
 export const getPrepopulatedNotifications = (): any[] => [
   // Nidhi Kumar (Resident)

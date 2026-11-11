@@ -128,12 +128,12 @@ export default function DailyCheckInsPage() {
   // Open Gate Pass Preview
   const handleOpenPassModal = (helper: Helper) => {
     // Check if there is an existing gate pass in gatePasses
-    const linkedPass = (gatePasses || []).find(
-      (gp) => gp && (
-        (helper.passId && gp.id === helper.passId) || 
-        (gp.name && helper.name && gp.name.toLowerCase() === helper.name.toLowerCase())
-      )
-    );
+    const linkedPass = (gatePasses || []).find((gp) => {
+      if (!gp) return false;
+      if (helper?.passId && gp?.id && gp.id === helper.passId) return true;
+      if (gp?.name && helper?.name && String(gp.name).toLowerCase() === String(helper.name).toLowerCase()) return true;
+      return false;
+    });
 
     const passPayload = linkedPass ? {
       ...linkedPass,
@@ -687,7 +687,7 @@ export default function DailyCheckInsPage() {
               ) : (
                 myHelpers.map((helper) => {
                   const todayStr = new Date().toISOString().split("T")[0];
-                  const todayLog = attendance.find(a => (a.workerId === helper.id || (a.workerName && helper.name && a.workerName.toLowerCase() === helper.name.toLowerCase())) && a.date === todayStr);
+                  const todayLog = attendance.find(a => (a.workerId === helper.id || (a?.workerName && helper?.name && String(a.workerName).toLowerCase() === String(helper.name).toLowerCase())) && a.date === todayStr);
                   const todayFlatLogs = flatAttendance.filter(fa => fa.helperId === helper.id && fa.date === todayStr);
                   const myFlatLog = todayFlatLogs.find(fa => fa.flatNumber === user?.unit);
 
@@ -715,7 +715,7 @@ export default function DailyCheckInsPage() {
                   }
 
                   const helperAttendanceHistory = attendance
-                    .filter(a => (a.workerId === helper.id || (a.workerName && helper.name && a.workerName.toLowerCase() === helper.name.toLowerCase())) && a.id !== todayLog?.id)
+                    .filter(a => (a.workerId === helper.id || (a?.workerName && helper?.name && String(a.workerName).toLowerCase() === String(helper.name).toLowerCase())) && a.id !== todayLog?.id)
                     .sort((a, b) => (new Date(b.date || 0).getTime() || 0) - (new Date(a.date || 0).getTime() || 0))
                     .slice(0, 4);
 

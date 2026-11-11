@@ -17,7 +17,8 @@ router.get("/", auth_js_1.authenticateToken, async (req, res) => {
             if (role === "warden") {
                 complaints = await db_js_1.default.complaint.findMany({
                     where: { portal: "hostel" },
-                    include: { chat: true, timeline: true, subscribers: true }
+                    include: { chat: true, timeline: true, subscribers: true },
+                    orderBy: { createdAt: "desc" }
                 });
             }
             else {
@@ -30,7 +31,8 @@ router.get("/", auth_js_1.authenticateToken, async (req, res) => {
                             { subscribers: { some: { userId: id } } }
                         ]
                     },
-                    include: { chat: true, timeline: true, subscribers: true }
+                    include: { chat: true, timeline: true, subscribers: true },
+                    orderBy: { createdAt: "desc" }
                 });
             }
         }
@@ -39,20 +41,23 @@ router.get("/", auth_js_1.authenticateToken, async (req, res) => {
             if (role === "secretary" || role === "manager") {
                 complaints = await db_js_1.default.complaint.findMany({
                     where: { portal: "society" },
-                    include: { chat: true, timeline: true, subscribers: true }
+                    include: { chat: true, timeline: true, subscribers: true },
+                    orderBy: { createdAt: "desc" }
                 });
             }
             else if (role === "worker") {
                 complaints = await db_js_1.default.complaint.findMany({
                     where: { portal: "society", assignedToId: id },
-                    include: { chat: true, timeline: true, subscribers: true }
+                    include: { chat: true, timeline: true, subscribers: true },
+                    orderBy: { createdAt: "desc" }
                 });
             }
             else {
                 // resident/security sees all society complaints
                 complaints = await db_js_1.default.complaint.findMany({
                     where: { portal: "society" },
-                    include: { chat: true, timeline: true, subscribers: true }
+                    include: { chat: true, timeline: true, subscribers: true },
+                    orderBy: { createdAt: "desc" }
                 });
             }
         }

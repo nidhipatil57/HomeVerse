@@ -64,7 +64,7 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
   const helperProfile = useMemo(() => {
     if (!worker) return null;
     return helpers.find(
-      (h) => h.id === worker.id || h.name.toLowerCase().includes(worker.name.toLowerCase())
+      (h) => h.id === worker.id || (h?.name && worker?.name && String(h.name).toLowerCase().includes(String(worker.name).toLowerCase()))
     );
   }, [helpers, worker]);
 
@@ -338,7 +338,7 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
               <CardContent className="p-4 space-y-3 max-h-[220px] overflow-y-auto">
                 {(() => {
                   const myEventDuties = (communityEvents || []).filter((ev) => 
-                    ev.volunteers?.some((v) => v.userId === worker?.id || v.volunteerName.toLowerCase().includes(worker?.name.toLowerCase()))
+                    ev.volunteers?.some((v) => v.userId === worker?.id || (v?.volunteerName && worker?.name && String(v.volunteerName).toLowerCase().includes(String(worker.name).toLowerCase())))
                   );
 
                   if (myEventDuties.length === 0) {
@@ -346,7 +346,7 @@ export function SocietyWorkerDashboard({ worker }: { worker: any }) {
                   }
 
                   return myEventDuties.map((ev) => {
-                    const myAssignment = ev.volunteers?.find((v) => v.userId === worker?.id || v.volunteerName.toLowerCase().includes(worker?.name.toLowerCase()));
+                    const myAssignment = ev.volunteers?.find((v) => v.userId === worker?.id || (v?.volunteerName && worker?.name && String(v.volunteerName).toLowerCase().includes(String(worker.name).toLowerCase())));
                     return (
                       <div key={ev.id} className="p-3 rounded-xl border border-border/40 bg-secondary/5 space-y-1.5 text-[10px] font-semibold">
                         <div className="flex justify-between items-center">

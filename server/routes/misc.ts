@@ -832,8 +832,14 @@ router.put("/rent/:id/pay", authenticateToken, async (req: any, res) => {
 // ==========================================
 router.get("/events", authenticateToken, async (req: any, res) => {
   try {
+    const isSecretary = req.user.role === "secretary";
+    const whereClause: any = { communityCode: req.user.communityCode || "SUN123" };
+    if (!isSecretary) {
+      whereClause.status = { not: "Draft" };
+    }
+
     const list = await prisma.communityEvent.findMany({
-      where: { communityCode: req.user.communityCode || "SUN123" },
+      where: whereClause,
       include: {
         rsvps: true,
         registrations: true,
@@ -859,7 +865,8 @@ router.post("/events", authenticateToken, async (req: any, res) => {
     title, description, date, time, location, organizer, priority,
     category, bannerImage, endTime, contactPerson, contactNumber,
     maxParticipants, registrationDeadline, entryFee, registrationRequired,
-    volunteerRequired, visibility, rules, thingsToBring, budget
+    volunteerRequired, visibility, rules, thingsToBring, budget, status,
+    eligibility, registrationFee, additionalInstructions
   } = req.body;
 
   if (!title || !description || !date || !time || !location || !organizer) {
@@ -868,6 +875,9 @@ router.post("/events", authenticateToken, async (req: any, res) => {
 
   try {
     const id = `EV-${Math.floor(100 + Math.random() * 900)}`;
+    const eventStatus = status || "Published";
+    const eventRules = additionalInstructions || rules || null;
+
     const newItem = await prisma.communityEvent.create({
       data: {
         id,
@@ -879,7 +889,7 @@ router.post("/events", authenticateToken, async (req: any, res) => {
         organizer,
         priority: priority || "normal",
         communityCode: req.user.communityCode || "SUN123",
-        category: category || "Other",
+        category: category || "Cultural",
         bannerImage: bannerImage || null,
         endTime: endTime || null,
         contactPerson: contactPerson || null,
@@ -887,13 +897,13 @@ router.post("/events", authenticateToken, async (req: any, res) => {
         maxParticipants: maxParticipants ? parseInt(maxParticipants) : null,
         registrationDeadline: registrationDeadline || null,
         entryFee: entryFee ? parseFloat(entryFee) : null,
-        registrationRequired: registrationRequired === true || registrationRequired === "true" || registrationRequired === "Yes",
+        registrationRequired: registrationRequired === true || registrationRequired === "true" || registrationRequired === "Yes" || true,
         volunteerRequired: volunteerRequired === true || volunteerRequired === "true" || volunteerRequired === "Yes",
-        visibility: visibility || "public",
-        rules: rules || null,
+        visibility: eligibility || visibility || "All Residents",
+        rules: eventRules,
         thingsToBring: thingsToBring || null,
         budget: budget ? parseFloat(budget) : 0.0,
-        status: "Active"
+        status: eventStatus
       },
       include: {
         rsvps: true,
@@ -909,18 +919,20 @@ router.post("/events", authenticateToken, async (req: any, res) => {
       }
     });
 
-    // Notify all residents
-    const residents = await prisma.user.findMany({
-      where: { communityCode: req.user.communityCode || "SUN123", role: "resident" }
-    });
+    // Notify all residents ONLY if published
+    if (eventStatus === "Published" || eventStatus === "Active") {
+      const residents = await prisma.user.findMany({
+        where: { communityCode: req.user.communityCode || "SUN123", role: "resident" }
+      });
 
-    for (const resi of residents) {
-      await sendInAppNotification(
-        resi.id,
-        "New event published.",
-        `🎪 "${title}" has been scheduled at the ${location} on ${date}.`,
-        "info"
-      );
+      for (const resi of residents) {
+        await sendInAppNotification(
+          resi.id,
+          "New event published.",
+          `🎪 "${title}" has been scheduled at ${location} on ${date} (${time}).`,
+          "info"
+        );
+      }
     }
 
     broadcastUpdate("event:update", newItem);
@@ -937,7 +949,8 @@ router.put("/events/:id", authenticateToken, async (req: any, res) => {
     title, description, date, time, location, organizer, priority,
     category, bannerImage, endTime, contactPerson, contactNumber,
     maxParticipants, registrationDeadline, entryFee, registrationRequired,
-    volunteerRequired, visibility, rules, thingsToBring, budget, status
+    volunteerRequired, visibility, rules, thingsToBring, budget, status,
+    eligibility, registrationFee, additionalInstructions
   } = req.body;
 
   try {
@@ -951,6 +964,8 @@ router.put("/events/:id", authenticateToken, async (req: any, res) => {
     }
 
     const isCancelled = status === "Cancelled" && existing.status !== "Cancelled";
+    const wasPublished = (existing.status === "Draft") && (status === "Published" || status === "Active");
+    const wasRescheduled = (date && date !== existing.date) || (time && time !== existing.time) || (location && location !== existing.location);
 
     const updated = await prisma.communityEvent.update({
       where: { id },
@@ -972,8 +987,8 @@ router.put("/events/:id", authenticateToken, async (req: any, res) => {
         entryFee: entryFee !== undefined ? (entryFee ? parseFloat(entryFee) : null) : existing.entryFee,
         registrationRequired: registrationRequired !== undefined ? (registrationRequired === true || registrationRequired === "true" || registrationRequired === "Yes") : existing.registrationRequired,
         volunteerRequired: volunteerRequired !== undefined ? (volunteerRequired === true || volunteerRequired === "true" || volunteerRequired === "Yes") : existing.volunteerRequired,
-        visibility: visibility !== undefined ? visibility : existing.visibility,
-        rules: rules !== undefined ? rules : existing.rules,
+        visibility: eligibility !== undefined ? eligibility : (visibility !== undefined ? visibility : existing.visibility),
+        rules: additionalInstructions !== undefined ? additionalInstructions : (rules !== undefined ? rules : existing.rules),
         thingsToBring: thingsToBring !== undefined ? thingsToBring : existing.thingsToBring,
         budget: budget !== undefined ? (budget ? parseFloat(budget) : 0.0) : existing.budget,
         status: status !== undefined ? status : existing.status
@@ -998,8 +1013,31 @@ router.put("/events/:id", authenticateToken, async (req: any, res) => {
         await sendInAppNotification(
           reg.userId,
           "Event cancelled.",
-          `⚠️ The event "${updated.title}" has been cancelled by the organizer.`,
+          `⚠️ The event "${updated.title}" has been cancelled by the Secretary.`,
           "warning"
+        );
+      }
+    } else if (wasRescheduled) {
+      for (const reg of existing.registrations) {
+        await sendInAppNotification(
+          reg.userId,
+          "Event Rescheduled",
+          `📅 "${updated.title}" has been rescheduled to ${updated.date} at ${updated.time} (${updated.location}).`,
+          "warning"
+        );
+      }
+    }
+
+    if (wasPublished) {
+      const residents = await prisma.user.findMany({
+        where: { communityCode: req.user.communityCode || "SUN123", role: "resident" }
+      });
+      for (const resi of residents) {
+        await sendInAppNotification(
+          resi.id,
+          "New event published.",
+          `🎪 "${updated.title}" is now published and open for registrations!`,
+          "info"
         );
       }
     }
@@ -1024,6 +1062,18 @@ router.post("/events/:id/register", authenticateToken, async (req: any, res) => 
 
     if (!event) {
       return res.status(404).json({ error: "Event not found" });
+    }
+
+    // Check deadline
+    if (event.registrationDeadline) {
+      const deadlineDate = new Date(event.registrationDeadline);
+      if (!isNaN(deadlineDate.getTime()) && deadlineDate < new Date()) {
+        return res.status(400).json({ error: "Registration failed. Registration deadline has passed." });
+      }
+    }
+
+    if (event.status === "Cancelled") {
+      return res.status(400).json({ error: "Cannot register for a cancelled event." });
     }
 
     // Check capacity limit
@@ -1084,6 +1134,35 @@ router.post("/events/:id/register", authenticateToken, async (req: any, res) => 
       });
     }
 
+    // Notify Resident
+    await sendInAppNotification(
+      req.user.id,
+      "Registration Confirmed",
+      `🎟️ Your registration for "${event.title}" is confirmed! Venue: ${event.location} on ${event.date}.`,
+      "success"
+    );
+
+    // Notify Secretary
+    const secretaries = await prisma.user.findMany({
+      where: { communityCode: req.user.communityCode || "SUN123", role: "secretary" }
+    });
+    for (const sec of secretaries) {
+      await sendInAppNotification(
+        sec.id,
+        "New Event Registration",
+        `👤 ${req.user.name || "Resident"} (${req.user.unit || "Flat"}) registered for "${event.title}".`,
+        "info"
+      );
+      if (event.maxParticipants && totalRegistered + incomingCount >= event.maxParticipants) {
+        await sendInAppNotification(
+          sec.id,
+          "Participant Capacity Reached",
+          `🚨 Maximum capacity (${event.maxParticipants}) reached for "${event.title}".`,
+          "alert"
+        );
+      }
+    }
+
     const updated = await prisma.communityEvent.findUnique({
       where: { id },
       include: {
@@ -1105,6 +1184,73 @@ router.post("/events/:id/register", authenticateToken, async (req: any, res) => 
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to register for event" });
+  }
+});
+
+router.delete("/events/:id/register", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  try {
+    const event = await prisma.communityEvent.findUnique({
+      where: { id }
+    });
+    if (!event) return res.status(404).json({ error: "Event not found" });
+
+    const existingReg = await prisma.eventRegistration.findFirst({
+      where: { eventId: id, userId: req.user.id }
+    });
+
+    if (existingReg) {
+      await prisma.eventRegistration.delete({
+        where: { id: existingReg.id }
+      });
+    }
+
+    await prisma.eventRsvp.deleteMany({
+      where: { eventId: id, userId: req.user.id }
+    });
+
+    // Notify Resident
+    await sendInAppNotification(
+      req.user.id,
+      "Registration Cancelled",
+      `Your registration for "${event.title}" has been cancelled.`,
+      "info"
+    );
+
+    // Notify Secretary
+    const secretaries = await prisma.user.findMany({
+      where: { communityCode: req.user.communityCode || "SUN123", role: "secretary" }
+    });
+    for (const sec of secretaries) {
+      await sendInAppNotification(
+        sec.id,
+        "Registration Cancellation",
+        `❌ ${req.user.name || "Resident"} (${req.user.unit || "Flat"}) cancelled registration for "${event.title}".`,
+        "info"
+      );
+    }
+
+    const updated = await prisma.communityEvent.findUnique({
+      where: { id },
+      include: {
+        rsvps: true,
+        registrations: true,
+        volunteers: true,
+        attendance: true,
+        feedbacks: true,
+        gallery: true,
+        polls: {
+          include: { votes: true }
+        },
+        expenses: true
+      }
+    });
+
+    broadcastUpdate("event:update", updated);
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to cancel registration" });
   }
 });
 

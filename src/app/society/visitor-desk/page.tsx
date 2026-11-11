@@ -237,7 +237,10 @@ export default function SecurityVisitorDeskPage() {
       const gp = (gatePasses || []).find((p) => p.id === id);
       if (gp) {
         // If helper, check in helper
-        const helper = (helpers || []).find((h) => h.passId === id || h.name.toLowerCase() === gp.name.toLowerCase());
+        const helper = (helpers || []).find(
+          (h) => (h?.passId && h.passId === id) || 
+                 (h?.name && gp?.name && String(h.name).toLowerCase() === String(gp.name).toLowerCase())
+        );
         if (helper) {
           await checkInHelper(helper.id, helper.name, helper.category, "Security Desk", helper.assignedFlats);
         }

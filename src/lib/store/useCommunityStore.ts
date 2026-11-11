@@ -233,6 +233,9 @@ export interface EventRegistration {
   guestCount: number;
   guestNames?: string;
   rsvpStatus: string;
+  paymentStatus?: "Paid" | "Free" | "Pending";
+  paidAmount?: number;
+  paymentMethod?: string;
 }
 
 export interface EventVolunteer {
@@ -322,6 +325,9 @@ export interface CommunityEvent {
   maxParticipants?: number;
   registrationDeadline?: string;
   entryFee?: number;
+  registrationFee?: "Free" | "Paid";
+  eligibility?: string;
+  additionalInstructions?: string;
   registrationRequired?: boolean;
   volunteerRequired?: boolean;
   visibility?: string;
@@ -531,6 +537,7 @@ interface CommunityState {
   updateEventDetails: (id: string, data: any) => Promise<void>;
   cancelEvent: (id: string) => Promise<void>;
   registerForEvent: (id: string, data: any) => Promise<void>;
+  cancelEventRegistration: (id: string, userId: string) => Promise<void>;
   volunteerForEvent: (id: string, data: any) => Promise<void>;
   markEventAttendance: (id: string, userId: string, isAttending: boolean) => Promise<void>;
   submitEventFeedback: (id: string, data: any) => Promise<void>;
@@ -723,11 +730,21 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     const state = get();
     const localUpdates: Partial<CommunityState> = {};
 
-    // Purge legacy special occasion payments/collections and ensure October bills are active
+    // Purge legacy special occasion payments/collections and ensure events are clean and fresh
     if (typeof window !== "undefined") {
       try {
         localStorage.removeItem("homeverse_collections");
         localUpdates.collections = [];
+
+        const storedEvents = localStorage.getItem("homeverse_communityEvents");
+        if (storedEvents) {
+          try {
+            const parsedEvents = JSON.parse(storedEvents);
+            if (Array.isArray(parsedEvents)) {
+              localUpdates.communityEvents = parsedEvents;
+            }
+          } catch (e) {}
+        }
 
         const storedPayments = localStorage.getItem("homeverse_payments");
         let finalPayments = getPrepopulatedPayments();
@@ -752,6 +769,22 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
             }
           } catch (e) {}
         }
+
+        // Deduplicate payments: ensure each flat/resident has strictly ONE pending maintenance bill per month
+        const seenPendingP = new Set<string>();
+        const dedupedPayments: any[] = [];
+        for (const p of finalPayments) {
+          if (p.paymentType === "Maintenance" && p.status?.toLowerCase() === "pending") {
+            const mKey = `${p.residentId || p.unit}_${p.month || (p.description?.includes("October 2026") || p.id?.includes("OCT") ? "October 2026" : p.description || p.dueDate)}`;
+            if (seenPendingP.has(mKey)) {
+              continue;
+            }
+            seenPendingP.add(mKey);
+          }
+          dedupedPayments.push(p);
+        }
+        finalPayments = dedupedPayments;
+
         localStorage.setItem("homeverse_payments", JSON.stringify(finalPayments));
         localUpdates.payments = finalPayments;
 
@@ -770,6 +803,22 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
             }
           } catch (e) {}
         }
+
+        // Deduplicate maintenance bills
+        const seenPendingB = new Set<string>();
+        const dedupedBills: any[] = [];
+        for (const b of finalBills) {
+          if (b.status?.toLowerCase() === "pending") {
+            const bKey = `${b.residentId || b.unit}_${b.month || "October 2026"}`;
+            if (seenPendingB.has(bKey)) {
+              continue;
+            }
+            seenPendingB.add(bKey);
+          }
+          dedupedBills.push(b);
+        }
+        finalBills = dedupedBills;
+
         localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(finalBills));
         localUpdates.maintenanceBills = finalBills;
 
@@ -967,6 +1016,22 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                     } catch (e) {}
                   }
                 }
+                if (key === "communityEvents" && Array.isArray(data)) {
+                  if (typeof window !== "undefined") {
+                    try {
+                      const stored = localStorage.getItem("homeverse_communityEvents");
+                      if (stored) {
+                        const localEvents = JSON.parse(stored);
+                        if (Array.isArray(localEvents) && localEvents.length > 0) {
+                          const dbIds = new Set(data.map((e: any) => e.id));
+                          const uniqueLocal = localEvents.filter((e: any) => !dbIds.has(e.id));
+                          data = [...data, ...uniqueLocal];
+                        }
+                      }
+                      localStorage.setItem("homeverse_communityEvents", JSON.stringify(data));
+                    } catch (e) {}
+                  }
+                }
 
                 // Sort lists so recent items are always on top
                 if (Array.isArray(data)) {
@@ -1025,7 +1090,8 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         { key: "flatAttendance", path: "/api/visitors/helpers/flat-attendance" },
         { key: "payments", path: "/api/payments" },
         { key: "collections", path: "/api/payments/collections" },
-        { key: "users", path: "/api/users" }
+        { key: "users", path: "/api/users" },
+        { key: "communityEvents", path: "/api/events" }
       ];
 
       const batchUpdates: Record<string, any> = {};
@@ -1051,6 +1117,22 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                   data.sort((a: any, b: any) => new Date(b.createdAt || b.scheduledDate || 0).getTime() - new Date(a.createdAt || a.scheduledDate || 0).getTime());
                 } else if (key === "attendance") {
                   data.sort((a: any, b: any) => new Date(b.checkInTime || b.date || 0).getTime() - new Date(a.checkInTime || a.date || 0).getTime());
+                }
+              }
+              if (key === "communityEvents" && Array.isArray(data)) {
+                if (typeof window !== "undefined") {
+                  try {
+                    const stored = localStorage.getItem("homeverse_communityEvents");
+                    if (stored) {
+                      const localEvents = JSON.parse(stored);
+                      if (Array.isArray(localEvents) && localEvents.length > 0) {
+                        const dbIds = new Set(data.map((e: any) => e.id));
+                        const uniqueLocal = localEvents.filter((e: any) => !dbIds.has(e.id));
+                        data = [...data, ...uniqueLocal];
+                      }
+                    }
+                    localStorage.setItem("homeverse_communityEvents", JSON.stringify(data));
+                  } catch (e) {}
                 }
               }
               const currentStr = JSON.stringify((get() as any)[key]);
@@ -1509,6 +1591,20 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         .then(data => set({ workerProfiles: data }))
         .catch(() => {});
     });
+
+    if (typeof window !== "undefined") {
+      const handleEventsStorage = (e: StorageEvent) => {
+        if (e.key === "homeverse_communityEvents" && e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            if (Array.isArray(parsed)) {
+              set({ communityEvents: parsed });
+            }
+          } catch (err) {}
+        }
+      };
+      window.addEventListener("storage", handleEventsStorage);
+    }
   },
 
   saveDb: () => {},
@@ -2682,35 +2778,321 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   createEvent: async (ev) => {
-    await fetch("/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(ev)
+    const id = ev.id || `EV-${Math.floor(100 + Math.random() * 900)}`;
+    const newEvent: CommunityEvent = {
+      ...ev,
+      id,
+      status: ev.status || "Published",
+      category: ev.category || "Cultural",
+      priority: ev.priority || "normal",
+      rsvps: ev.rsvps || [],
+      registrations: ev.registrations || [],
+      createdAt: new Date().toISOString()
+    };
+
+    set((state) => {
+      const nextEvents = [newEvent, ...(state.communityEvents || [])];
+      let nextNotifs = [...(state.notifications || [])];
+
+      // If published, notify residents
+      if (newEvent.status === "Published" || newEvent.status === "Active") {
+        const residents = (state.users || []).filter((u) => u.role === "resident");
+        const newNotifs = residents.map((r) => ({
+          id: `NTF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          userId: r.id,
+          title: "New Event Published",
+          message: `🎪 "${newEvent.title}" is scheduled at ${newEvent.location} on ${newEvent.date} (${newEvent.time}). Discover & Register now!`,
+          type: "info" as const,
+          read: false,
+          createdAt: new Date().toISOString()
+        }));
+        nextNotifs = [...newNotifs, ...nextNotifs];
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_communityEvents", JSON.stringify(nextEvents));
+          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifs));
+          window.dispatchEvent(new Event("homeverse:events_updated"));
+        } catch (e) {}
+      }
+
+      return { communityEvents: nextEvents, notifications: nextNotifs };
     });
+
+    try {
+      await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newEvent)
+      });
+    } catch (e) {}
   },
 
   updateEventDetails: async (id, data) => {
-    await fetch(`/api/events/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
+    set((state) => {
+      let isCancelled = false;
+      let isPublished = false;
+      let isRescheduled = false;
+      let eventTitle = "";
+      let registeredUsers: string[] = [];
+
+      const nextEvents = (state.communityEvents || []).map((ev) => {
+        if (ev.id === id) {
+          eventTitle = data.title || ev.title;
+          registeredUsers = (ev.registrations || []).map((r) => r.userId);
+          if (ev.status === "Draft" && (data.status === "Published" || data.status === "Active")) {
+            isPublished = true;
+          }
+          if (data.status === "Cancelled" && ev.status !== "Cancelled") {
+            isCancelled = true;
+          }
+          if ((data.date && data.date !== ev.date) || (data.time && data.time !== ev.time)) {
+            isRescheduled = true;
+          }
+          return { ...ev, ...data };
+        }
+        return ev;
+      });
+
+      let nextNotifs = [...(state.notifications || [])];
+
+      if (isCancelled && registeredUsers.length > 0) {
+        const cancelNotifs = registeredUsers.map((uid) => ({
+          id: `NTF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          userId: uid,
+          title: "Event Cancelled",
+          message: `⚠️ "${eventTitle}" has been cancelled by the Secretary.`,
+          type: "warning" as const,
+          read: false,
+          createdAt: new Date().toISOString()
+        }));
+        nextNotifs = [...cancelNotifs, ...nextNotifs];
+      } else if (isRescheduled && registeredUsers.length > 0) {
+        const reschedNotifs = registeredUsers.map((uid) => ({
+          id: `NTF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          userId: uid,
+          title: "Event Rescheduled",
+          message: `📅 "${eventTitle}" has been rescheduled to ${data.date || "new date"} at ${data.time || "new time"}.`,
+          type: "warning" as const,
+          read: false,
+          createdAt: new Date().toISOString()
+        }));
+        nextNotifs = [...reschedNotifs, ...nextNotifs];
+      } else if (isPublished) {
+        const residents = (state.users || []).filter((u) => u.role === "resident");
+        const pubNotifs = residents.map((r) => ({
+          id: `NTF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          userId: r.id,
+          title: "New Event Published",
+          message: `🎪 "${eventTitle}" is now published and open for registrations!`,
+          type: "info" as const,
+          read: false,
+          createdAt: new Date().toISOString()
+        }));
+        nextNotifs = [...pubNotifs, ...nextNotifs];
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_communityEvents", JSON.stringify(nextEvents));
+          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifs));
+          window.dispatchEvent(new Event("homeverse:events_updated"));
+        } catch (e) {}
+      }
+
+      return { communityEvents: nextEvents, notifications: nextNotifs };
     });
+
+    try {
+      await fetch(`/api/events/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+    } catch (e) {}
   },
 
   cancelEvent: async (id) => {
-    await fetch(`/api/events/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "Cancelled" })
-    });
+    await get().updateEventDetails(id, { status: "Cancelled" });
   },
 
   registerForEvent: async (id, data) => {
-    await fetch(`/api/events/${id}/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
+    set((state) => {
+      let targetEvent: CommunityEvent | undefined;
+      const nextEvents = (state.communityEvents || []).map((ev) => {
+        if (ev.id === id) {
+          targetEvent = ev;
+          const regs = [...(ev.registrations || [])];
+          const existingIdx = regs.findIndex((r) => r.userId === data.userId);
+          const newReg: EventRegistration = {
+            id: `REG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            eventId: id,
+            userId: data.userId,
+            userName: data.userName || "Resident",
+            flatNumber: data.flatNumber || "A-202",
+            contactNumber: data.contactNumber || "",
+            registeredAt: new Date().toISOString(),
+            guestCount: data.guestCount ? parseInt(data.guestCount) : 0,
+            guestNames: data.guestNames || "",
+            rsvpStatus: data.rsvpStatus || "Going",
+            paymentStatus: data.paymentStatus || (ev.entryFee && ev.entryFee > 0 ? "Paid" : "Free"),
+            paidAmount: data.paidAmount || (ev.entryFee ? ev.entryFee * (1 + (data.guestCount ? parseInt(data.guestCount) : 0)) : 0),
+            paymentMethod: data.paymentMethod || "UPI"
+          };
+
+          if (existingIdx >= 0) {
+            regs[existingIdx] = { ...regs[existingIdx], ...newReg };
+          } else {
+            regs.push(newReg);
+          }
+          return { ...ev, registrations: regs };
+        }
+        return ev;
+      });
+
+      // Also create payment entry if paid
+      let nextPayments = [...(state.payments || [])];
+      if (data.paidAmount && data.paidAmount > 0) {
+        const paymentRecord = {
+          id: `PAY-EV-${Date.now()}`,
+          title: `Event Pass: ${targetEvent?.title || "Society Event"}`,
+          amount: data.paidAmount,
+          payer: data.userName,
+          unit: data.flatNumber,
+          type: "event",
+          status: "paid",
+          paidDate: new Date().toISOString().split("T")[0],
+          method: data.paymentMethod || "UPI",
+          receiptUrl: `/receipts/EV-${Date.now()}.pdf`
+        };
+        nextPayments = [paymentRecord, ...nextPayments];
+      }
+
+      // Create notifications
+      const secretaries = (state.users || []).filter((u) => u.role === "secretary");
+      const residentNotif = {
+        id: `NTF-${Date.now()}-res`,
+        userId: data.userId,
+        title: "Registration Confirmed",
+        message: `🎟️ Your registration for "${targetEvent?.title || "Event"}" is confirmed! Venue: ${targetEvent?.location || "Society Grounds"}.`,
+        type: "success" as const,
+        read: false,
+        createdAt: new Date().toISOString()
+      };
+
+      const secNotifs: Notification[] = secretaries.map((s) => ({
+        id: `NTF-${Date.now()}-sec-${s.id}`,
+        userId: s.id,
+        title: "New Event Registration",
+        message: `👤 ${data.userName} (${data.flatNumber || "Flat"}) registered for "${targetEvent?.title || "Event"}".`,
+        type: "info" as const,
+        read: false,
+        createdAt: new Date().toISOString()
+      }));
+
+      // Check if capacity reached
+      if (targetEvent?.maxParticipants) {
+        const currentTotal = (targetEvent.registrations || []).reduce((acc, r) => acc + 1 + (r.guestCount || 0), 0) + 1 + (data.guestCount ? parseInt(data.guestCount) : 0);
+        if (currentTotal >= targetEvent.maxParticipants) {
+          const capNotifs: Notification[] = secretaries.map((s) => ({
+            id: `NTF-${Date.now()}-cap-${s.id}`,
+            userId: s.id,
+            title: "Capacity Reached",
+            message: `🚨 Maximum capacity (${targetEvent?.maxParticipants}) reached for "${targetEvent?.title}".`,
+            type: "alert" as const,
+            read: false,
+            createdAt: new Date().toISOString()
+          }));
+          secNotifs.push(...capNotifs);
+        }
+      }
+
+      const nextNotifs = [residentNotif, ...secNotifs, ...(state.notifications || [])];
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_communityEvents", JSON.stringify(nextEvents));
+          localStorage.setItem("homeverse_payments", JSON.stringify(nextPayments));
+          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifs));
+        } catch (e) {}
+      }
+
+      return {
+        communityEvents: nextEvents,
+        payments: nextPayments,
+        notifications: nextNotifs
+      };
     });
+
+    try {
+      await fetch(`/api/events/${id}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+    } catch (e) {}
+  },
+
+  cancelEventRegistration: async (id, userId) => {
+    set((state) => {
+      let eventTitle = "";
+      let regName = "";
+      let regFlat = "";
+
+      const nextEvents = (state.communityEvents || []).map((ev) => {
+        if (ev.id === id) {
+          eventTitle = ev.title;
+          const reg = (ev.registrations || []).find((r) => r.userId === userId);
+          if (reg) {
+            regName = reg.userName;
+            regFlat = reg.flatNumber || "";
+          }
+          const filteredRegs = (ev.registrations || []).filter((r) => r.userId !== userId);
+          return { ...ev, registrations: filteredRegs };
+        }
+        return ev;
+      });
+
+      const secretaries = (state.users || []).filter((u) => u.role === "secretary");
+      const residentNotif = {
+        id: `NTF-${Date.now()}-res-cancel`,
+        userId: userId,
+        title: "Registration Cancelled",
+        message: `Your registration for "${eventTitle}" has been successfully cancelled.`,
+        type: "info" as const,
+        read: false,
+        createdAt: new Date().toISOString()
+      };
+
+      const secNotifs = secretaries.map((s) => ({
+        id: `NTF-${Date.now()}-sec-cancel-${s.id}`,
+        userId: s.id,
+        title: "Registration Cancellation",
+        message: `❌ ${regName || "Resident"} (${regFlat || "Flat"}) cancelled their registration for "${eventTitle}".`,
+        type: "info" as const,
+        read: false,
+        createdAt: new Date().toISOString()
+      }));
+
+      const nextNotifs = [residentNotif, ...secNotifs, ...(state.notifications || [])];
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_communityEvents", JSON.stringify(nextEvents));
+          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifs));
+          window.dispatchEvent(new Event("homeverse:events_updated"));
+        } catch (e) {}
+      }
+
+      return { communityEvents: nextEvents, notifications: nextNotifs };
+    });
+
+    try {
+      await fetch(`/api/events/${id}/register`, {
+        method: "DELETE"
+      });
+    } catch (e) {}
   },
 
   volunteerForEvent: async (id, data) => {
@@ -2992,12 +3374,13 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   generateBulkMaintenanceBills: async (billDetails) => {
     set((state) => {
       const residents = state.users.filter((u) => u.role === "resident" && u.portal === "society");
+      const existingBills = state.maintenanceBills || [];
       const targetResidents = residents.filter((r) => {
         if (billDetails.applicableTo === "Selected Building" && billDetails.selectedBuilding) {
           return r.building === billDetails.selectedBuilding;
         }
         return true;
-      });
+      }).filter((r) => !existingBills.some((eb) => (eb.residentId === r.id || eb.unit === r.unit) && eb.month === billDetails.month && eb.status === "pending"));
 
       const newBills = targetResidents.map((r, i) => ({
         id: `BILL-${Date.now()}-${i}`,

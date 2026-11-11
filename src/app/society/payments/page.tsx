@@ -126,7 +126,7 @@ export default function PaymentsPage() {
     const cleanUserWing = (user.building || "").toUpperCase().replace(/[^A-Z]/g, "") ||
                           (user.unit || "").toUpperCase().replace(/[^A-Z]/g, "");
 
-    return payments.filter(p => {
+    const filtered = payments.filter(p => {
       // 1. Direct resident ID match
       if (p.residentId && user.id && p.residentId === user.id) return true;
 
@@ -142,6 +142,23 @@ export default function PaymentsPage() {
       }
       return false;
     });
+
+    // Deduplicate pending maintenance bills so there is strictly ONLY ONE pending bill per month (e.g. October 2026)
+    const seenPendingMonth = new Set<string>();
+    const deduplicated: typeof filtered = [];
+
+    for (const p of filtered) {
+      if (p.paymentType === "Maintenance" && p.status?.toLowerCase() === "pending") {
+        const monthKey = p.month || (p.description?.includes("October 2026") || p.id?.includes("OCT") ? "October 2026" : p.description || p.dueDate);
+        if (seenPendingMonth.has(monthKey)) {
+          continue; // Skip duplicate pending maintenance
+        }
+        seenPendingMonth.add(monthKey);
+      }
+      deduplicated.push(p);
+    }
+
+    return deduplicated;
   }, [payments, user]);
 
   const activeCollections = useMemo(() => {
