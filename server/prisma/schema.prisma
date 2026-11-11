@@ -105,6 +105,16 @@ model Complaint {
   images              String[]
   videos              String[]
   resolvedAt          DateTime?
+  forwardedAt         DateTime?
+  forwardedBy         String?
+  forwardedByName     String?
+  managerId           String?
+  rejectedAt          DateTime?
+  rejectedBy          String?
+  rejectReason        String?
+  completedAt         DateTime?
+  rating              Int?
+  ratingReview        String?
   assignedTo          String?
   assignedToId        String?
   duplicateGroup      String[]

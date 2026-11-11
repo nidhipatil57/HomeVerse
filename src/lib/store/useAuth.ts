@@ -155,6 +155,27 @@ const getInitialStoredUser = (): (User & Record<string, any>) | null => {
 };
 
 const initialUser = getInitialStoredUser();
+export const AUTH_TOKEN_KEY = "homeverse_token";
+
+export function getStoredAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function getAuthHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...(extra || {}) };
+  const token = getStoredAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+let sessionVerifiedThisLoad = false;
 
 export const useAuth = create<AuthState>((set, get) => ({
   user: initialUser,
@@ -163,25 +184,55 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   initialize: async () => {
     if (typeof window === "undefined") return;
-    const current = get().user;
-    if (current && get().isAuthenticated) {
-      return;
-    }
-    try {
-      const stored = localStorage.getItem("homeverse_auth");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed && (parsed.name === "Sara Shah" || parsed.email === "sara@sunshinecomplex.com")) {
-          parsed.unit = "202";
-          parsed.building = "A Wing";
-          try { localStorage.setItem("homeverse_auth", JSON.stringify(parsed)); } catch (e) {}
+    let activeUser = get().user;
+    if (!activeUser) {
+      try {
+        const stored = localStorage.getItem("homeverse_auth");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && (parsed.name === "Sara Shah" || parsed.email === "sara@sunshinecomplex.com")) {
+            parsed.unit = "202";
+            parsed.building = "A Wing";
+            try { localStorage.setItem("homeverse_auth", JSON.stringify(parsed)); } catch (e) {}
+          }
+          activeUser = parsed;
+          set({ user: parsed, isAuthenticated: true, isLoading: false });
+        } else {
+          set({ user: null, isAuthenticated: false, isLoading: false });
+          return;
         }
-        set({ user: parsed, isAuthenticated: true, isLoading: false });
-      } else {
+      } catch (e) {
         set({ user: null, isAuthenticated: false, isLoading: false });
+        return;
       }
-    } catch (e) {
-      set({ user: null, isAuthenticated: false, isLoading: false });
+    }
+
+    if (activeUser && !sessionVerifiedThisLoad) {
+      sessionVerifiedThisLoad = true;
+      try {
+        const res = await fetch("/api/auth/me", {
+          credentials: "include",
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.user) {
+            const refreshed = { ...data.user };
+            if (refreshed.name === "Sara Shah" || refreshed.email === "sara@sunshinecomplex.com") {
+              refreshed.unit = "202";
+              refreshed.building = "A Wing";
+            }
+            localStorage.setItem("homeverse_auth", JSON.stringify(refreshed));
+            set({ user: refreshed, isAuthenticated: true });
+          }
+        } else if (res.status === 401) {
+          localStorage.removeItem("homeverse_auth");
+          localStorage.removeItem(AUTH_TOKEN_KEY);
+          set({ user: null, isAuthenticated: false });
+        }
+      } catch (e) {
+        // Ignore transient network errors on initial check
+      }
     }
   },
 
@@ -191,10 +242,12 @@ export const useAuth = create<AuthState>((set, get) => ({
     const trimmedEmail = (email || "").trim().toLowerCase();
     const cleanPassword = (password || "").trim();
 
-    // 1. Try server API if backend exists
+    // 1. Authenticate against backend API first (source of truth for JWT cookie + token)
+    let authRejectedByServer = false;
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: trimmedEmail, password: cleanPassword })
       });
@@ -202,10 +255,20 @@ export const useAuth = create<AuthState>((set, get) => ({
         const data = await res.json();
         if (data && data.user) {
           profile = data.user;
+          if (typeof window !== "undefined" && data.token) {
+            localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+          }
         }
+      } else if (res.status === 400 || res.status === 401) {
+        authRejectedByServer = true;
       }
     } catch (e) {
-      // Backend unavailable, fallback to mock auth
+      // Backend unavailable, fallback to offline lookup
+    }
+
+    if (authRejectedByServer) {
+      set({ isLoading: false });
+      return false;
     }
 
     // 2. Comprehensive client-side fallback lookup
@@ -299,28 +362,32 @@ export const useAuth = create<AuthState>((set, get) => ({
       }
     }
 
+    const clearRejectedSession = async () => {
+      try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); } catch (e) {}
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+      }
+      set({ isLoading: false });
+    };
+
     // Role & portal verification (case-insensitive)
     if (role && profile.role && profile.role.toLowerCase() !== role.toLowerCase()) {
-      try { await fetch("/api/auth/logout", { method: "POST" }); } catch (e) {}
-      set({ isLoading: false });
+      await clearRejectedSession();
       throw new Error(`Invalid role selected for this account (account role is ${profile.role}).`);
     }
 
     if (portal && profile.portal && profile.portal.toLowerCase() !== portal.toLowerCase()) {
-      try { await fetch("/api/auth/logout", { method: "POST" }); } catch (e) {}
-      set({ isLoading: false });
+      await clearRejectedSession();
       throw new Error(`Invalid portal selected for this account (account portal is ${profile.portal}).`);
     }
 
     if (profile.status === "pending") {
-      try { await fetch("/api/auth/logout", { method: "POST" }); } catch (e) {}
-      set({ isLoading: false });
+      await clearRejectedSession();
       throw new Error("Your account is pending Secretary approval.");
     }
 
     if (profile.status === "rejected" || profile.status === "deactivated") {
-      try { await fetch("/api/auth/logout", { method: "POST" }); } catch (e) {}
-      set({ isLoading: false });
+      await clearRejectedSession();
       throw new Error(`Your account status is ${profile.status}.`);
     }
 
@@ -333,6 +400,7 @@ export const useAuth = create<AuthState>((set, get) => ({
     if (typeof window !== "undefined") {
       localStorage.setItem("homeverse_auth", JSON.stringify(profile));
     }
+    sessionVerifiedThisLoad = true;
     set({ user: profile, isAuthenticated: true, isLoading: false });
     return true;
   },
@@ -352,12 +420,16 @@ export const useAuth = create<AuthState>((set, get) => ({
       try {
         const res = await fetch("/api/auth/login", {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: defaultEmail, password: defaultPassword })
         });
         if (res.ok) {
           const data = await res.json();
           profile = data.user;
+          if (typeof window !== "undefined" && data.token) {
+            localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+          }
         }
       } catch (e) {}
 
@@ -383,6 +455,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       if (typeof window !== "undefined") {
         localStorage.setItem("homeverse_auth", JSON.stringify(profile));
       }
+      sessionVerifiedThisLoad = true;
       set({ user: profile, isAuthenticated: true, isLoading: false });
       return "success";
     } catch (err: any) {
@@ -403,15 +476,18 @@ export const useAuth = create<AuthState>((set, get) => ({
     try {
       let newUser: any = null;
 
+      let regToken: string | null = null;
       try {
         const res = await fetch("/api/auth/register", {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(userData)
         });
         if (res.ok) {
           const data = await res.json();
           newUser = data.user;
+          regToken = data.token || null;
         }
       } catch (e) {}
 
@@ -434,7 +510,11 @@ export const useAuth = create<AuthState>((set, get) => ({
       if (newUser.status === "approved") {
         if (typeof window !== "undefined") {
           localStorage.setItem("homeverse_auth", JSON.stringify(newUser));
+          if (regToken) {
+            localStorage.setItem(AUTH_TOKEN_KEY, regToken);
+          }
         }
+        sessionVerifiedThisLoad = true;
         set({ user: newUser, isAuthenticated: true, isLoading: false });
       } else {
         set({ user: null, isAuthenticated: false, isLoading: false });
@@ -448,11 +528,13 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   logout: async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch (e) {}
     if (typeof window !== "undefined") {
       localStorage.removeItem("homeverse_auth");
+      localStorage.removeItem(AUTH_TOKEN_KEY);
     }
+    sessionVerifiedThisLoad = false;
     set({ user: null, isAuthenticated: false });
   },
 
@@ -469,7 +551,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       try {
         await fetch("/api/auth/profile", {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(details)
         });
       } catch (e) {}

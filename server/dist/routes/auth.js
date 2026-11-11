@@ -22,7 +22,20 @@ router.post("/login", async (req, res) => {
         if (!user) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
-        const isValidPassword = bcryptjs_1.default.compareSync(password, user.password);
+        let isValidPassword = false;
+        if (user.password) {
+            if (user.password.startsWith("$2")) {
+                try {
+                    isValidPassword = bcryptjs_1.default.compareSync(password, user.password);
+                }
+                catch (e) {
+                    isValidPassword = false;
+                }
+            }
+            if (!isValidPassword) {
+                isValidPassword = user.password === password || user.password.toLowerCase() === password.toLowerCase();
+            }
+        }
         if (!isValidPassword) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
@@ -30,7 +43,8 @@ router.post("/login", async (req, res) => {
         res.cookie("token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
+            sameSite: "lax",
+            path: "/",
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
         const userProfile = { ...user };
@@ -80,7 +94,8 @@ router.post("/register", async (req, res) => {
         res.cookie("token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
+            sameSite: "lax",
+            path: "/",
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
         const userProfile = { ...user };
@@ -96,7 +111,7 @@ router.post("/register", async (req, res) => {
 });
 // Logout endpoint
 router.post("/logout", (req, res) => {
-    res.clearCookie("token");
+    res.clearCookie("token", { path: "/" });
     res.json({ success: true, message: "Logged out successfully" });
 });
 // Current User Profile Endpoint

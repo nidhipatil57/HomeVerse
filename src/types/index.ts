@@ -143,6 +143,14 @@ export interface Complaint {
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string;
+  forwardedAt?: string;
+  forwardedBy?: string;
+  forwardedByName?: string;
+  managerId?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  rejectReason?: string;
+  completedAt?: string;
   rating?: number;
   ratingReview?: string;
   timeline: ComplaintTimelineEntry[];

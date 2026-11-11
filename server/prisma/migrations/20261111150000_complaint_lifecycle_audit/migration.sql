@@ -1,0 +1,16 @@
+-- Idempotent complaint lifecycle audit columns
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "department" TEXT;
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "adminNotes" TEXT;
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "operationalNotes" TEXT;
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "expectedArrival" TEXT;
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "forwardedAt" TIMESTAMP(3);
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "forwardedBy" TEXT;
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "forwardedByName" TEXT;
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "managerId" TEXT;
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "rejectedAt" TIMESTAMP(3);
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "rejectedBy" TEXT;
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "rejectReason" TEXT;
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "completedAt" TIMESTAMP(3);
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "rating" INTEGER;
+ALTER TABLE "Complaint" ADD COLUMN IF NOT EXISTS "ratingReview" TEXT;
+

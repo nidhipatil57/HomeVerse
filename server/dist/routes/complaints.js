@@ -8,16 +8,65 @@ const db_js_1 = __importDefault(require("../config/db.js"));
 const auth_js_1 = require("../middleware/auth.js");
 const index_js_1 = require("../socket/index.js");
 const router = (0, express_1.Router)();
+const complaintInclude = {
+    chat: { orderBy: { timestamp: "asc" } },
+    timeline: { orderBy: { timestamp: "asc" } },
+    subscribers: true
+};
+const NON_MANAGER_STATUSES = [
+    "submitted",
+    "under-review",
+    "Under Secretary Review",
+    "under secretary review",
+    "Rejected",
+    "rejected"
+];
+async function createComplaintNotifications(tx, items) {
+    const uniqueMap = new Map();
+    for (const item of items) {
+        if (item.userId && !uniqueMap.has(`${item.userId}:${item.title}`)) {
+            uniqueMap.set(`${item.userId}:${item.title}`, item);
+        }
+    }
+    const deduped = Array.from(uniqueMap.values());
+    if (deduped.length === 0)
+        return [];
+    const targetIds = Array.from(new Set(deduped.map((i) => i.userId)));
+    const existingUsers = await tx.user.findMany({
+        where: { id: { in: targetIds } },
+        select: { id: true }
+    });
+    const validUserIds = new Set(existingUsers.map((u) => u.id));
+    const created = [];
+    let idx = 0;
+    for (const item of deduped) {
+        if (!validUserIds.has(item.userId))
+            continue;
+        const notif = await tx.notification.create({
+            data: {
+                id: `NTF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}-${idx++}`,
+                userId: item.userId,
+                title: item.title,
+                message: item.message,
+                type: item.type
+            }
+        });
+        created.push(notif);
+    }
+    return created;
+}
 // GET all complaints (role-scoped)
 router.get("/", auth_js_1.authenticateToken, async (req, res) => {
     try {
-        const { role, portal, id } = req.user;
+        const role = String(req.user.role || "").toLowerCase();
+        const portal = String(req.user.portal || "society").toLowerCase();
+        const id = req.user.id;
         let complaints;
         if (portal === "hostel") {
-            if (role === "warden") {
+            if (role === "warden" || role === "admin") {
                 complaints = await db_js_1.default.complaint.findMany({
                     where: { portal: "hostel" },
-                    include: { chat: true, timeline: true, subscribers: true },
+                    include: complaintInclude,
                     orderBy: { createdAt: "desc" }
                 });
             }
@@ -31,32 +80,36 @@ router.get("/", auth_js_1.authenticateToken, async (req, res) => {
                             { subscribers: { some: { userId: id } } }
                         ]
                     },
-                    include: { chat: true, timeline: true, subscribers: true },
+                    include: complaintInclude,
                     orderBy: { createdAt: "desc" }
                 });
             }
         }
         else {
             // society
-            if (role === "secretary" || role === "manager") {
+            if (role === "manager") {
+                // Manager sees ONLY complaints forwarded by Secretary or already in operational/reopened/resolved workflow
                 complaints = await db_js_1.default.complaint.findMany({
-                    where: { portal: "society" },
-                    include: { chat: true, timeline: true, subscribers: true },
+                    where: {
+                        portal: "society",
+                        status: { notIn: NON_MANAGER_STATUSES }
+                    },
+                    include: complaintInclude,
                     orderBy: { createdAt: "desc" }
                 });
             }
             else if (role === "worker") {
                 complaints = await db_js_1.default.complaint.findMany({
                     where: { portal: "society", assignedToId: id },
-                    include: { chat: true, timeline: true, subscribers: true },
+                    include: complaintInclude,
                     orderBy: { createdAt: "desc" }
                 });
             }
             else {
-                // resident/security sees all society complaints
+                // secretary / resident / security / admin sees society complaints
                 complaints = await db_js_1.default.complaint.findMany({
                     where: { portal: "society" },
-                    include: { chat: true, timeline: true, subscribers: true },
+                    include: complaintInclude,
                     orderBy: { createdAt: "desc" }
                 });
             }
@@ -71,20 +124,30 @@ router.get("/", auth_js_1.authenticateToken, async (req, res) => {
 // POST raise new complaint
 router.post("/", auth_js_1.authenticateToken, async (req, res) => {
     const { title, description, category, priority, unit, building, wing, emergency, images, videos } = req.body;
-    if (!title || !description || !category) {
+    if (!title?.trim() || !description?.trim() || !category?.trim()) {
         return res.status(400).json({ error: "Title, description, and category are required" });
     }
     try {
-        const { id: userId, portal } = req.user;
-        let resolvedName = req.user.name;
-        if (!resolvedName) {
-            const userRecord = await db_js_1.default.user.findUnique({ where: { id: userId } });
-            resolvedName = userRecord?.name || "Resident";
+        const submitter = await db_js_1.default.user.findUnique({
+            where: { id: req.user.id },
+            select: { id: true, name: true, unit: true, building: true, portal: true, communityCode: true }
+        });
+        if (!submitter) {
+            return res.status(401).json({ error: "Authenticated user account not found in database. Please re-login." });
         }
+        const portal = submitter.portal || req.user.portal || "society";
+        const resolvedName = submitter.name || req.user.name || "Resident";
+        const resolvedUnit = (unit && String(unit).trim()) || submitter.unit || "N/A";
+        const resolvedBuilding = (building && String(building).trim()) || (wing && String(wing).trim()) || submitter.building || "A Wing";
         // AI Diagnostics logic
-        const categoryLower = category.toLowerCase();
+        const categoryLower = String(category).toLowerCase();
         let predictedPriority = priority || "medium";
-        if (categoryLower.includes("water") || categoryLower.includes("leak") || categoryLower.includes("lift") || categoryLower.includes("fire") || categoryLower.includes("security")) {
+        if (!priority &&
+            (categoryLower.includes("water") ||
+                categoryLower.includes("leak") ||
+                categoryLower.includes("lift") ||
+                categoryLower.includes("fire") ||
+                categoryLower.includes("security"))) {
             predictedPriority = "high";
         }
         if (emergency) {
@@ -105,122 +168,206 @@ router.post("/", auth_js_1.authenticateToken, async (req, res) => {
             requiredMaterials = ["Control Relay Board", "Lubricant Spray"];
             expectedCost = "₹1,200";
         }
+        const cleanTitle = String(title).trim();
+        const cleanDescription = String(description).trim();
+        const cleanCategory = String(category).trim();
         // Check duplicates
         const activeComplaints = await db_js_1.default.complaint.findMany({
             where: {
                 portal,
-                status: { notIn: ["closed", "resolved"] },
-                category,
-                building
+                status: { notIn: ["closed", "resolved", "Rejected", "rejected"] },
+                category: cleanCategory,
+                building: resolvedBuilding
             }
         });
         let duplicateMatch = null;
-        const descLower = description.toLowerCase();
+        const descLower = cleanDescription.toLowerCase();
         for (const c of activeComplaints) {
-            const matchWordCount = descLower.split(" ").filter((w) => c.description.toLowerCase().includes(w)).length;
+            const matchWordCount = descLower.split(" ").filter((w) => w.length > 2 && c.description.toLowerCase().includes(w)).length;
             if (matchWordCount > 3) {
                 duplicateMatch = c;
                 break;
             }
         }
         const complaintId = `COMP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-        const newComplaint = await db_js_1.default.complaint.create({
-            data: {
-                id: complaintId,
-                title,
-                description,
-                category,
-                priority: predictedPriority,
-                raisedBy: userId,
-                raisedByName: resolvedName,
-                unit: unit || "A-204",
-                building: building || "Tower A",
-                status: "submitted",
-                portal,
-                emergency: emergency || false,
-                images: images || [],
-                videos: videos || [],
-                isDuplicate: duplicateMatch ? true : false,
-                possibleDuplicateOf: duplicateMatch ? duplicateMatch.id : null,
-                duplicateGroup: [],
-                timeline: {
-                    create: [
-                        {
-                            status: "submitted",
-                            note: "Complaint registered successfully and AI diagnostics compiled.",
-                            by: "System"
-                        }
-                    ]
-                }
-            },
-            include: { chat: true, timeline: true, subscribers: true }
-        });
-        // If duplicate was found, link to the parent's group
-        if (duplicateMatch) {
-            const parent = await db_js_1.default.complaint.findUnique({ where: { id: duplicateMatch.id } });
-            if (parent) {
-                const currentGroup = parent.duplicateGroup || [];
-                if (!currentGroup.includes(complaintId)) {
-                    await db_js_1.default.complaint.update({
-                        where: { id: duplicateMatch.id },
-                        data: { duplicateGroup: [...currentGroup, complaintId] }
-                    });
+        const result = await db_js_1.default.$transaction(async (tx) => {
+            const createdComplaint = await tx.complaint.create({
+                data: {
+                    id: complaintId,
+                    title: cleanTitle,
+                    description: cleanDescription,
+                    category: cleanCategory,
+                    priority: predictedPriority,
+                    raisedBy: submitter.id,
+                    raisedByName: resolvedName,
+                    unit: resolvedUnit,
+                    building: resolvedBuilding,
+                    status: "submitted",
+                    portal,
+                    emergency: Boolean(emergency),
+                    images: Array.isArray(images) ? images : [],
+                    videos: Array.isArray(videos) ? videos : [],
+                    isDuplicate: Boolean(duplicateMatch),
+                    possibleDuplicateOf: duplicateMatch ? duplicateMatch.id : null,
+                    duplicateGroup: [],
+                    timeline: {
+                        create: [
+                            {
+                                status: "submitted",
+                                note: `Complaint registered by ${resolvedName} (Flat ${resolvedUnit}, ${resolvedBuilding}) and queued for Secretary review.`,
+                                by: resolvedName
+                            }
+                        ]
+                    }
+                },
+                include: complaintInclude
+            });
+            if (duplicateMatch) {
+                const parent = await tx.complaint.findUnique({ where: { id: duplicateMatch.id } });
+                if (parent) {
+                    const currentGroup = parent.duplicateGroup || [];
+                    if (!currentGroup.includes(complaintId)) {
+                        await tx.complaint.update({
+                            where: { id: duplicateMatch.id },
+                            data: { duplicateGroup: [...currentGroup, complaintId] }
+                        });
+                    }
                 }
             }
-        }
-        // Add extra calculated properties for the response
+            // Notify Society Secretary / Hostel Warden dynamically (no hardcoded IDs)
+            const reviewerRoles = portal === "hostel" ? ["warden", "admin"] : ["secretary", "admin"];
+            let reviewers = await tx.user.findMany({
+                where: {
+                    portal,
+                    role: { in: reviewerRoles },
+                    status: { notIn: ["rejected", "deactivated"] },
+                    ...(submitter.communityCode ? { communityCode: submitter.communityCode } : {})
+                },
+                select: { id: true }
+            });
+            if (reviewers.length === 0 && submitter.communityCode) {
+                reviewers = await tx.user.findMany({
+                    where: {
+                        portal,
+                        role: { in: reviewerRoles },
+                        status: { notIn: ["rejected", "deactivated"] }
+                    },
+                    select: { id: true }
+                });
+            }
+            const notifInputs = [
+                {
+                    userId: submitter.id,
+                    title: "Complaint Registered",
+                    message: `Your complaint "${cleanTitle}" (${complaintId}) has been submitted and is Under Review.`,
+                    type: "success"
+                },
+                ...reviewers.map((sec) => ({
+                    userId: sec.id,
+                    title: `New Complaint: ${cleanTitle}`,
+                    message: `${resolvedName} (Flat ${resolvedUnit}, ${resolvedBuilding}) submitted a ${cleanCategory} complaint (${complaintId}).`,
+                    type: "info"
+                }))
+            ];
+            const notifications = await createComplaintNotifications(tx, notifInputs);
+            return { createdComplaint, notifications };
+        });
         const finalComplaint = {
-            ...newComplaint,
+            ...result.createdComplaint,
             aiAnalysis: {
                 predictedPriority,
-                suggestedCategory: category,
+                suggestedCategory: cleanCategory,
                 estimatedCompletion,
                 requiredMaterials,
                 expectedCost,
                 possibleDuplicateOf: duplicateMatch ? duplicateMatch.id : undefined,
-                isDuplicate: duplicateMatch ? true : false
+                isDuplicate: Boolean(duplicateMatch)
             }
         };
         (0, index_js_1.broadcastUpdate)("complaint:update", finalComplaint);
+        result.notifications.forEach((n) => (0, index_js_1.broadcastUpdate)("notification:update", n));
         res.status(201).json(finalComplaint);
     }
     catch (error) {
         console.error("Error creating complaint:", error);
-        res.status(500).json({ error: "Failed to create complaint" });
+        res.status(500).json({ error: error?.message || "Failed to create complaint" });
     }
 });
-// PUT update complaint status & optional fields (like priority)
+// PUT update complaint status & optional fields (like priority or resident reopen)
 router.put("/:id/status", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { status, note, by, priority } = req.body;
     try {
-        const dataToUpdate = {};
-        if (status !== undefined)
-            dataToUpdate.status = status;
-        if (priority !== undefined)
-            dataToUpdate.priority = priority;
-        const updated = await db_js_1.default.complaint.update({
-            where: { id },
-            data: {
-                ...dataToUpdate,
-                timeline: {
-                    create: [
-                        {
-                            status: status || "updated",
-                            note: note || `Complaint updated`,
-                            by: by || req.user.name
-                        }
-                    ]
+        const existing = await db_js_1.default.complaint.findUnique({ where: { id } });
+        if (!existing) {
+            return res.status(404).json({ error: "Complaint not found" });
+        }
+        const result = await db_js_1.default.$transaction(async (tx) => {
+            const nextStatus = status !== undefined ? String(status) : existing.status;
+            const dataToUpdate = {};
+            if (status !== undefined)
+                dataToUpdate.status = nextStatus;
+            if (priority !== undefined)
+                dataToUpdate.priority = priority;
+            if (nextStatus.toLowerCase() === "completed" || nextStatus.toLowerCase() === "work completed") {
+                dataToUpdate.completedAt = new Date();
+            }
+            if (nextStatus.toLowerCase() === "closed" || nextStatus.toLowerCase() === "resolved") {
+                dataToUpdate.resolvedAt = new Date();
+            }
+            const updated = await tx.complaint.update({
+                where: { id },
+                data: {
+                    ...dataToUpdate,
+                    timeline: {
+                        create: [
+                            {
+                                status: nextStatus || "updated",
+                                note: note || `Complaint status updated to ${nextStatus}`,
+                                by: by || req.user.name || "System"
+                            }
+                        ]
+                    }
+                },
+                include: complaintInclude
+            });
+            const notifInputs = [];
+            if (nextStatus.toLowerCase() === "reopened") {
+                const handlers = await tx.user.findMany({
+                    where: {
+                        portal: existing.portal,
+                        role: { in: existing.portal === "hostel" ? ["warden"] : ["manager", "secretary"] },
+                        status: { notIn: ["rejected", "deactivated"] }
+                    },
+                    select: { id: true }
+                });
+                for (const h of handlers) {
+                    notifInputs.push({
+                        userId: h.id,
+                        title: `Complaint Reopened: ${existing.title}`,
+                        message: `${req.user.name || existing.raisedByName} reopened complaint ${existing.id}: ${note || "Requested further help."}`,
+                        type: "warning"
+                    });
                 }
-            },
-            include: { chat: true, timeline: true, subscribers: true }
+            }
+            else if (existing.raisedBy && req.user.id !== existing.raisedBy) {
+                notifInputs.push({
+                    userId: existing.raisedBy,
+                    title: `Complaint Update: ${nextStatus}`,
+                    message: note || `Your complaint "${existing.title}" (${existing.id}) was updated to ${nextStatus}.`,
+                    type: nextStatus.toLowerCase() === "completed" ? "success" : "info"
+                });
+            }
+            const notifications = await createComplaintNotifications(tx, notifInputs);
+            return { updated, notifications };
         });
-        (0, index_js_1.broadcastUpdate)("complaint:update", updated);
-        res.json(updated);
+        (0, index_js_1.broadcastUpdate)("complaint:update", result.updated);
+        result.notifications.forEach((n) => (0, index_js_1.broadcastUpdate)("notification:update", n));
+        res.json(result.updated);
     }
     catch (error) {
         console.error("Error updating complaint status:", error);
-        res.status(500).json({ error: "Failed to update complaint status" });
+        res.status(500).json({ error: error?.message || "Failed to update complaint status" });
     }
 });
 // PUT assign worker to complaint
@@ -228,6 +375,10 @@ router.put("/:id/assign", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { assignedTo, assignedToId, note } = req.body;
     try {
+        const existing = await db_js_1.default.complaint.findUnique({ where: { id } });
+        if (!existing) {
+            return res.status(404).json({ error: "Complaint not found" });
+        }
         const updated = await db_js_1.default.complaint.update({
             where: { id },
             data: {
@@ -244,24 +395,28 @@ router.put("/:id/assign", auth_js_1.authenticateToken, async (req, res) => {
                     ]
                 }
             },
-            include: { chat: true, timeline: true, subscribers: true }
+            include: complaintInclude
         });
         (0, index_js_1.broadcastUpdate)("complaint:update", updated);
         res.json(updated);
     }
     catch (error) {
         console.error("Error assigning worker to complaint:", error);
-        res.status(500).json({ error: "Failed to assign worker" });
+        res.status(500).json({ error: error?.message || "Failed to assign worker" });
     }
 });
 // POST add message to complaint chat
 router.post("/:id/chat", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { message } = req.body;
-    if (!message) {
+    if (!message?.trim()) {
         return res.status(400).json({ error: "Message is required" });
     }
     try {
+        const existing = await db_js_1.default.complaint.findUnique({ where: { id } });
+        if (!existing) {
+            return res.status(404).json({ error: "Complaint not found" });
+        }
         const newMessage = await db_js_1.default.complaintChatMessage.create({
             data: {
                 complaintId: id,
@@ -273,14 +428,14 @@ router.post("/:id/chat", auth_js_1.authenticateToken, async (req, res) => {
         });
         const updatedComplaint = await db_js_1.default.complaint.findUnique({
             where: { id },
-            include: { chat: true, timeline: true, subscribers: true }
+            include: complaintInclude
         });
         (0, index_js_1.broadcastUpdate)("complaint:update", updatedComplaint);
         res.status(201).json(newMessage);
     }
     catch (error) {
         console.error("Error adding chat message:", error);
-        res.status(500).json({ error: "Failed to add chat message" });
+        res.status(500).json({ error: error?.message || "Failed to add chat message" });
     }
 });
 // POST subscribe resident to common board complaint
@@ -288,24 +443,28 @@ router.post("/:id/subscribe", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { userId, userName, unit } = req.body;
     try {
+        const existing = await db_js_1.default.complaint.findUnique({ where: { id } });
+        if (!existing) {
+            return res.status(404).json({ error: "Complaint not found" });
+        }
         const subscription = await db_js_1.default.complaintSubscriber.create({
             data: {
                 complaintId: id,
                 userId: userId || req.user.id,
                 userName: userName || req.user.name,
-                unit: unit || "A-301"
+                unit: unit || "A-202"
             }
         });
         const updatedComplaint = await db_js_1.default.complaint.findUnique({
             where: { id },
-            include: { chat: true, timeline: true, subscribers: true }
+            include: complaintInclude
         });
         (0, index_js_1.broadcastUpdate)("complaint:update", updatedComplaint);
         res.status(201).json(subscription);
     }
     catch (error) {
         console.error("Error subscribing to complaint:", error);
-        res.status(500).json({ error: "Failed to subscribe to complaint" });
+        res.status(500).json({ error: error?.message || "Failed to subscribe to complaint" });
     }
 });
 // PUT update ETA
@@ -313,9 +472,14 @@ router.put("/:id/eta", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { eta } = req.body;
     try {
+        const existing = await db_js_1.default.complaint.findUnique({ where: { id } });
+        if (!existing) {
+            return res.status(404).json({ error: "Complaint not found" });
+        }
         const updated = await db_js_1.default.complaint.update({
             where: { id },
             data: {
+                expectedArrival: eta,
                 timeline: {
                     create: [
                         {
@@ -326,60 +490,97 @@ router.put("/:id/eta", auth_js_1.authenticateToken, async (req, res) => {
                     ]
                 }
             },
-            include: { chat: true, timeline: true, subscribers: true }
+            include: complaintInclude
         });
         (0, index_js_1.broadcastUpdate)("complaint:update", updated);
         res.json(updated);
     }
     catch (error) {
-        res.status(500).json({ error: "Failed to update ETA" });
+        res.status(500).json({ error: error?.message || "Failed to update ETA" });
     }
 });
 // PUT rate and close complaint
 router.put("/:id/rate", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { rating, review } = req.body;
+    const numericRating = Number(rating);
+    if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+        return res.status(400).json({ error: "Rating must be a number between 1 and 5" });
+    }
     try {
         const comp = await db_js_1.default.complaint.findUnique({ where: { id } });
         if (!comp)
             return res.status(404).json({ error: "Complaint not found" });
-        const updated = await db_js_1.default.complaint.update({
-            where: { id },
-            data: {
-                status: "closed",
-                resolvedAt: new Date(),
-                timeline: {
-                    create: [
-                        {
-                            status: "closed",
-                            note: `Resident closed the ticket and rated it ${rating} stars. Review: ${review || "No review left."}`,
-                            by: req.user.name
-                        }
-                    ]
-                }
-            },
-            include: { chat: true, timeline: true, subscribers: true }
-        });
-        // Update worker rating if worker is assigned
-        if (comp.assignedToId) {
-            const allComplaints = await db_js_1.default.complaint.findMany({
-                where: { assignedToId: comp.assignedToId }
-            });
-            const rated = allComplaints.filter(c => c.resolvedAt !== null && c.id !== id);
-            const totalRatings = rated.length + 1;
-            const sumRatings = rated.reduce((sum, r) => sum + 5, 0) + rating;
-            const averageRating = sumRatings / totalRatings;
-            await db_js_1.default.user.update({
-                where: { id: comp.assignedToId },
-                data: { rating: Number(averageRating.toFixed(2)) }
-            });
+        const roleLower = String(req.user.role || "").toLowerCase();
+        if (comp.raisedBy !== req.user.id && !["secretary", "admin", "manager", "warden"].includes(roleLower)) {
+            return res.status(403).json({ error: "Only the resident who raised this complaint can confirm and close it." });
         }
-        (0, index_js_1.broadcastUpdate)("complaint:update", updated);
-        res.json(updated);
+        const cleanReview = review ? String(review).trim() : "";
+        const result = await db_js_1.default.$transaction(async (tx) => {
+            const updated = await tx.complaint.update({
+                where: { id },
+                data: {
+                    status: "closed",
+                    resolvedAt: new Date(),
+                    rating: Math.round(numericRating),
+                    ratingReview: cleanReview || null,
+                    timeline: {
+                        create: [
+                            {
+                                status: "closed",
+                                note: `Resident verified completion and closed ticket with ${numericRating}/5 rating. Review: ${cleanReview || "No review left."}`,
+                                by: req.user.name || comp.raisedByName
+                            }
+                        ]
+                    }
+                },
+                include: complaintInclude
+            });
+            // Update worker rating using real saved DB ratings
+            if (comp.assignedToId) {
+                const ratedComplaints = await tx.complaint.findMany({
+                    where: {
+                        assignedToId: comp.assignedToId,
+                        rating: { not: null }
+                    },
+                    select: { rating: true }
+                });
+                if (ratedComplaints.length > 0) {
+                    const sum = ratedComplaints.reduce((acc, item) => acc + (item.rating || 0), 0);
+                    const averageRating = sum / ratedComplaints.length;
+                    await tx.user.update({
+                        where: { id: comp.assignedToId },
+                        data: { rating: Number(averageRating.toFixed(2)) }
+                    });
+                }
+            }
+            const notifTargets = [];
+            if (comp.managerId) {
+                notifTargets.push({
+                    userId: comp.managerId,
+                    title: `Complaint Closed: ${comp.title}`,
+                    message: `${req.user.name || comp.raisedByName} confirmed resolution of ${comp.id} (${numericRating}★).`,
+                    type: "success"
+                });
+            }
+            if (comp.assignedToId) {
+                notifTargets.push({
+                    userId: comp.assignedToId,
+                    title: `Resident Feedback Received (${numericRating}★)`,
+                    message: `Complaint "${comp.title}" was closed by the resident. Review: ${cleanReview || "Confirmed satisfactory"}`,
+                    type: "success"
+                });
+            }
+            const notifications = await createComplaintNotifications(tx, notifTargets);
+            return { updated, notifications };
+        });
+        (0, index_js_1.broadcastUpdate)("complaint:update", result.updated);
+        result.notifications.forEach((n) => (0, index_js_1.broadcastUpdate)("notification:update", n));
+        res.json(result.updated);
     }
     catch (error) {
         console.error("Error rating complaint:", error);
-        res.status(500).json({ error: "Failed to rate complaint" });
+        res.status(500).json({ error: error?.message || "Failed to rate complaint" });
     }
 });
 // POST merge duplicate complaints
@@ -390,17 +591,18 @@ router.post("/merge", auth_js_1.authenticateToken, async (req, res) => {
         if (!parent)
             return res.status(404).json({ error: "Parent complaint not found" });
         const currentGroup = parent.duplicateGroup || [];
-        const newGroup = Array.from(new Set([...currentGroup, ...duplicateTicketIds]));
+        const newGroup = Array.from(new Set([...currentGroup, ...(duplicateTicketIds || [])]));
         const updatedParent = await db_js_1.default.complaint.update({
             where: { id: parentTicketId },
             data: { duplicateGroup: newGroup },
-            include: { chat: true, timeline: true, subscribers: true }
+            include: complaintInclude
         });
-        for (const childId of duplicateTicketIds) {
+        for (const childId of duplicateTicketIds || []) {
             const updatedChild = await db_js_1.default.complaint.update({
                 where: { id: childId },
                 data: {
                     status: "closed",
+                    resolvedAt: new Date(),
                     timeline: {
                         create: [
                             {
@@ -411,7 +613,7 @@ router.post("/merge", auth_js_1.authenticateToken, async (req, res) => {
                         ]
                     }
                 },
-                include: { chat: true, timeline: true, subscribers: true }
+                include: complaintInclude
             });
             (0, index_js_1.broadcastUpdate)("complaint:update", updatedChild);
         }
@@ -420,126 +622,254 @@ router.post("/merge", auth_js_1.authenticateToken, async (req, res) => {
     }
     catch (error) {
         console.error("Error merging complaints:", error);
-        res.status(500).json({ error: "Failed to merge complaints" });
+        res.status(500).json({ error: error?.message || "Failed to merge complaints" });
     }
 });
 // DELETE complaint
 router.delete("/:id", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
+        const existing = await db_js_1.default.complaint.findUnique({ where: { id } });
+        if (!existing) {
+            return res.status(404).json({ error: "Complaint not found" });
+        }
         await db_js_1.default.complaint.delete({ where: { id } });
         (0, index_js_1.broadcastUpdate)("complaint:delete", { id });
-        res.json({ success: true });
+        res.json({ success: true, id });
     }
     catch (error) {
         console.error("Error deleting complaint:", error);
-        res.status(500).json({ error: "Failed to delete complaint" });
+        res.status(500).json({ error: error?.message || "Failed to delete complaint" });
     }
 });
-// PUT secretary review
+// PUT secretary review (Forward to Manager OR Reject Complaint)
 router.put("/:id/secretary-review", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { status, priority, category, department, adminNotes, rejectReason } = req.body;
     try {
-        if (req.user.role !== "secretary" && req.user.role !== "warden") {
-            return res.status(403).json({ error: "Access denied. Administrative role required." });
+        const roleLower = String(req.user.role || "").toLowerCase();
+        if (!["secretary", "warden", "admin"].includes(roleLower)) {
+            return res.status(403).json({ error: "Access denied. Secretary/Administrative role required." });
         }
-        const complaint = await db_js_1.default.complaint.findUnique({ where: { id } });
-        if (!complaint) {
-            return res.status(404).json({ error: "Complaint not found" });
+        const secretaryUser = await db_js_1.default.user.findUnique({
+            where: { id: req.user.id },
+            select: { id: true, name: true, portal: true, communityCode: true }
+        });
+        if (!secretaryUser) {
+            return res.status(401).json({ error: "Secretary account not found in database. Please log in again." });
         }
-        const actualStatus = status || (rejectReason ? "Rejected" : "Verified");
-        const updated = await db_js_1.default.complaint.update({
+        const complaint = await db_js_1.default.complaint.findUnique({
             where: { id },
-            data: {
-                status: actualStatus,
-                priority: priority || undefined,
-                category: category || undefined,
-                department: department || undefined,
-                adminNotes: adminNotes || rejectReason || undefined,
-                timeline: {
-                    create: [
-                        {
-                            status: actualStatus,
-                            note: rejectReason ? `Rejected by Secretary: ${rejectReason}` : `Verified & approved by Secretary. Priority: ${priority}. Assigned Department: ${department}.`,
-                            by: req.user.name || "Secretary"
-                        }
-                    ]
+            include: { raisedByUser: { select: { id: true, portal: true, communityCode: true, name: true } } }
+        });
+        if (!complaint) {
+            return res.status(404).json({ error: `Complaint "${id}" not found in database.` });
+        }
+        // Society / portal authorization check
+        if (secretaryUser.portal && complaint.portal && secretaryUser.portal.toLowerCase() !== complaint.portal.toLowerCase()) {
+            return res.status(403).json({ error: "Access denied. Complaint belongs to another portal." });
+        }
+        if (secretaryUser.communityCode &&
+            complaint.raisedByUser?.communityCode &&
+            secretaryUser.communityCode !== complaint.raisedByUser.communityCode) {
+            return res.status(403).json({ error: "Access denied. Complaint belongs to another society." });
+        }
+        const isRejecting = String(status || "").toLowerCase() === "rejected" ||
+            (rejectReason !== undefined && String(rejectReason).trim().length > 0);
+        if (isRejecting && (!rejectReason || !String(rejectReason).trim())) {
+            return res.status(400).json({ error: "Rejection reason is mandatory when rejecting a complaint." });
+        }
+        const currentStatusLower = String(complaint.status || "").toLowerCase();
+        const reviewableStatuses = ["submitted", "under-review", "under secretary review", "reopened"];
+        if (!reviewableStatuses.includes(currentStatusLower)) {
+            return res.status(400).json({
+                error: `Complaint cannot be reviewed in its current state ("${complaint.status}"). It has already been forwarded, rejected, or closed.`
+            });
+        }
+        const cleanRejectReason = rejectReason ? String(rejectReason).trim() : "";
+        const cleanAdminNotes = adminNotes ? String(adminNotes).trim() : "";
+        const actualStatus = isRejecting ? "Rejected" : (status || "Forwarded to Manager");
+        const actorName = secretaryUser.name || req.user.name || "Secretary";
+        const result = await db_js_1.default.$transaction(async (tx) => {
+            let managers = [];
+            if (!isRejecting) {
+                const managerRole = complaint.portal === "hostel" ? "warden" : "manager";
+                managers = await tx.user.findMany({
+                    where: {
+                        portal: complaint.portal,
+                        role: managerRole,
+                        status: { notIn: ["rejected", "deactivated"] },
+                        ...(secretaryUser.communityCode ? { communityCode: secretaryUser.communityCode } : {})
+                    },
+                    select: { id: true, name: true }
+                });
+                if (managers.length === 0 && secretaryUser.communityCode) {
+                    managers = await tx.user.findMany({
+                        where: {
+                            portal: complaint.portal,
+                            role: managerRole,
+                            status: { notIn: ["rejected", "deactivated"] }
+                        },
+                        select: { id: true, name: true }
+                    });
                 }
-            },
-            include: { chat: true, timeline: true, subscribers: true }
-        });
-        // Create Notification for the resident who raised it
-        const notifId = `NTF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
-        await db_js_1.default.notification.create({
-            data: {
-                id: notifId,
-                userId: complaint.raisedBy,
-                title: `Complaint Update: ${actualStatus}`,
-                message: rejectReason ? `Your complaint was rejected: ${rejectReason}` : `Your complaint has been verified and forwarded to the operations manager.`,
-                type: rejectReason ? "error" : "success"
             }
+            const detailParts = [];
+            if (priority)
+                detailParts.push(`Priority: ${priority}`);
+            if (department)
+                detailParts.push(`Department: ${department}`);
+            if (cleanAdminNotes)
+                detailParts.push(`Notes: ${cleanAdminNotes}`);
+            const timelineNote = isRejecting
+                ? `Rejected by Secretary (${actorName}): ${cleanRejectReason}`
+                : `Forwarded to Operations Manager by Secretary (${actorName}).${detailParts.length ? ` ${detailParts.join(". ")}.` : ""}`;
+            const now = new Date();
+            const updated = await tx.complaint.update({
+                where: { id },
+                data: {
+                    status: actualStatus,
+                    priority: priority || undefined,
+                    category: category || undefined,
+                    department: department || undefined,
+                    adminNotes: isRejecting ? cleanRejectReason : (cleanAdminNotes || complaint.adminNotes),
+                    ...(isRejecting
+                        ? {
+                            rejectedAt: now,
+                            rejectedBy: secretaryUser.id,
+                            rejectReason: cleanRejectReason
+                        }
+                        : {
+                            forwardedAt: now,
+                            forwardedBy: secretaryUser.id,
+                            forwardedByName: actorName,
+                            managerId: managers[0]?.id || null
+                        }),
+                    timeline: {
+                        create: [
+                            {
+                                status: actualStatus,
+                                note: timelineNote,
+                                by: actorName
+                            }
+                        ]
+                    }
+                },
+                include: complaintInclude
+            });
+            const notifTargets = [
+                {
+                    userId: complaint.raisedBy,
+                    title: isRejecting ? `Complaint Rejected: ${complaint.title}` : "Complaint Under Review — Forwarded to Manager",
+                    message: isRejecting
+                        ? `Your complaint (${complaint.id}) was rejected by the Secretary. Reason: ${cleanRejectReason}`
+                        : `Your complaint (${complaint.id}) has been verified by ${actorName} and forwarded to the Society Manager.`,
+                    type: isRejecting ? "error" : "success"
+                }
+            ];
+            if (!isRejecting) {
+                for (const mgr of managers) {
+                    notifTargets.push({
+                        userId: mgr.id,
+                        title: `Complaint Assigned for Operations: ${complaint.title}`,
+                        message: `${actorName} forwarded complaint ${complaint.id} (Flat ${complaint.unit}, ${complaint.building}, Priority: ${priority || complaint.priority}) for worker dispatch.`,
+                        type: "info"
+                    });
+                }
+            }
+            const notifications = await createComplaintNotifications(tx, notifTargets);
+            return { updated, notifications };
         });
-        (0, index_js_1.broadcastUpdate)("complaint:update", updated);
-        (0, index_js_1.broadcastUpdate)("notification:update", { userId: complaint.raisedBy });
-        res.json(updated);
+        (0, index_js_1.broadcastUpdate)("complaint:update", result.updated);
+        result.notifications.forEach((n) => (0, index_js_1.broadcastUpdate)("notification:update", n));
+        res.json(result.updated);
     }
     catch (error) {
         console.error("Error updating secretary review:", error);
-        res.status(500).json({ error: "Failed to update complaint: " + error.message });
+        res.status(500).json({ error: error?.message || "Failed to review complaint" });
     }
 });
-// PUT manager action
+// PUT manager action (Assign Worker / Update Status / Mark Work Completed)
 router.put("/:id/manager-action", auth_js_1.authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { status, assignedTo, assignedToId, expectedArrival, operationalNotes } = req.body;
     try {
-        if (req.user.role !== "manager" && req.user.role !== "warden") {
-            return res.status(403).json({ error: "Access denied. Operational role required." });
+        const roleLower = String(req.user.role || "").toLowerCase();
+        if (!["manager", "warden", "admin"].includes(roleLower)) {
+            return res.status(403).json({ error: "Access denied. Operations Manager role required." });
         }
         const complaint = await db_js_1.default.complaint.findUnique({ where: { id } });
         if (!complaint) {
             return res.status(404).json({ error: "Complaint not found" });
         }
-        const updated = await db_js_1.default.complaint.update({
-            where: { id },
-            data: {
-                status: status || undefined,
-                assignedTo: assignedTo || undefined,
-                assignedToId: assignedToId || undefined,
-                expectedArrival: expectedArrival || undefined,
-                operationalNotes: operationalNotes || undefined,
-                resolvedAt: status === "Completed" ? new Date() : undefined,
-                timeline: {
-                    create: [
-                        {
-                            status: status || "Worker Being Coordinated",
-                            note: operationalNotes || `Manager updated progress. Worker: ${assignedTo || "Coordinated"}. Expected Arrival: ${expectedArrival || "N/A"}.`,
-                            by: req.user.name || "Manager"
-                        }
-                    ]
+        const currentLower = String(complaint.status || "").toLowerCase();
+        if (["submitted", "under-review", "under secretary review", "rejected"].includes(currentLower)) {
+            return res.status(400).json({
+                error: `Complaint is currently "${complaint.status}" and must be forwarded by the Secretary before Manager action.`
+            });
+        }
+        if (["closed", "resolved"].includes(currentLower)) {
+            return res.status(400).json({ error: "Closed complaints cannot be modified by Manager." });
+        }
+        const nextStatus = status || complaint.status;
+        const isMarkingCompleted = ["completed", "work completed"].includes(String(nextStatus).toLowerCase());
+        const cleanOpsNotes = operationalNotes ? String(operationalNotes).trim() : "";
+        const actorName = req.user.name || "Manager";
+        const result = await db_js_1.default.$transaction(async (tx) => {
+            const updated = await tx.complaint.update({
+                where: { id },
+                data: {
+                    status: nextStatus || undefined,
+                    managerId: complaint.managerId || req.user.id,
+                    assignedTo: assignedTo || undefined,
+                    assignedToId: assignedToId || undefined,
+                    expectedArrival: expectedArrival || undefined,
+                    operationalNotes: cleanOpsNotes || undefined,
+                    completedAt: isMarkingCompleted ? new Date() : undefined,
+                    timeline: {
+                        create: [
+                            {
+                                status: nextStatus || "Worker Being Coordinated",
+                                note: cleanOpsNotes ||
+                                    `Manager (${actorName}) updated status to ${nextStatus}.${assignedTo ? ` Worker: ${assignedTo}.` : ""}${expectedArrival ? ` ETA: ${expectedArrival}.` : ""}`,
+                                by: actorName
+                            }
+                        ]
+                    }
+                },
+                include: complaintInclude
+            });
+            const notifTargets = [
+                {
+                    userId: complaint.raisedBy,
+                    title: isMarkingCompleted
+                        ? `Work Completed — Please Confirm & Rate`
+                        : `Complaint Progress: ${nextStatus}`,
+                    message: isMarkingCompleted
+                        ? `Manager marked "${complaint.title}" (${complaint.id}) as Completed. Please verify and confirm resolution.`
+                        : `Your complaint "${complaint.title}" is now ${nextStatus}.${assignedTo ? ` Assigned technician: ${assignedTo}.` : ""}${expectedArrival ? ` ETA: ${expectedArrival}.` : ""}`,
+                    type: isMarkingCompleted ? "success" : "info"
                 }
-            },
-            include: { chat: true, timeline: true, subscribers: true }
-        });
-        // Create Notification for the resident
-        const notifId = `NTF-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
-        await db_js_1.default.notification.create({
-            data: {
-                id: notifId,
-                userId: complaint.raisedBy,
-                title: `Complaint Progress: ${status}`,
-                message: `Manager updated your complaint status to ${status}. Details: ${operationalNotes || "N/A"}`,
-                type: status === "Completed" ? "success" : "info"
+            ];
+            const effectiveWorkerId = assignedToId || complaint.assignedToId;
+            if (effectiveWorkerId && !isMarkingCompleted) {
+                notifTargets.push({
+                    userId: effectiveWorkerId,
+                    title: `New Work Dispatch: ${complaint.title}`,
+                    message: `You were assigned to Flat ${complaint.unit} (${complaint.building}). ETA: ${expectedArrival || complaint.expectedArrival || "ASAP"}. ${cleanOpsNotes}`,
+                    type: "info"
+                });
             }
+            const notifications = await createComplaintNotifications(tx, notifTargets);
+            return { updated, notifications };
         });
-        (0, index_js_1.broadcastUpdate)("complaint:update", updated);
-        (0, index_js_1.broadcastUpdate)("notification:update", { userId: complaint.raisedBy });
-        res.json(updated);
+        (0, index_js_1.broadcastUpdate)("complaint:update", result.updated);
+        result.notifications.forEach((n) => (0, index_js_1.broadcastUpdate)("notification:update", n));
+        res.json(result.updated);
     }
     catch (error) {
         console.error("Error updating manager action:", error);
-        res.status(500).json({ error: "Failed to update complaint: " + error.message });
+        res.status(500).json({ error: error?.message || "Failed to update complaint" });
     }
 });
 exports.default = router;

@@ -1325,10 +1325,15 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
                                           size="sm"
                                           variant="destructive"
                                           onClick={async () => {
-                                            await useCommunityStore.getState().reviewComplaintSecretary(c.id, {
-                                              rejectReason: rejectReasonValue
-                                            });
-                                            alert("Complaint marked as rejected.");
+                                            try {
+                                              await useCommunityStore.getState().reviewComplaintSecretary(c.id, {
+                                                status: "Rejected",
+                                                rejectReason: rejectReasonValue
+                                              });
+                                              alert("Complaint marked as rejected.");
+                                            } catch (err: any) {
+                                              alert("Error rejecting complaint: " + (err?.message || "Failed to reject complaint"));
+                                            }
                                           }}
                                           className="h-8 rounded-lg text-xs"
                                         >
@@ -1338,14 +1343,18 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
                                         <Button
                                           size="sm"
                                           onClick={async () => {
-                                            await useCommunityStore.getState().reviewComplaintSecretary(c.id, {
-                                              status: "Forwarded to Manager",
-                                              priority,
-                                              category: c.category,
-                                              department: dept,
-                                              adminNotes: adminNotesValue
-                                            });
-                                            alert("Complaint approved & forwarded to Manager.");
+                                            try {
+                                              await useCommunityStore.getState().reviewComplaintSecretary(c.id, {
+                                                status: "Forwarded to Manager",
+                                                priority,
+                                                category: c.category,
+                                                department: dept,
+                                                adminNotes: adminNotesValue
+                                              });
+                                              alert("Complaint approved & forwarded to Manager.");
+                                            } catch (err: any) {
+                                              alert("Error forwarding complaint: " + (err?.message || "Failed to forward complaint"));
+                                            }
                                           }}
                                           className="h-8 rounded-lg text-xs gradient-primary text-white border-0"
                                         >

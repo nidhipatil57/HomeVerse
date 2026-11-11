@@ -158,8 +158,8 @@ export default function ComplaintsPage() {
   const [managerTab, setManagerTab] = useState<"in-progress" | "solved">("in-progress");
 
   const getResidentMaskedStatus = (status: string) => {
-    const s = status.toLowerCase();
-    if (["submitted", "under-review", "verified", "forwarded to manager"].includes(s)) {
+    const s = (status || "").toLowerCase();
+    if (["submitted", "under-review", "under secretary review", "verified", "forwarded to manager"].includes(s)) {
       return { label: "Under Review", badgeClass: "bg-amber-500/10 text-amber-600 border-amber-500/20" };
     }
     if (["worker being coordinated", "assigned", "accepted"].includes(s)) {
@@ -180,8 +180,11 @@ export default function ComplaintsPage() {
     if (["completed", "work completed"].includes(s)) {
       return { label: "Completed", badgeClass: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" };
     }
-    if (s === "closed") {
+    if (s === "closed" || s === "resolved") {
       return { label: "Closed", badgeClass: "bg-gray-500/10 text-gray-500 border-gray-500/20" };
+    }
+    if (s === "rejected") {
+      return { label: "Rejected", badgeClass: "bg-red-500/10 text-red-600 border-red-500/20" };
     }
     if (s === "reopened") {
       return { label: "Reopened (Under Review)", badgeClass: "bg-purple-500/10 text-purple-600 border-purple-500/20" };
@@ -270,22 +273,24 @@ export default function ComplaintsPage() {
       // 1. Role boundaries
       if (isResident) {
         // Resident sees only own flat complaints OR complaints they subscribed to
-        const isOwner = c.raisedBy === user?.id || c.unit === user?.unit;
+        const isOwner = c.raisedBy === user?.id || (user?.unit && c.unit === user.unit);
         const isSubscribed = c.subscribers?.some(s => s.userId === user?.id);
         if (!isOwner && !isSubscribed) return false;
 
         // Apply resident tab filtering
+        const s = (c.status || "").toLowerCase();
         const isActiveStatus = [
-          "submitted", "under-review", "Verified", "Forwarded to Manager",
-          "Worker Being Coordinated", "Scheduled", "Work In Progress", "reopened",
+          "submitted", "under-review", "under secretary review", "verified", "forwarded to manager",
+          "worker being coordinated", "scheduled", "work in progress", "work started", "reopened",
           "assigned", "accepted", "travelling", "reached-society", "reached-building",
-          "reached-flat", "work-started", "in-progress", "completed", "Completed"
-        ].includes(c.status);
+          "reached-flat", "work-started", "in-progress", "awaiting completion", "delayed",
+          "rescheduled", "completed", "work completed", "resident-verification"
+        ].includes(s);
 
         if (residentTab === "active") {
           if (!isActiveStatus) return false;
         } else {
-          // completed
+          // completed / closed / rejected
           if (isActiveStatus) return false;
         }
       } else if (isWorker) {
@@ -304,19 +309,20 @@ export default function ComplaintsPage() {
         if (!isSecurityCat) return false;
       } else if (isSecretary) {
         // Secretary filters based on secretaryTab
-        const s = c.status?.toLowerCase();
+        const s = (c.status || "").toLowerCase();
         if (secretaryTab === "new") {
-          return ["submitted", "under-review", "verified", "reopened", "reopen"].includes(s);
+          return ["submitted", "under-review", "under secretary review", "reopened", "reopen"].includes(s);
         } else if (secretaryTab === "forwarded") {
-          return ["forwarded to manager", "worker being coordinated", "assigned", "accepted", "scheduled", "work in progress", "in-progress", "work started", "awaiting completion", "delayed", "rescheduled", "completed", "completed"].includes(s);
+          return ["verified", "forwarded to manager", "worker being coordinated", "assigned", "accepted", "scheduled", "work in progress", "in-progress", "work started", "work-started", "awaiting completion", "delayed", "rescheduled", "completed", "work completed", "resident-verification"].includes(s);
         } else if (secretaryTab === "rejected") {
           return s === "rejected";
         } else if (secretaryTab === "history") {
           return ["closed", "resolved"].includes(s);
         }
       } else if (isManager) {
-        // Manager filters based on managerTab
-        const s = c.status?.toLowerCase();
+        // Manager only sees Secretary-forwarded / active / solved complaints (never unforwarded or rejected)
+        const s = (c.status || "").toLowerCase();
+        if (["submitted", "under-review", "under secretary review", "rejected"].includes(s)) return false;
         const isSolved = ["closed", "resolved", "completed", "work completed"].includes(s);
         if (managerTab === "in-progress") {
           if (isSolved) return false;
@@ -509,22 +515,25 @@ export default function ComplaintsPage() {
     };
 
     try {
-      await addComplaint(payload);
-    } catch (err) {
+      const saved = await addComplaint(payload);
+      if (saved && (saved as any).id) {
+        setSelectedComplaintId((saved as any).id);
+      }
+      // Reset fields only after database persistence succeeds
+      setTitle("");
+      setDescription("");
+      setCategory("plumbing");
+      setPriority("medium");
+      setWing("");
+      setFlat("");
+      setEmergency(false);
+      setUploadedImages([]);
+      setUploadedVideos([]);
+      setDialogOpen(false);
+    } catch (err: any) {
       console.error("Error creating complaint:", err);
+      alert("Error submitting complaint: " + (err?.message || "Please verify your login session and try again."));
     }
-
-    // Reset fields
-    setTitle("");
-    setDescription("");
-    setCategory("plumbing");
-    setPriority("medium");
-    setWing("");
-    setFlat("");
-    setEmergency(false);
-    setUploadedImages([]);
-    setUploadedVideos([]);
-    setDialogOpen(false);
   };
 
   const handleJoinExisting = async (parentIssue: Complaint) => {
@@ -658,12 +667,17 @@ export default function ComplaintsPage() {
 
   const handlePriorityOverride = async () => {
     if (!selected || !overridePriority) return;
-    await updateComplaintStatus(selected.id, selected.status, {
-      by: user?.name || "Secretary",
-      note: `Priority changed manually from ${selected.priority.toUpperCase()} to ${overridePriority.toUpperCase()}.`,
-      priority: overridePriority
-    } as any);
-    setOverridePriority("");
+    try {
+      await updateComplaintStatus(selected.id, selected.status, {
+        by: user?.name || "Secretary",
+        note: `Priority changed manually from ${selected.priority.toUpperCase()} to ${overridePriority.toUpperCase()}.`,
+        priority: overridePriority
+      });
+      setOverridePriority("");
+      alert("Priority updated successfully.");
+    } catch (err: any) {
+      alert("Error updating priority: " + (err?.message || "Failed to update priority"));
+    }
   };
 
   const handleStatusChangeAdmin = async (status: ComplaintStatus) => {
@@ -1402,9 +1416,13 @@ export default function ComplaintsPage() {
                           size="sm"
                           onClick={async () => {
                             if (confirm("Are you sure you want to delete this complaint?")) {
-                              await fetch(`/api/complaints/${selected.id}`, { method: "DELETE" });
-                              setSelectedComplaintId(null);
-                              alert("Ticket deleted.");
+                              try {
+                                await useCommunityStore.getState().deleteComplaint(selected.id);
+                                setSelectedComplaintId(null);
+                                alert("Ticket deleted.");
+                              } catch (err: any) {
+                                alert("Error deleting complaint: " + (err?.message || "Failed to delete"));
+                              }
                             }
                           }}
                           className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10 rounded-lg shrink-0"
@@ -1535,8 +1553,31 @@ export default function ComplaintsPage() {
                         </div>
                       </div>
 
+                      {/* Rejection Reason Banner */}
+                      {selected.status?.toLowerCase() === "rejected" && (
+                        <div className="p-3.5 bg-red-500/10 rounded-xl border border-red-500/20 space-y-1">
+                          <span className="font-bold text-red-600 uppercase tracking-wider text-[9px] block">
+                            Complaint Rejected by Secretary {selected.rejectedAt ? `· ${new Date(selected.rejectedAt).toLocaleString()}` : ""}
+                          </span>
+                          <p className="text-foreground text-xs font-semibold">
+                            {selected.rejectReason || selected.adminNotes || "Rejected by Secretary."}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Forwarded Audit Banner for Secretary / Manager */}
+                      {!isResident && selected.forwardedAt && (
+                        <div className="p-3.5 bg-blue-500/5 rounded-xl border border-blue-500/15 space-y-1">
+                          <span className="font-bold text-blue-600 uppercase tracking-wider text-[9px] block">Forwarded to Manager</span>
+                          <p className="text-foreground text-xs">
+                            Verified & forwarded by <strong>{selected.forwardedByName || "Secretary"}</strong> on{" "}
+                            <strong>{new Date(selected.forwardedAt).toLocaleString()}</strong>
+                          </p>
+                        </div>
+                      )}
+
                       {/* Admin Notes from Secretary */}
-                      {selected.adminNotes && (
+                      {selected.adminNotes && selected.status?.toLowerCase() !== "rejected" && (
                         <div className="p-3.5 bg-indigo-500/5 rounded-xl border border-indigo-500/10 space-y-1">
                           <span className="font-bold text-indigo-500 uppercase tracking-wider text-[9px] block">Secretary Validation Notes</span>
                           <p className="text-foreground text-xs font-semibold">{selected.adminNotes}</p>
@@ -1564,9 +1605,9 @@ export default function ComplaintsPage() {
                         <div className="p-4 bg-secondary/15 rounded-xl border border-border/40 space-y-4">
                           <span className="font-bold text-foreground block text-sm">Manager Operations Console</span>
 
-                          {selected.status !== "Completed" && selected.status !== "closed" ? (
+                          {!["completed", "work completed", "closed", "resolved"].includes((selected.status || "").toLowerCase()) ? (
                             <>
-                              {!["Work In Progress", "in-progress", "work-started"].includes(selected.status) ? (
+                              {!["work in progress", "in-progress", "work-started", "work started", "awaiting completion", "delayed", "rescheduled", "assigned", "scheduled", "worker being coordinated"].includes((selected.status || "").toLowerCase()) && !selected.assignedTo ? (
                                 /* Form to Assign Worker & Dispatch */
                                 <form onSubmit={handleManagerActionSubmit} className="space-y-3">
                                   <span className="font-bold text-muted-foreground text-[10px] block uppercase tracking-wider">Assign Worker & Dispatch Task</span>
@@ -1701,7 +1742,7 @@ export default function ComplaintsPage() {
                           </div>
 
                           {/* Forward or Reject Controls */}
-                          {["submitted", "under-review"].includes(selected.status) ? (
+                          {["submitted", "under-review", "under secretary review", "reopened"].includes((selected.status || "").toLowerCase()) ? (
                             <div className="space-y-4 pt-3 border-t border-border/30">
                               <div>
                                 <label className="text-[10px] text-muted-foreground uppercase font-bold block mb-1">Administrative / Rejection Notes</label>

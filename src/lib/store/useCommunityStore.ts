@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { io } from "socket.io-client";
+import { getAuthHeaders, getStoredAuthToken } from "./useAuth";
 import {
   Complaint, ComplaintTimelineEntry, Visitor, VisitorStatus, UserRole, PortalType, User, Announcement, EmergencyAlert,
   GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord,
@@ -432,14 +433,15 @@ interface CommunityState {
   addRegisteredUser: (u: User & Record<string, any>) => Promise<void>;
   
   // Complaint Transactions
-  addComplaint: (c: Omit<Complaint, "id" | "createdAt" | "updatedAt" | "timeline">) => Promise<void>;
-  updateComplaintStatus: (id: string, status: Complaint["status"], details?: { by?: string; note?: string; afterPhoto?: string }) => Promise<void>;
+  addComplaint: (c: Omit<Complaint, "id" | "createdAt" | "updatedAt" | "timeline">) => Promise<Complaint>;
+  updateComplaintStatus: (id: string, status: Complaint["status"], details?: { by?: string; note?: string; afterPhoto?: string; priority?: ComplaintPriority }) => Promise<void>;
   assignComplaintWorker: (id: string, workerName: string, workerId: string, eta: string) => Promise<void>;
   rateComplaint: (id: string, rating: number, review?: string) => Promise<void>;
   addComplaintChatMessage: (id: string, message: Omit<ComplaintChatMessage, "id" | "timestamp">) => Promise<void>;
   mergeComplaints: (parentTicketId: string, duplicateTicketIds: string[]) => Promise<void>;
   subscribeToComplaint: (id: string, userId: string, userName: string, unit: string) => Promise<void>;
   updateComplaintEta: (id: string, eta: string) => Promise<void>;
+  deleteComplaint: (id: string) => Promise<void>;
 
   // Leaves Transactions
   submitLeaveRequest: (req: Omit<LeaveRequest, "id" | "status" | "createdAt">) => Promise<void>;
@@ -672,6 +674,11 @@ const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
             localStorage.setItem("homeverse_gatePasses", JSON.stringify(finalPasses));
             return finalPasses as unknown as T;
           }
+          if (key === "complaints") {
+            const cleaned = parsed.filter((c: any) => c && c.id && !/^CMP-1[5-9]\d{8,}/.test(String(c.id)));
+            localStorage.setItem("homeverse_complaints", JSON.stringify(cleaned));
+            return cleaned as unknown as T;
+          }
           if (parsed.length > 0) {
             return parsed as unknown as T;
           }
@@ -683,7 +690,7 @@ const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
 };
 
 export const useCommunityStore = create<CommunityState>((set, get) => ({
-  complaints: loadLocalOrSeed("complaints", getPrepopulatedComplaints),
+  complaints: loadLocalOrSeed("complaints", () => [] as Complaint[]),
   leaveRequests: loadLocalOrSeed("leaveRequests", getPrepopulatedLeaveRequests),
   visitors: loadLocalOrSeed("visitors", getPrepopulatedVisitors),
   laundrySlots: loadLocalOrSeed("laundrySlots", getPrepopulatedLaundrySlots),
@@ -901,29 +908,33 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         }
         localStorage.setItem("homeverse_flatAttendance", JSON.stringify(finalFlatAtt));
         localUpdates.flatAttendance = finalFlatAtt;
-        // Guarantee empty collections and clean payments with ONLY October pending
+        // Guarantee empty collections and always-fresh payments from seed (prevents stale localStorage duplicates)
         localStorage.removeItem("homeverse_collections");
         localUpdates.collections = [];
 
-        const initStoredPayments = localStorage.getItem("homeverse_payments");
-        let basePayments = getPrepopulatedPayments();
-        if (initStoredPayments) {
-          try {
-            const parsedP = JSON.parse(initStoredPayments);
-            if (Array.isArray(parsedP) && parsedP.length >= 100) {
-              basePayments = parsedP;
-            }
-          } catch (e) {}
-        }
-        const cleanPayments = basePayments.map((p: any) => {
+        // Always start from seed to avoid stale localStorage duplicates
+        const freshSeedPayments = getPrepopulatedPayments();
+        // Apply status rules: October Maintenance stays pending, everything else is paid
+        const cleanPayments = freshSeedPayments.map((p: any) => {
           const isOct = p.id?.includes("OCT") || (p.description || "").includes("October 2026") || (p.dueDate && p.dueDate.startsWith("2026-10"));
           if (isOct && p.paymentType === "Maintenance") {
-            return p.status === "paid" ? p : { ...p, status: "pending" };
+            return { ...p, status: "pending" };
           }
           return { ...p, status: "paid" };
         });
-        localStorage.setItem("homeverse_payments", JSON.stringify(cleanPayments));
-        localUpdates.payments = cleanPayments;
+        // Final dedup: strictly one pending Maintenance per resident per month
+        const seenFinal = new Set<string>();
+        const finalCleanPayments: any[] = [];
+        for (const p of cleanPayments) {
+          if (p.paymentType === "Maintenance" && p.status?.toLowerCase() === "pending") {
+            const key = `${p.residentId || p.unit}_${p.month || (p.id?.includes("OCT") ? "October 2026" : p.dueDate)}`;
+            if (seenFinal.has(key)) continue;
+            seenFinal.add(key);
+          }
+          finalCleanPayments.push(p);
+        }
+        localStorage.setItem("homeverse_payments", JSON.stringify(finalCleanPayments));
+        localUpdates.payments = finalCleanPayments;
       } catch (e) {}
     }
 
@@ -948,8 +959,12 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       set(localUpdates as any);
     }
 
-    if ((globalThis as any).__homeverse_db_initialized) return;
+    const currentToken = getStoredAuthToken() || "";
+    const alreadyInitialized = Boolean((globalThis as any).__homeverse_db_initialized);
+    const tokenChanged = (globalThis as any).__homeverse_last_token !== currentToken;
+    if (alreadyInitialized && !tokenChanged) return;
     (globalThis as any).__homeverse_db_initialized = true;
+    (globalThis as any).__homeverse_last_token = currentToken;
 
     // 1. Initial REST state fetch
     const fetchInitialState = async () => {
@@ -991,11 +1006,12 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         ];
 
         const updates: Record<string, any> = {};
+        const reqInit: RequestInit = { credentials: "include", headers: getAuthHeaders() };
 
         await Promise.all(
           endpoints.map(async ({ key, path }) => {
             try {
-              const res = await fetch(path);
+              const res = await fetch(path, reqInit);
               if (res.ok) {
                 let data = await res.json();
                 if (key === "attendance" && Array.isArray(data)) {
@@ -1054,7 +1070,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                   }
                 }
 
-                if (Array.isArray(data) && data.length > 0) {
+                if (Array.isArray(data) && (data.length > 0 || key === "complaints" || key === "notifications")) {
                   updates[key] = data;
                   if (typeof window !== "undefined") {
                     try {
@@ -1084,6 +1100,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
       const criticalEndpoints = [
         { key: "complaints", path: "/api/complaints" },
+        { key: "notifications", path: "/api/notifications" },
         { key: "serviceBookings", path: "/api/community-services/bookings" },
         { key: "helpers", path: "/api/visitors/helpers" },
         { key: "attendance", path: "/api/visitors/attendance" },
@@ -1095,11 +1112,12 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       ];
 
       const batchUpdates: Record<string, any> = {};
+      const pollInit: RequestInit = { credentials: "include", headers: getAuthHeaders() };
 
       await Promise.all(
         criticalEndpoints.map(async ({ key, path }) => {
           try {
-            const res = await fetch(path);
+            const res = await fetch(path, pollInit);
             if (res.ok) {
               let data = await res.json();
               if (key === "attendance" && Array.isArray(data)) {
@@ -1113,6 +1131,8 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
               if (Array.isArray(data)) {
                 if (key === "complaints") {
                   data.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+                } else if (key === "notifications") {
+                  data.sort((a: any, b: any) => new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime());
                 } else if (key === "serviceBookings") {
                   data.sort((a: any, b: any) => new Date(b.createdAt || b.scheduledDate || 0).getTime() - new Date(a.createdAt || a.scheduledDate || 0).getTime());
                 } else if (key === "attendance") {
@@ -1139,6 +1159,9 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
               const nextStr = JSON.stringify(data);
               if (currentStr !== nextStr) {
                 batchUpdates[key] = data;
+                if ((key === "complaints" || key === "notifications") && typeof window !== "undefined") {
+                  try { localStorage.setItem(`homeverse_${key}`, nextStr); } catch (e) {}
+                }
               }
             }
           } catch (e) {}
@@ -1200,14 +1223,24 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
 
     socket.on("complaint:update", (updated: any) => {
+      if (!updated || !updated.id) return;
       const current = get().complaints || [];
       const index = current.findIndex(c => c.id === updated.id);
-      if (index > -1) {
-        const next = [...current];
-        next[index] = updated;
-        set({ complaints: next });
-      } else {
-        set({ complaints: [updated, ...current] });
+      const next = index > -1
+        ? current.map((c, idx) => (idx === index ? updated : c))
+        : [updated, ...current];
+      set({ complaints: next });
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_complaints", JSON.stringify(next)); } catch (e) {}
+      }
+    });
+
+    socket.on("complaint:delete", ({ id }: any) => {
+      if (!id) return;
+      const next = (get().complaints || []).filter(c => c.id !== id);
+      set({ complaints: next });
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_complaints", JSON.stringify(next)); } catch (e) {}
       }
     });
 
@@ -1389,14 +1422,15 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
 
     socket.on("notification:update", (updated: any) => {
+      if (!updated || !updated.id) return;
       const current = get().notifications || [];
       const index = current.findIndex(n => n.id === updated.id);
-      if (index > -1) {
-        const next = [...current];
-        next[index] = updated;
-        set({ notifications: next });
-      } else {
-        set({ notifications: [updated, ...current] });
+      const next = index > -1
+        ? current.map((n, idx) => (idx === index ? updated : n))
+        : [updated, ...current];
+      set({ notifications: next });
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_notifications", JSON.stringify(next)); } catch (e) {}
       }
     });
 
@@ -1618,29 +1652,26 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   addComplaint: async (c) => {
-    const id = `CMP-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
-    const now = new Date().toISOString();
-    const newComplaint: Complaint = {
-      ...c,
-      id,
-      status: (c.status as any) || "submitted",
-      portal: c.portal || "society",
-      createdAt: now,
-      updatedAt: now,
-      timeline: [
-        {
-          status: (c.status as any) || "submitted",
-          timestamp: now,
-          by: c.raisedByName || "Resident",
-          note: "Complaint registered and submitted."
-        }
-      ],
-      chat: [],
-      subscribers: []
-    };
+    const res = await fetch("/api/complaints", {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(c)
+    });
 
+    if (!res.ok) {
+      let errMsg = `Failed to register complaint (HTTP ${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) errMsg = body.error;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const savedComplaint: Complaint = await res.json();
     set((state) => {
-      const updated = [newComplaint, ...(state.complaints || [])];
+      const filtered = (state.complaints || []).filter((cmp) => cmp.id !== savedComplaint.id);
+      const updated = [savedComplaint, ...filtered];
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
@@ -1648,37 +1679,35 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       }
       return { complaints: updated };
     });
-
-    try {
-      await fetch("/api/complaints", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newComplaint)
-      });
-    } catch (e) {}
+    return savedComplaint;
   },
 
   updateComplaintStatus: async (id, status, details) => {
-    const now = new Date().toISOString();
+    const res = await fetch(`/api/complaints/${id}/status`, {
+      method: "PUT",
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        status,
+        note: details?.note,
+        by: details?.by,
+        priority: details?.priority,
+        afterPhoto: details?.afterPhoto
+      })
+    });
+
+    if (!res.ok) {
+      let errMsg = `Failed to update complaint status (HTTP ${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) errMsg = body.error;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const serverUpdated: Complaint = await res.json();
     set((state) => {
-      const updated = (state.complaints || []).map((cmp) => {
-        if (cmp.id === id) {
-          const newTimelineItem: ComplaintTimelineEntry = {
-            status,
-            timestamp: now,
-            by: details?.by || "Staff",
-            note: details?.note || `Status changed to ${status}`,
-            afterPhoto: details?.afterPhoto
-          };
-          return {
-            ...cmp,
-            status,
-            updatedAt: now,
-            timeline: [...(cmp.timeline || []), newTimelineItem]
-          };
-        }
-        return cmp;
-      });
+      const updated = (state.complaints || []).map((cmp) => (cmp.id === id ? serverUpdated : cmp));
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
@@ -1686,39 +1715,28 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       }
       return { complaints: updated };
     });
-
-    try {
-      await fetch(`/api/complaints/${id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, note: details?.note, by: details?.by })
-      });
-    } catch (e) {}
   },
 
   assignComplaintWorker: async (id, workerName, workerId, eta) => {
-    const now = new Date().toISOString();
+    const res = await fetch(`/api/complaints/${id}/assign`, {
+      method: "PUT",
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ assignedTo: workerName, assignedToId: workerId, note: `Assigned ETA: ${eta}` })
+    });
+
+    if (!res.ok) {
+      let errMsg = `Failed to assign worker (HTTP ${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) errMsg = body.error;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const serverUpdated: Complaint = await res.json();
     set((state) => {
-      const updated = (state.complaints || []).map((cmp) => {
-        if (cmp.id === id) {
-          const newTimelineItem: ComplaintTimelineEntry = {
-            status: "assigned" as const,
-            timestamp: now,
-            by: "Management",
-            note: `Assigned to ${workerName} (ETA: ${eta})`
-          };
-          return {
-            ...cmp,
-            status: "assigned" as const,
-            assignedTo: workerName,
-            assignedToId: workerId,
-            eta,
-            updatedAt: now,
-            timeline: [...(cmp.timeline || []), newTimelineItem]
-          };
-        }
-        return cmp;
-      });
+      const updated = (state.complaints || []).map((cmp) => (cmp.id === id ? serverUpdated : cmp));
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
@@ -1726,24 +1744,28 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       }
       return { complaints: updated };
     });
-
-    try {
-      await fetch(`/api/complaints/${id}/assign`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignedTo: workerName, assignedToId: workerId, note: `Assigned ETA: ${eta}` })
-      });
-    } catch (e) {}
   },
 
   rateComplaint: async (id, rating, review) => {
+    const res = await fetch(`/api/complaints/${id}/rate`, {
+      method: "PUT",
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ rating, review })
+    });
+
+    if (!res.ok) {
+      let errMsg = `Failed to rate and close complaint (HTTP ${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) errMsg = body.error;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const serverUpdated: Complaint = await res.json();
     set((state) => {
-      const updated = (state.complaints || []).map((cmp) => {
-        if (cmp.id === id) {
-          return { ...cmp, rating, review };
-        }
-        return cmp;
-      });
+      const updated = (state.complaints || []).map((cmp) => (cmp.id === id ? serverUpdated : cmp));
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
@@ -1751,29 +1773,34 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       }
       return { complaints: updated };
     });
-
-    try {
-      await fetch(`/api/complaints/${id}/rate`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rating, review })
-      });
-    } catch (e) {}
   },
 
   addComplaintChatMessage: async (id, msg) => {
-    const now = new Date().toISOString();
-    const newMsg = {
-      id: `MSG-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
-      timestamp: now,
-      ...msg
-    };
+    const res = await fetch(`/api/complaints/${id}/chat`, {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ message: msg.message, senderId: msg.senderId, senderName: msg.senderName, senderRole: msg.senderRole })
+    });
+
+    if (!res.ok) {
+      let errMsg = `Failed to send chat message (HTTP ${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) errMsg = body.error;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const savedMsg = await res.json();
     set((state) => {
       const updated = (state.complaints || []).map((cmp) => {
         if (cmp.id === id) {
+          const existing = cmp.chat || [];
+          const hasMsg = existing.some((m: any) => m.id === savedMsg.id);
           return {
             ...cmp,
-            chat: [...(cmp.chat || []), newMsg]
+            chat: hasMsg ? existing : [...existing, savedMsg]
           };
         }
         return cmp;
@@ -1785,19 +1812,31 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       }
       return { complaints: updated };
     });
-
-    try {
-      await fetch(`/api/complaints/${id}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg.message, senderId: msg.senderId, senderName: msg.senderName, senderRole: msg.senderRole })
-      });
-    } catch (e) {}
   },
 
   mergeComplaints: async (parentTicketId, duplicateTicketIds) => {
+    const res = await fetch("/api/complaints/merge", {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ parentTicketId, duplicateTicketIds })
+    });
+
+    if (!res.ok) {
+      let errMsg = `Failed to merge complaints (HTTP ${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) errMsg = body.error;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const body = await res.json();
     set((state) => {
       const updated = (state.complaints || []).map((cmp) => {
+        if (cmp.id === parentTicketId && body?.parent) {
+          return body.parent;
+        }
         if (duplicateTicketIds.includes(cmp.id)) {
           return { ...cmp, status: "closed" as const, parentTicketId };
         }
@@ -1810,17 +1849,26 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       }
       return { complaints: updated };
     });
-
-    try {
-      await fetch("/api/complaints/merge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parentTicketId, duplicateTicketIds })
-      });
-    } catch (e) {}
   },
 
   subscribeToComplaint: async (id, userId, userName, unit) => {
+    const res = await fetch(`/api/complaints/${id}/subscribe`, {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ userId, userName, unit })
+    });
+
+    if (!res.ok) {
+      let errMsg = `Failed to subscribe to complaint (HTTP ${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) errMsg = body.error;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const savedSub = await res.json();
     set((state) => {
       const updated = (state.complaints || []).map((cmp) => {
         if (cmp.id === id) {
@@ -1828,7 +1876,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           if (!subs.some((s: any) => s.userId === userId)) {
             return {
               ...cmp,
-              subscribers: [...subs, { userId, name: userName, unit }]
+              subscribers: [...subs, { userId, name: userName || savedSub.userName, unit: unit || savedSub.unit }]
             };
           }
         }
@@ -1841,24 +1889,28 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       }
       return { complaints: updated };
     });
-
-    try {
-      await fetch(`/api/complaints/${id}/subscribe`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, userName, unit })
-      });
-    } catch (e) {}
   },
 
   updateComplaintEta: async (id, eta) => {
+    const res = await fetch(`/api/complaints/${id}/eta`, {
+      method: "PUT",
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ eta })
+    });
+
+    if (!res.ok) {
+      let errMsg = `Failed to update ETA (HTTP ${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) errMsg = body.error;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const serverUpdated: Complaint = await res.json();
     set((state) => {
-      const updated = (state.complaints || []).map((cmp) => {
-        if (cmp.id === id) {
-          return { ...cmp, eta };
-        }
-        return cmp;
-      });
+      const updated = (state.complaints || []).map((cmp) => (cmp.id === id ? serverUpdated : cmp));
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
@@ -1866,14 +1918,33 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       }
       return { complaints: updated };
     });
+  },
 
-    try {
-      await fetch(`/api/complaints/${id}/eta`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eta })
-      });
-    } catch (e) {}
+  deleteComplaint: async (id) => {
+    const res = await fetch(`/api/complaints/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: getAuthHeaders()
+    });
+
+    if (!res.ok) {
+      let errMsg = `Failed to delete complaint (HTTP ${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) errMsg = body.error;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    set((state) => {
+      const updated = (state.complaints || []).filter((cmp) => cmp.id !== id);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return { complaints: updated };
+    });
   },
 
   submitLeaveRequest: async (req) => {
@@ -3162,14 +3233,17 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   sendNotification: async (userId, title, message, type) => {
     await fetch("/api/notifications", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ userId, title, message, type })
     });
   },
 
   markNotificationsRead: async (userId) => {
     await fetch("/api/notifications/read", {
-      method: "PUT"
+      method: "PUT",
+      credentials: "include",
+      headers: getAuthHeaders()
     });
   },
 
@@ -3811,33 +3885,53 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   reviewComplaintSecretary: async (id, data) => {
     const res = await fetch(`/api/complaints/${id}/secretary-review`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      credentials: "include",
       body: JSON.stringify(data)
     });
     if (res.ok) {
       const updated = await res.json();
-      set((state) => ({
-        complaints: state.complaints.map((c) => (c.id === id ? updated : c))
-      }));
+      set((state) => {
+        const next = state.complaints.map((c) => (c.id === id ? updated : c));
+        if (typeof window !== "undefined") {
+          try { localStorage.setItem("homeverse_complaints", JSON.stringify(next)); } catch (e) {}
+        }
+        return { complaints: next };
+      });
       return updated;
     }
-    throw new Error("Failed to review complaint");
+    let errMsg = `Failed to review complaint (HTTP ${res.status})`;
+    try {
+      const errBody = await res.json();
+      if (errBody?.error) errMsg = errBody.error;
+    } catch (e) {}
+    throw new Error(errMsg);
   },
 
   actionComplaintManager: async (id, data) => {
     const res = await fetch(`/api/complaints/${id}/manager-action`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      credentials: "include",
       body: JSON.stringify(data)
     });
     if (res.ok) {
       const updated = await res.json();
-      set((state) => ({
-        complaints: state.complaints.map((c) => (c.id === id ? updated : c))
-      }));
+      set((state) => {
+        const next = state.complaints.map((c) => (c.id === id ? updated : c));
+        if (typeof window !== "undefined") {
+          try { localStorage.setItem("homeverse_complaints", JSON.stringify(next)); } catch (e) {}
+        }
+        return { complaints: next };
+      });
       return updated;
     }
-    throw new Error("Failed to update complaint operations");
+    let errMsg = `Failed to update complaint operations (HTTP ${res.status})`;
+    try {
+      const errBody = await res.json();
+      if (errBody?.error) errMsg = errBody.error;
+    } catch (e) {}
+    throw new Error(errMsg);
   },
 
   addStaticWorker: async (workerData) => {
