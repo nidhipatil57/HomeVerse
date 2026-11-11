@@ -1,4 +1,4 @@
-import { Complaint, Visitor, User, Announcement, EmergencyAlert, GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord } from "@/types";
+import { Complaint, Visitor, User, Announcement, EmergencyAlert, GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord, Helper, HelperAttendance } from "@/types";
 import {
   LeaveRequest,
   LaundrySlot,
@@ -184,12 +184,62 @@ export const getPrepopulatedVisitors = (): Visitor[] => [
     name: "Anita Sen",
     phone: "+91 98555 66666",
     purpose: "Relative",
-    visitingUnit: "A-102",
+    visitingUnit: "102",
     visitingResident: "Gaurav Sen",
     status: "denied",
     date: "2026-07-05",
     portal: "society",
     approvedBy: "Raj Singh (Security)"
+  },
+  {
+    id: "VIS-005",
+    name: "Amazon Logistics Courier",
+    phone: "+91 98222 11000",
+    purpose: "Package Delivery",
+    visitingUnit: "202",
+    visitingResident: "Sara Shah",
+    visitingResidentId: "user-resident-1",
+    status: "approved",
+    isDelivery: true,
+    deliveryCompany: "Amazon",
+    otp: "639201",
+    qrCode: "HOMEVERSE-PASS-VIS-005-639201",
+    expectedAt: new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString(),
+    date: new Date().toISOString().split("T")[0],
+    portal: "society"
+  },
+  {
+    id: "VIS-006",
+    name: "Karan Singhania",
+    phone: "+91 98111 55443",
+    purpose: "College friend meetup",
+    visitingUnit: "202",
+    visitingResident: "Sara Shah",
+    visitingResidentId: "user-resident-1",
+    status: "pending",
+    otp: "892014",
+    qrCode: "HOMEVERSE-PASS-VIS-006-892014",
+    expectedAt: new Date().toISOString(),
+    date: new Date().toISOString().split("T")[0],
+    portal: "society"
+  },
+  {
+    id: "VIS-007",
+    name: "Swiggy Delivery Partner",
+    phone: "+91 98777 66554",
+    purpose: "Food Delivery",
+    visitingUnit: "202",
+    visitingResident: "Sara Shah",
+    visitingResidentId: "user-resident-1",
+    status: "checked-in",
+    isDelivery: true,
+    deliveryCompany: "Swiggy",
+    checkInTime: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+    expectedAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
+    otp: "128394",
+    qrCode: "HOMEVERSE-PASS-VIS-007-128394",
+    date: new Date().toISOString().split("T")[0],
+    portal: "society"
   }
 ];
 
@@ -4615,6 +4665,20 @@ export const getPrepopulatedNotifications = (): Notification[] => [
 ];
 
 export const getPrepopulatedUsers = (): (User & Record<string, any>)[] => [
+  // --- MANAGER ---
+  {
+    id: "user-manager-1",
+    name: "Vikram Malhotra",
+    email: "manager@sunshinecomplex.com",
+    phone: "+91 98765 22222",
+    role: "manager",
+    portal: "society",
+    societyName: "Sunshine Complex",
+    communityCode: "SUN123",
+    status: "approved",
+    joinedAt: "2026-01-15",
+    password: "Manager@123"
+  },
   // --- SECRETARY ---
   {
     id: "user-secretary-1",
@@ -5293,17 +5357,675 @@ export const getPrepopulatedEmergencies = (): EmergencyAlert[] => [
 
 export const getPrepopulatedGatePasses = (): GatePass[] => [
   {
-    id: "PASS-001",
-    name: "Ravi Kumar (Interior Designer)",
-    company: "HomeDecor Studio",
-    purpose: "Renovation contractor team",
-    validFrom: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    validTo: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
-    assignedResident: "Nidhi Kumar",
-    unit: "101",
-    building: "A Wing",
-    status: "active",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
+    "id": "PASS-001",
+    "name": "Ravi Kumar (Interior Designer)",
+    "company": "HomeDecor Studio",
+    "purpose": "Renovation contractor team",
+    "validFrom": "2026-11-10T11:14:58.699Z",
+    "validTo": "2026-11-17T13:14:58.701Z",
+    "assignedResident": "Nidhi Kumar",
+    "unit": "101",
+    "building": "A Wing",
+    "status": "active",
+    "otp": "682910",
+    "qrCodeData": "HOMEVERSE-PASS-PASS-001-682910",
+    "createdAt": "2026-11-10T11:14:58.701Z"
+  },
+  {
+    "id": "GP-1011",
+    "name": "Kamla Devi",
+    "phone": "+91 98201 10101",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "08:00 AM - 12:00 PM",
+    "assignedResident": "Nidhi Kumar",
+    "unit": "101",
+    "building": "A Wing",
+    "status": "active",
+    "otp": "131415",
+    "qrCodeData": "HOMEVERSE-PASS-GP-1011-131415",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-1021",
+    "name": "Rekha Shinde",
+    "phone": "+91 98201 10102",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "07:30 AM - 11:30 AM",
+    "assignedResident": "Gaurav Sen",
+    "unit": "102",
+    "building": "A Wing",
+    "status": "active",
+    "otp": "162830",
+    "qrCodeData": "HOMEVERSE-PASS-GP-1021-162830",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-1022",
+    "name": "Pooja Sharma",
+    "phone": "+91 98201 10103",
+    "passType": "Cook",
+    "purpose": "Cook Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "allowedTimings": "07:00 AM - 10:00 AM",
+    "assignedResident": "Gaurav Sen",
+    "unit": "102",
+    "building": "A Wing",
+    "status": "active",
+    "otp": "194245",
+    "qrCodeData": "HOMEVERSE-PASS-GP-1022-194245",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-2011",
+    "name": "Laxmi Bai",
+    "phone": "+91 98201 10201",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "09:00 AM - 01:00 PM",
+    "assignedResident": "Sunita Rao",
+    "unit": "201",
+    "building": "A Wing",
+    "status": "active",
+    "otp": "225660",
+    "qrCodeData": "HOMEVERSE-PASS-GP-2011-225660",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-2021",
+    "name": "Sunita Patil",
+    "phone": "+91 87654 32118",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "allowedTimings": "07:00 AM - 01:00 PM",
+    "assignedResident": "Sara Shah",
+    "unit": "202",
+    "building": "A Wing",
+    "status": "active",
+    "otp": "257075",
+    "qrCodeData": "HOMEVERSE-PASS-GP-2021-257075",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-2022",
+    "name": "Meena Sharma",
+    "phone": "+91 98201 12345",
+    "passType": "Cook",
+    "purpose": "Cook Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "07:00 AM - 12:00 PM",
+    "assignedResident": "Sara Shah",
+    "unit": "202",
+    "building": "A Wing",
+    "status": "active",
+    "otp": "288490",
+    "qrCodeData": "HOMEVERSE-PASS-GP-2022-288490",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-3011",
+    "name": "Geeta Maurya",
+    "phone": "+91 98201 10301",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "08:30 AM - 12:30 PM",
+    "assignedResident": "Rahul Verma (Secretary)",
+    "unit": "301",
+    "building": "A Wing",
+    "status": "active",
+    "otp": "319905",
+    "qrCodeData": "HOMEVERSE-PASS-GP-3011-319905",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-3021",
+    "name": "Anita Pawar",
+    "phone": "+91 98201 10302",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "07:00 AM - 11:00 AM",
+    "assignedResident": "Rahul Mehta",
+    "unit": "302",
+    "building": "A Wing",
+    "status": "active",
+    "otp": "351320",
+    "qrCodeData": "HOMEVERSE-PASS-GP-3021-351320",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-3022",
+    "name": "Shanti Bai",
+    "phone": "+91 98201 10303",
+    "passType": "Cook",
+    "purpose": "Cook Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "allowedTimings": "06:30 PM - 09:30 PM",
+    "assignedResident": "Rahul Mehta",
+    "unit": "302",
+    "building": "A Wing",
+    "status": "active",
+    "otp": "382735",
+    "qrCodeData": "HOMEVERSE-PASS-GP-3022-382735",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-4011",
+    "name": "Radha Yadav",
+    "phone": "+91 98201 20101",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "08:00 AM - 12:00 PM",
+    "assignedResident": "Kishore Kumar",
+    "unit": "101",
+    "building": "B Wing",
+    "status": "active",
+    "otp": "414150",
+    "qrCodeData": "HOMEVERSE-PASS-GP-4011-414150",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-4021",
+    "name": "Kavita Das",
+    "phone": "+91 98201 20102",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "07:30 AM - 11:30 AM",
+    "assignedResident": "Anjali Patil",
+    "unit": "102",
+    "building": "B Wing",
+    "status": "active",
+    "otp": "445565",
+    "qrCodeData": "HOMEVERSE-PASS-GP-4021-445565",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-4022",
+    "name": "Vimla Devi",
+    "phone": "+91 98201 20103",
+    "passType": "Cook",
+    "purpose": "Cook Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "07:00 AM - 10:30 AM",
+    "assignedResident": "Anjali Patil",
+    "unit": "102",
+    "building": "B Wing",
+    "status": "active",
+    "otp": "476980",
+    "qrCodeData": "HOMEVERSE-PASS-GP-4022-476980",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-5011",
+    "name": "Suman Kumari",
+    "phone": "+91 98201 20201",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "09:00 AM - 01:00 PM",
+    "assignedResident": "Rohan Kulkarni",
+    "unit": "201",
+    "building": "B Wing",
+    "status": "active",
+    "otp": "508395",
+    "qrCodeData": "HOMEVERSE-PASS-GP-5011-508395",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-5021",
+    "name": "Poonam Solanki",
+    "phone": "+91 98201 20202",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "08:00 AM - 12:00 PM",
+    "assignedResident": "Vikram Malhotra",
+    "unit": "202",
+    "building": "B Wing",
+    "status": "active",
+    "otp": "539810",
+    "qrCodeData": "HOMEVERSE-PASS-GP-5021-539810",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-5022",
+    "name": "Asha Ben",
+    "phone": "+91 98201 20203",
+    "passType": "Cook",
+    "purpose": "Cook Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "allowedTimings": "06:00 PM - 09:00 PM",
+    "assignedResident": "Vikram Malhotra",
+    "unit": "202",
+    "building": "B Wing",
+    "status": "active",
+    "otp": "571225",
+    "qrCodeData": "HOMEVERSE-PASS-GP-5022-571225",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-6011",
+    "name": "Deepa Rao",
+    "phone": "+91 98201 20301",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "08:30 AM - 12:30 PM",
+    "assignedResident": "Sneha Reddy",
+    "unit": "301",
+    "building": "B Wing",
+    "status": "active",
+    "otp": "602640",
+    "qrCodeData": "HOMEVERSE-PASS-GP-6011-602640",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-6021",
+    "name": "Sarita Verma",
+    "phone": "+91 98201 20302",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "07:30 AM - 11:30 AM",
+    "assignedResident": "Manish Sharma",
+    "unit": "302",
+    "building": "B Wing",
+    "status": "active",
+    "otp": "634055",
+    "qrCodeData": "HOMEVERSE-PASS-GP-6021-634055",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-6022",
+    "name": "Kiran Joshi",
+    "phone": "+91 98201 20303",
+    "passType": "Cook",
+    "purpose": "Cook Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "07:00 AM - 11:00 AM",
+    "assignedResident": "Manish Sharma",
+    "unit": "302",
+    "building": "B Wing",
+    "status": "active",
+    "otp": "665470",
+    "qrCodeData": "HOMEVERSE-PASS-GP-6022-665470",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-7011",
+    "name": "Usha Rathod",
+    "phone": "+91 98201 30101",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "08:00 AM - 12:00 PM",
+    "assignedResident": "Amit Joshi",
+    "unit": "101",
+    "building": "C Wing",
+    "status": "active",
+    "otp": "696885",
+    "qrCodeData": "HOMEVERSE-PASS-GP-7011-696885",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-7012",
+    "name": "Maya Patel",
+    "phone": "+91 98201 30102",
+    "passType": "Cook",
+    "purpose": "Cook Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "allowedTimings": "07:00 AM - 10:30 AM",
+    "assignedResident": "Amit Joshi",
+    "unit": "101",
+    "building": "C Wing",
+    "status": "active",
+    "otp": "728300",
+    "qrCodeData": "HOMEVERSE-PASS-GP-7012-728300",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-7021",
+    "name": "Mangala Bai",
+    "phone": "+91 98201 30103",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "09:00 AM - 01:00 PM",
+    "assignedResident": "Deepak Patel",
+    "unit": "102",
+    "building": "C Wing",
+    "status": "active",
+    "otp": "759715",
+    "qrCodeData": "HOMEVERSE-PASS-GP-7021-759715",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-8011",
+    "name": "Tara Devi",
+    "phone": "+91 98201 30201",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "07:30 AM - 11:30 AM",
+    "assignedResident": "Priya Desai",
+    "unit": "201",
+    "building": "C Wing",
+    "status": "active",
+    "otp": "791130",
+    "qrCodeData": "HOMEVERSE-PASS-GP-8011-791130",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-8012",
+    "name": "Indira Shinde",
+    "phone": "+91 98201 30202",
+    "passType": "Cook",
+    "purpose": "Cook Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "06:30 PM - 09:30 PM",
+    "assignedResident": "Priya Desai",
+    "unit": "201",
+    "building": "C Wing",
+    "status": "active",
+    "otp": "822545",
+    "qrCodeData": "HOMEVERSE-PASS-GP-8012-822545",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-8021",
+    "name": "Savita More",
+    "phone": "+91 98201 30203",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "08:00 AM - 12:00 PM",
+    "assignedResident": "Meera Iyer",
+    "unit": "202",
+    "building": "C Wing",
+    "status": "active",
+    "otp": "853960",
+    "qrCodeData": "HOMEVERSE-PASS-GP-8021-853960",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-9011",
+    "name": "Manju Devi",
+    "phone": "+91 98201 30301",
+    "passType": "Maid",
+    "purpose": "Maid Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "allowedTimings": "07:00 AM - 11:00 AM",
+    "assignedResident": "Suresh Nair",
+    "unit": "301",
+    "building": "C Wing",
+    "status": "active",
+    "otp": "885375",
+    "qrCodeData": "HOMEVERSE-PASS-GP-9011-885375",
+    "createdAt": "2026-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "GP-9012",
+    "name": "Lakshmi Nair",
+    "phone": "+91 98201 30302",
+    "passType": "Cook",
+    "purpose": "Cook Domestic Pass",
+    "validFrom": "2026-01-01",
+    "validTo": "Open",
+    "permittedDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "allowedTimings": "07:30 AM - 11:00 AM",
+    "assignedResident": "Suresh Nair",
+    "unit": "301",
+    "building": "C Wing",
+    "status": "active",
+    "otp": "916790",
+    "qrCodeData": "HOMEVERSE-PASS-GP-9012-916790",
+    "createdAt": "2026-01-15T08:00:00.000Z"
   }
 ];
 
@@ -5513,6 +6235,943 @@ export const getPrepopulatedItemMatches = (): ItemMatch[] => [
   }
 ];
 
+export const getPrepopulatedHelpers = (): Helper[] => [
+  {
+    "id": "HLP-101",
+    "name": "Kamla Devi",
+    "category": "Maid",
+    "phone": "+91 98201 10101",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "08:00 AM",
+    "expectedExit": "12:00 PM",
+    "assignedFlats": [
+      "101",
+      "A-101",
+      "A Wing 101"
+    ],
+    "assignedResidents": [
+      "Nidhi Kumar"
+    ],
+    "residentIds": [
+      "user-resident-2"
+    ],
+    "joinedAt": "2026-01-10",
+    "portal": "society",
+    "passId": "GP-1011",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-102",
+    "name": "Rekha Shinde",
+    "category": "Maid",
+    "phone": "+91 98201 10102",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "07:30 AM",
+    "expectedExit": "11:30 AM",
+    "assignedFlats": [
+      "102",
+      "A-102",
+      "A Wing 102"
+    ],
+    "assignedResidents": [
+      "Gaurav Sen"
+    ],
+    "residentIds": [
+      "user-resident-10"
+    ],
+    "joinedAt": "2026-01-12",
+    "portal": "society",
+    "passId": "GP-1021",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-103",
+    "name": "Pooja Sharma",
+    "category": "Cook",
+    "phone": "+91 98201 10103",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "expectedArrival": "07:00 AM",
+    "expectedExit": "10:00 AM",
+    "assignedFlats": [
+      "102",
+      "A-102",
+      "A Wing 102"
+    ],
+    "assignedResidents": [
+      "Gaurav Sen"
+    ],
+    "residentIds": [
+      "user-resident-10"
+    ],
+    "joinedAt": "2026-01-15",
+    "portal": "society",
+    "passId": "GP-1022",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-104",
+    "name": "Laxmi Bai",
+    "category": "Maid",
+    "phone": "+91 98201 10201",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "09:00 AM",
+    "expectedExit": "01:00 PM",
+    "assignedFlats": [
+      "201",
+      "A-201",
+      "A Wing 201"
+    ],
+    "assignedResidents": [
+      "Sunita Rao"
+    ],
+    "residentIds": [
+      "user-resident-3"
+    ],
+    "joinedAt": "2026-01-18",
+    "portal": "society",
+    "passId": "GP-2011",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-105",
+    "name": "Sunita Patil",
+    "category": "Maid",
+    "phone": "+91 87654 32118",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "expectedArrival": "07:00 AM",
+    "expectedExit": "01:00 PM",
+    "assignedFlats": [
+      "202",
+      "A-202",
+      "A Wing 202"
+    ],
+    "assignedResidents": [
+      "Sara Shah"
+    ],
+    "residentIds": [
+      "user-resident-1"
+    ],
+    "joinedAt": "2026-01-15",
+    "portal": "society",
+    "passId": "GP-2021",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-106",
+    "name": "Meena Sharma",
+    "category": "Cook",
+    "phone": "+91 98201 12345",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "07:00 AM",
+    "expectedExit": "12:00 PM",
+    "assignedFlats": [
+      "202",
+      "A-202",
+      "A Wing 202"
+    ],
+    "assignedResidents": [
+      "Sara Shah"
+    ],
+    "residentIds": [
+      "user-resident-1"
+    ],
+    "joinedAt": "2026-02-01",
+    "portal": "society",
+    "passId": "GP-2022",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-107",
+    "name": "Geeta Maurya",
+    "category": "Maid",
+    "phone": "+91 98201 10301",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "08:30 AM",
+    "expectedExit": "12:30 PM",
+    "assignedFlats": [
+      "301",
+      "A-301",
+      "A Wing 301"
+    ],
+    "assignedResidents": [
+      "Rahul Verma (Secretary)"
+    ],
+    "residentIds": [
+      "user-secretary-1"
+    ],
+    "joinedAt": "2026-01-20",
+    "portal": "society",
+    "passId": "GP-3011",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-108",
+    "name": "Anita Pawar",
+    "category": "Maid",
+    "phone": "+91 98201 10302",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "07:00 AM",
+    "expectedExit": "11:00 AM",
+    "assignedFlats": [
+      "302",
+      "A-302",
+      "A Wing 302"
+    ],
+    "assignedResidents": [
+      "Rahul Mehta"
+    ],
+    "residentIds": [
+      "user-resident-6"
+    ],
+    "joinedAt": "2026-01-22",
+    "portal": "society",
+    "passId": "GP-3021",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-109",
+    "name": "Shanti Bai",
+    "category": "Cook",
+    "phone": "+91 98201 10303",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "expectedArrival": "06:30 PM",
+    "expectedExit": "09:30 PM",
+    "assignedFlats": [
+      "302",
+      "A-302",
+      "A Wing 302"
+    ],
+    "assignedResidents": [
+      "Rahul Mehta"
+    ],
+    "residentIds": [
+      "user-resident-6"
+    ],
+    "joinedAt": "2026-01-25",
+    "portal": "society",
+    "passId": "GP-3022",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-110",
+    "name": "Radha Yadav",
+    "category": "Maid",
+    "phone": "+91 98201 20101",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "08:00 AM",
+    "expectedExit": "12:00 PM",
+    "assignedFlats": [
+      "101",
+      "B-101",
+      "B Wing 101"
+    ],
+    "assignedResidents": [
+      "Kishore Kumar"
+    ],
+    "residentIds": [
+      "user-resident-4"
+    ],
+    "joinedAt": "2026-02-01",
+    "portal": "society",
+    "passId": "GP-4011",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-111",
+    "name": "Kavita Das",
+    "category": "Maid",
+    "phone": "+91 98201 20102",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "07:30 AM",
+    "expectedExit": "11:30 AM",
+    "assignedFlats": [
+      "102",
+      "B-102",
+      "B Wing 102"
+    ],
+    "assignedResidents": [
+      "Anjali Patil"
+    ],
+    "residentIds": [
+      "user-resident-7"
+    ],
+    "joinedAt": "2026-02-03",
+    "portal": "society",
+    "passId": "GP-4021",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-112",
+    "name": "Vimla Devi",
+    "category": "Cook",
+    "phone": "+91 98201 20103",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "07:00 AM",
+    "expectedExit": "10:30 AM",
+    "assignedFlats": [
+      "102",
+      "B-102",
+      "B Wing 102"
+    ],
+    "assignedResidents": [
+      "Anjali Patil"
+    ],
+    "residentIds": [
+      "user-resident-7"
+    ],
+    "joinedAt": "2026-02-05",
+    "portal": "society",
+    "passId": "GP-4022",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-113",
+    "name": "Suman Kumari",
+    "category": "Maid",
+    "phone": "+91 98201 20201",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "09:00 AM",
+    "expectedExit": "01:00 PM",
+    "assignedFlats": [
+      "201",
+      "B-201",
+      "B Wing 201"
+    ],
+    "assignedResidents": [
+      "Rohan Kulkarni"
+    ],
+    "residentIds": [
+      "user-resident-8"
+    ],
+    "joinedAt": "2026-02-08",
+    "portal": "society",
+    "passId": "GP-5011",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-114",
+    "name": "Poonam Solanki",
+    "category": "Maid",
+    "phone": "+91 98201 20202",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "08:00 AM",
+    "expectedExit": "12:00 PM",
+    "assignedFlats": [
+      "202",
+      "B-202",
+      "B Wing 202"
+    ],
+    "assignedResidents": [
+      "Vikram Malhotra"
+    ],
+    "residentIds": [
+      "user-resident-11"
+    ],
+    "joinedAt": "2026-02-10",
+    "portal": "society",
+    "passId": "GP-5021",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-115",
+    "name": "Asha Ben",
+    "category": "Cook",
+    "phone": "+91 98201 20203",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "expectedArrival": "06:00 PM",
+    "expectedExit": "09:00 PM",
+    "assignedFlats": [
+      "202",
+      "B-202",
+      "B Wing 202"
+    ],
+    "assignedResidents": [
+      "Vikram Malhotra"
+    ],
+    "residentIds": [
+      "user-resident-11"
+    ],
+    "joinedAt": "2026-02-12",
+    "portal": "society",
+    "passId": "GP-5022",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-116",
+    "name": "Deepa Rao",
+    "category": "Maid",
+    "phone": "+91 98201 20301",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "08:30 AM",
+    "expectedExit": "12:30 PM",
+    "assignedFlats": [
+      "301",
+      "B-301",
+      "B Wing 301"
+    ],
+    "assignedResidents": [
+      "Sneha Reddy"
+    ],
+    "residentIds": [
+      "user-resident-12"
+    ],
+    "joinedAt": "2026-02-15",
+    "portal": "society",
+    "passId": "GP-6011",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-117",
+    "name": "Sarita Verma",
+    "category": "Maid",
+    "phone": "+91 98201 20302",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "07:30 AM",
+    "expectedExit": "11:30 AM",
+    "assignedFlats": [
+      "302",
+      "B-302",
+      "B Wing 302"
+    ],
+    "assignedResidents": [
+      "Manish Sharma"
+    ],
+    "residentIds": [
+      "user-resident-13"
+    ],
+    "joinedAt": "2026-02-18",
+    "portal": "society",
+    "passId": "GP-6021",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-118",
+    "name": "Kiran Joshi",
+    "category": "Cook",
+    "phone": "+91 98201 20303",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "07:00 AM",
+    "expectedExit": "11:00 AM",
+    "assignedFlats": [
+      "302",
+      "B-302",
+      "B Wing 302"
+    ],
+    "assignedResidents": [
+      "Manish Sharma"
+    ],
+    "residentIds": [
+      "user-resident-13"
+    ],
+    "joinedAt": "2026-02-20",
+    "portal": "society",
+    "passId": "GP-6022",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-119",
+    "name": "Usha Rathod",
+    "category": "Maid",
+    "phone": "+91 98201 30101",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "08:00 AM",
+    "expectedExit": "12:00 PM",
+    "assignedFlats": [
+      "101",
+      "C-101",
+      "C Wing 101"
+    ],
+    "assignedResidents": [
+      "Amit Joshi"
+    ],
+    "residentIds": [
+      "user-resident-5"
+    ],
+    "joinedAt": "2026-02-22",
+    "portal": "society",
+    "passId": "GP-7011",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-120",
+    "name": "Maya Patel",
+    "category": "Cook",
+    "phone": "+91 98201 30102",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "expectedArrival": "07:00 AM",
+    "expectedExit": "10:30 AM",
+    "assignedFlats": [
+      "101",
+      "C-101",
+      "C Wing 101"
+    ],
+    "assignedResidents": [
+      "Amit Joshi"
+    ],
+    "residentIds": [
+      "user-resident-5"
+    ],
+    "joinedAt": "2026-02-25",
+    "portal": "society",
+    "passId": "GP-7012",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-121",
+    "name": "Mangala Bai",
+    "category": "Maid",
+    "phone": "+91 98201 30103",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "09:00 AM",
+    "expectedExit": "01:00 PM",
+    "assignedFlats": [
+      "102",
+      "C-102",
+      "C Wing 102"
+    ],
+    "assignedResidents": [
+      "Deepak Patel"
+    ],
+    "residentIds": [
+      "user-resident-14"
+    ],
+    "joinedAt": "2026-03-01",
+    "portal": "society",
+    "passId": "GP-7021",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-122",
+    "name": "Tara Devi",
+    "category": "Maid",
+    "phone": "+91 98201 30201",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "07:30 AM",
+    "expectedExit": "11:30 AM",
+    "assignedFlats": [
+      "201",
+      "C-201",
+      "C Wing 201"
+    ],
+    "assignedResidents": [
+      "Priya Desai"
+    ],
+    "residentIds": [
+      "user-resident-9"
+    ],
+    "joinedAt": "2026-03-03",
+    "portal": "society",
+    "passId": "GP-8011",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-123",
+    "name": "Indira Shinde",
+    "category": "Cook",
+    "phone": "+91 98201 30202",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "06:30 PM",
+    "expectedExit": "09:30 PM",
+    "assignedFlats": [
+      "201",
+      "C-201",
+      "C Wing 201"
+    ],
+    "assignedResidents": [
+      "Priya Desai"
+    ],
+    "residentIds": [
+      "user-resident-9"
+    ],
+    "joinedAt": "2026-03-05",
+    "portal": "society",
+    "passId": "GP-8012",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-124",
+    "name": "Savita More",
+    "category": "Maid",
+    "phone": "+91 98201 30203",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "08:00 AM",
+    "expectedExit": "12:00 PM",
+    "assignedFlats": [
+      "202",
+      "C-202",
+      "C Wing 202"
+    ],
+    "assignedResidents": [
+      "Meera Iyer"
+    ],
+    "residentIds": [
+      "user-resident-15"
+    ],
+    "joinedAt": "2026-03-08",
+    "portal": "society",
+    "passId": "GP-8021",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-125",
+    "name": "Manju Devi",
+    "category": "Maid",
+    "phone": "+91 98201 30301",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
+    "expectedArrival": "07:00 AM",
+    "expectedExit": "11:00 AM",
+    "assignedFlats": [
+      "301",
+      "C-301",
+      "C Wing 301"
+    ],
+    "assignedResidents": [
+      "Suresh Nair"
+    ],
+    "residentIds": [
+      "user-resident-16"
+    ],
+    "joinedAt": "2026-03-10",
+    "portal": "society",
+    "passId": "GP-9011",
+    "passStatus": "active"
+  },
+  {
+    "id": "HLP-126",
+    "name": "Lakshmi Nair",
+    "category": "Cook",
+    "phone": "+91 98201 30302",
+    "workingDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "expectedArrival": "07:30 AM",
+    "expectedExit": "11:00 AM",
+    "assignedFlats": [
+      "301",
+      "C-301",
+      "C Wing 301"
+    ],
+    "assignedResidents": [
+      "Suresh Nair"
+    ],
+    "residentIds": [
+      "user-resident-16"
+    ],
+    "joinedAt": "2026-03-12",
+    "portal": "society",
+    "passId": "GP-9012",
+    "passStatus": "active"
+  }
+];
+
+export const getPrepopulatedHelperAttendance = (): HelperAttendance[] => [
+  {
+    "id": "ATT-001",
+    "workerId": "HLP-105",
+    "workerName": "Sunita Patil",
+    "workerCategory": "Maid",
+    "date": "2026-11-10",
+    "checkInTime": "2026-11-10T10:14:58.701Z",
+    "entryGate": "Main Security Gate",
+    "assignedFlats": [
+      "202",
+      "A-202"
+    ],
+    "status": "checked-in"
+  },
+  {
+    "id": "ATT-002",
+    "workerId": "HLP-106",
+    "workerName": "Meena Sharma",
+    "workerCategory": "Cook",
+    "date": "2026-11-10",
+    "checkInTime": "2026-11-10T09:14:58.701Z",
+    "checkOutTime": "2026-11-10T12:14:58.701Z",
+    "entryGate": "Main Security Gate",
+    "assignedFlats": [
+      "202",
+      "A-202"
+    ],
+    "status": "checked-out"
+  },
+  {
+    "id": "ATT-003",
+    "workerId": "HLP-101",
+    "workerName": "Kamla Devi",
+    "workerCategory": "Maid",
+    "date": "2026-11-10",
+    "checkInTime": "2026-11-10T11:14:58.701Z",
+    "entryGate": "Gate 1",
+    "assignedFlats": [
+      "101",
+      "A-101"
+    ],
+    "status": "checked-in"
+  },
+  {
+    "id": "ATT-004",
+    "workerId": "HLP-103",
+    "workerName": "Pooja Sharma",
+    "workerCategory": "Cook",
+    "date": "2026-11-10",
+    "checkInTime": "2026-11-10T08:14:58.701Z",
+    "checkOutTime": "2026-11-10T11:14:58.701Z",
+    "entryGate": "Main Security Gate",
+    "assignedFlats": [
+      "102",
+      "A-102"
+    ],
+    "status": "checked-out"
+  },
+  {
+    "id": "ATT-005",
+    "workerId": "HLP-110",
+    "workerName": "Radha Yadav",
+    "workerCategory": "Maid",
+    "date": "2026-11-10",
+    "checkInTime": "2026-11-10T12:14:58.701Z",
+    "entryGate": "Gate 2",
+    "assignedFlats": [
+      "101",
+      "B-101"
+    ],
+    "status": "checked-in"
+  },
+  {
+    "id": "ATT-006",
+    "workerId": "HLP-119",
+    "workerName": "Usha Rathod",
+    "workerCategory": "Maid",
+    "date": "2026-11-10",
+    "checkInTime": "2026-11-10T10:44:58.701Z",
+    "entryGate": "Main Security Gate",
+    "assignedFlats": [
+      "101",
+      "C-101"
+    ],
+    "status": "checked-in"
+  }
+];
+
+export const getPrepopulatedFlatAttendance = (): any[] => [
+  {
+    "id": "FLA-ATT-001",
+    "helperId": "HLP-105",
+    "helperName": "Sunita Patil",
+    "date": "2026-11-10",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "flatNumber": "202",
+    "checkInTime": "2026-11-10T10:14:58.701Z",
+    "checkOutTime": "2026-11-10T11:44:58.701Z",
+    "duration": 90,
+    "servicePerformed": "Dusting & Cleaning",
+    "status": "completed",
+    "notes": "Living room and kitchen cleaned thoroughly"
+  },
+  {
+    "id": "FLA-ATT-002",
+    "helperId": "HLP-106",
+    "helperName": "Meena Sharma",
+    "date": "2026-11-10",
+    "residentId": "user-resident-1",
+    "residentName": "Sara Shah",
+    "flatNumber": "202",
+    "checkInTime": "2026-11-10T09:14:58.701Z",
+    "checkOutTime": "2026-11-10T12:14:58.701Z",
+    "duration": 180,
+    "servicePerformed": "Cooking",
+    "status": "completed",
+    "notes": "Breakfast and lunch prepared"
+  }
+];
+
 export const getInitialDb = () => ({
   users: getPrepopulatedUsers(),
   complaints: getPrepopulatedComplaints(),
@@ -5540,5 +7199,8 @@ export const getInitialDb = () => ({
   flats: getPrepopulatedFlats(),
   rentRecords: getPrepopulatedRentRecords(),
   payments: getPrepopulatedPayments(),
-  collections: getPrepopulatedCollections()
+  collections: getPrepopulatedCollections(),
+  helpers: getPrepopulatedHelpers(),
+  attendance: getPrepopulatedHelperAttendance(),
+  flatAttendance: getPrepopulatedFlatAttendance()
 });

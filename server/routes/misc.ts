@@ -670,7 +670,7 @@ router.put("/payments/:id/pay", authenticateToken, async (req: any, res) => {
     if (!payment) return res.status(404).json({ error: "Payment request not found" });
 
     const txnId = `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
-    const nowStr = new Date().toLocaleDateString('en-CA');
+    const nowStr = new Date().toISOString();
 
     const updatedPayment = await prisma.residentPayment.update({
       where: { id },

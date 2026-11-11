@@ -20,6 +20,30 @@ import {
   LineChart, Line, CartesianGrid, Cell, PieChart, Pie 
 } from "recharts";
 
+function formatPaymentDateTime(dateStr?: string | null): string {
+  if (!dateStr) return "N/A";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const datePart = d.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
+    if (dateStr.includes("T") || dateStr.includes(":") || dateStr.includes(" ")) {
+      const timePart = d.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      });
+      return `${datePart} at ${timePart}`;
+    }
+    return datePart;
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function PaymentsPage() {
   const { user, initialize } = useAuth();
   const {
@@ -98,13 +122,23 @@ export default function PaymentsPage() {
     if (user.role === "secretary") {
       return payments;
     }
+    const cleanUserUnit = (user.unit || "").replace(/^[A-Za-z\s-]+/, "").trim();
+    const cleanUserWing = (user.building || "").toUpperCase().replace(/[^A-Z]/g, "") ||
+                          (user.unit || "").toUpperCase().replace(/[^A-Z]/g, "");
+
     return payments.filter(p => {
-      if (p.residentId === user.id) return true;
-      if (user.unit) {
-        const cleanUserUnit = user.unit.replace(/^[A-Za-z\s-]+/, '').trim();
-        const cleanPUnit = (p.unit || '').replace(/^[A-Za-z\s-]+/, '').trim();
-        if (cleanPUnit && cleanPUnit === cleanUserUnit) return true;
-        if (p.unit === user.unit) return true;
+      // 1. Direct resident ID match
+      if (p.residentId && user.id && p.residentId === user.id) return true;
+
+      // 2. Exact Unit + Wing match (prevents cross-wing collision like A-202 vs B-202 vs C-202)
+      const cleanPUnit = (p.unit || "").replace(/^[A-Za-z\s-]+/, "").trim();
+      const cleanPWing = (p.building || "").toUpperCase().replace(/[^A-Z]/g, "") ||
+                         (p.unit || "").toUpperCase().replace(/[^A-Z]/g, "");
+
+      if (cleanUserUnit && cleanPUnit === cleanUserUnit) {
+        if (!cleanUserWing || !cleanPWing || cleanUserWing === cleanPWing) {
+          return true;
+        }
       }
       return false;
     });
@@ -147,18 +181,24 @@ export default function PaymentsPage() {
     return myPayments.filter(p => p.paymentType !== "Maintenance" && p.status.toLowerCase() === "pending");
   }, [myPayments]);
 
-  // Payment History filtered list
+  // Payment History filtered list (sorted from newest to oldest)
   const paymentsHistory = useMemo(() => {
-    return myPayments.filter(p => {
-      const matchSearch = p.paymentType.toLowerCase().includes(search.toLowerCase()) || 
-                          (p.id && p.id.toLowerCase().includes(search.toLowerCase())) ||
-                          (p.transactionId && p.transactionId.toLowerCase().includes(search.toLowerCase()));
-      const matchStatus = statusFilter === "all" || p.status.toLowerCase() === statusFilter.toLowerCase();
-      const matchType = typeFilter === "all" || 
-                        (typeFilter === "maintenance" && p.paymentType === "Maintenance") ||
-                        (typeFilter === "special" && p.paymentType !== "Maintenance");
-      return matchSearch && matchStatus && matchType;
-    });
+    return myPayments
+      .filter(p => {
+        const matchSearch = p.paymentType.toLowerCase().includes(search.toLowerCase()) || 
+                            (p.id && p.id.toLowerCase().includes(search.toLowerCase())) ||
+                            (p.transactionId && p.transactionId.toLowerCase().includes(search.toLowerCase()));
+        const matchStatus = statusFilter === "all" || p.status.toLowerCase() === statusFilter.toLowerCase();
+        const matchType = typeFilter === "all" || 
+                          (typeFilter === "maintenance" && p.paymentType === "Maintenance") ||
+                          (typeFilter === "special" && p.paymentType !== "Maintenance");
+        return matchSearch && matchStatus && matchType;
+      })
+      .sort((a, b) => {
+        const timeB = new Date(b.paidDate || b.dueDate || 0).getTime();
+        const timeA = new Date(a.paidDate || a.dueDate || 0).getTime();
+        return timeB - timeA;
+      });
   }, [myPayments, search, statusFilter, typeFilter]);
 
   // Secretary Stats
@@ -271,11 +311,11 @@ export default function PaymentsPage() {
               <span class="label">Month:</span>
               <span class="value">${month}</span>
               <span class="label">Payment Date:</span>
-              <span class="value">${payment.paidDate || "N/A"}</span>
+              <span class="value">${formatPaymentDateTime(payment.paidDate)}</span>
               <span class="label">Payment Status:</span>
               <span class="value" style="color: #10b981; font-weight: 750;">${payment.status?.toUpperCase() || "PAID"}</span>
               <span class="label">Payment Method:</span>
-              <span class="value">${payment.paymentMethod || "Card"}</span>
+              <span class="value">${payment.paymentMethod || "UPI"}</span>
               <span class="label">Generated Timestamp:</span>
               <span class="value">${generatedTimestamp}</span>
               ${payment.lateFee ? `
@@ -357,8 +397,8 @@ export default function PaymentsPage() {
         <td>${p.id}</td>
         <td>${p.paymentType}</td>
         <td>₹${p.amount.toLocaleString()}</td>
-        <td>${p.paidDate || "N/A"}</td>
-        <td>${p.paymentMethod || "Card"}</td>
+        <td>${formatPaymentDateTime(p.paidDate)}</td>
+        <td>${p.paymentMethod || "UPI"}</td>
         <td>${p.transactionId || "N/A"}</td>
       </tr>
     `).join("");
@@ -560,7 +600,7 @@ export default function PaymentsPage() {
                             {p.building || "Sunshine Complex"} • {p.paymentType} • Due date: {p.dueDate}
                           </p>
                           {p.status.toLowerCase() === "paid" && p.paidDate && (
-                            <p className="text-[9px] text-green-500 mt-0.5">Paid On: {p.paidDate} ({p.paymentMethod || "Card"})</p>
+                            <p className="text-[9px] text-emerald-600 font-medium mt-0.5">Paid On: {formatPaymentDateTime(p.paidDate)} ({p.paymentMethod || "UPI"})</p>
                           )}
                         </div>
                         <div className="flex items-center gap-3">
@@ -1042,7 +1082,7 @@ export default function PaymentsPage() {
                         <td style="padding:8px;border-bottom:1px solid #ddd;">Flat ${p.unit}</td>
                         <td style="padding:8px;border-bottom:1px solid #ddd;">₹${p.amount}</td>
                         <td style="padding:8px;border-bottom:1px solid #ddd;">${p.status}</td>
-                        <td style="padding:8px;border-bottom:1px solid #ddd;">${p.paidDate || "N/A"}</td>
+                        <td style="padding:8px;border-bottom:1px solid #ddd;">${formatPaymentDateTime(p.paidDate)}</td>
                         <td style="padding:8px;border-bottom:1px solid #ddd;">${p.transactionId || "N/A"}</td>
                       </tr>
                     `).join("");
@@ -1104,7 +1144,7 @@ export default function PaymentsPage() {
                         <div>
                           <div className="font-bold text-foreground">Flat {p.unit} • {p.residentName}</div>
                           <div className="text-[10px] text-muted-foreground mt-0.5">
-                            {p.status.toLowerCase() === "paid" ? `Paid on ${p.paidDate} via ${p.paymentMethod || "Card"}` : `Dues pending since ${p.dueDate}`}
+                            {p.status.toLowerCase() === "paid" ? `Paid on ${formatPaymentDateTime(p.paidDate)} via ${p.paymentMethod || "UPI"}` : `Dues pending since ${p.dueDate}`}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
@@ -1162,7 +1202,7 @@ export default function PaymentsPage() {
         {[
           { label: "Total Outstanding", value: `₹${totalOutstanding.toLocaleString()}`, desc: `${pendingPaymentsCount} Pending`, color: "text-rose-500 bg-rose-500/10", icon: AlertTriangle },
           { label: "Total Paid (CY)", value: `₹${totalPaidThisYear.toLocaleString()}`, desc: "This Year", color: "text-emerald-500 bg-emerald-500/10", icon: CheckCircle2 },
-          { label: "Last Payment Date", value: lastPayment ? lastPayment.paidDate || "N/A" : "N/A", desc: lastPayment ? `₹${lastPayment.amount.toLocaleString()}` : "No payments", color: "text-blue-500 bg-blue-500/10", icon: Calendar },
+          { label: "Last Payment Date", value: lastPayment ? formatPaymentDateTime(lastPayment.paidDate) : "N/A", desc: lastPayment ? `₹${lastPayment.amount.toLocaleString()}` : "No payments", color: "text-blue-500 bg-blue-500/10", icon: Calendar },
           { label: "Pending Requests", value: specialContributions.length, desc: "Special Collections", color: "text-amber-500 bg-amber-500/10", icon: Info }
         ].map((c, idx) => (
           <Card key={idx} className="border-border/50 bg-card">
@@ -1394,8 +1434,8 @@ export default function PaymentsPage() {
                     ID: {p.id} • Due: {p.dueDate}
                   </p>
                   {p.status.toLowerCase() === "paid" && p.paidDate && (
-                    <p className="text-[9px] text-emerald-500 mt-0.5">
-                      Paid on: {p.paidDate} (${p.paymentMethod || "Card"}) • Txn ID: {p.transactionId}
+                    <p className="text-[9px] text-emerald-600 font-medium mt-0.5">
+                      Paid on: {formatPaymentDateTime(p.paidDate)} ({p.paymentMethod || "UPI"}) • Txn ID: <span className="font-mono">{p.transactionId}</span>
                     </p>
                   )}
                 </div>

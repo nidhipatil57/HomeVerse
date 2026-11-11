@@ -6,24 +6,31 @@ Use this document to quickly access credentials for complete application testing
 
 ## 🏢 Society Portal: Sunshine Complex (`SUN123`)
 
-### 1. Residents
+### 1. Residents (16 Units Across A, B, C Wings)
 | Role | Name | Username (Email) | Password | Unit / Flat | Status | Details / Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Resident** | Sara Shah | `sara@sunshinecomplex.com` | `Sara@123` | Flat A-204 | Approved | Owner (Has assigned Plumber task) |
-| **Resident** | Rahul Mehta | `rahul.mehta@sunshinecomplex.com` | `Rahul@123` | Flat A-302 | Approved | Owner |
-| **Resident** | Anjali Patil | `anjali@sunshinecomplex.com` | `Anjali@123` | Flat B-105 | Approved | Owner |
-| **Resident** | Rohan Kulkarni | `rohan.k@sunshinecomplex.com` | `Rohan@123` | Flat B-503 | Approved | Owner |
-| **Resident** | Priya Desai | `priya.d@sunshinecomplex.com` | `Priya@123` | Flat C-201 | Approved | Owner |
-| **Resident** | Amit Joshi | `amit.j@sunshinecomplex.com` | `Amit@123` | Flat C-404 | Approved | Tenant |
-| **Resident** | Nidhi Kumar | `nidhi@sunshinecomplex.com` | `Nidhi@123` | Flat A-301 | Approved | Owner (Has resolved Electrician task) |
-| **Resident** | Kishore Kumar | `kishore@sunshinecomplex.com` | `Kishore@123` | Flat B-101 | Approved | Tenant (Has pending maintenance bill) |
-| **Resident** | Sunita Rao | `sunita@sunshinecomplex.com` | `Sunita@123` | Flat A-201 | Approved | Owner (Has overdue maintenance bill) |
+| **Resident** | Nidhi Kumar | `nidhi@sunshinecomplex.com` | `Nidhi@123` | Flat A-101 | Approved | Owner |
 | **Resident** | Gaurav Sen | `gaurav@sunshinecomplex.com` | `Gaurav@123` | Flat A-102 | Approved | Tenant |
+| **Resident** | Sunita Rao | `sunita@sunshinecomplex.com` | `Sunita@123` | Flat A-201 | Approved | Owner |
+| **Resident** | Sara Shah | `sara@sunshinecomplex.com` | `Sara@123` | Flat A-202 | Approved | Owner |
+| **Resident** | Rahul Mehta | `rahul.mehta@sunshinecomplex.com` | `Rahul@123` | Flat A-302 | Approved | Owner |
+| **Resident** | Kishore Kumar | `kishore@sunshinecomplex.com` | `Kishore@123` | Flat B-101 | Approved | Tenant |
+| **Resident** | Anjali Patil | `anjali@sunshinecomplex.com` | `Anjali@123` | Flat B-102 | Approved | Owner |
+| **Resident** | Rohan Kulkarni | `rohan.k@sunshinecomplex.com` | `Rohan@123` | Flat B-201 | Approved | Owner |
+| **Resident** | Vikram Malhotra | `vikram.m@sunshinecomplex.com` | `Vikram@123` | Flat B-202 | Approved | Owner |
+| **Resident** | Sneha Reddy | `sneha.r@sunshinecomplex.com` | `Sneha@123` | Flat B-301 | Approved | Owner |
+| **Resident** | Manish Sharma | `manish.s@sunshinecomplex.com` | `Manish@123` | Flat B-302 | Approved | Tenant |
+| **Resident** | Amit Joshi | `amit.j@sunshinecomplex.com` | `Amit@123` | Flat C-101 | Approved | Tenant |
+| **Resident** | Deepak Patel | `deepak.p@sunshinecomplex.com` | `Deepak@123` | Flat C-102 | Approved | Owner |
+| **Resident** | Priya Desai | `priya.d@sunshinecomplex.com` | `Priya@123` | Flat C-201 | Approved | Owner |
+| **Resident** | Meera Iyer | `meera.i@sunshinecomplex.com` | `Meera@123` | Flat C-202 | Approved | Owner |
+| **Resident** | Suresh Nair | `suresh.n@sunshinecomplex.com` | `Suresh@123` | Flat C-301 | Approved | Owner |
 
-### 2. Secretary
+### 2. Secretary & Manager
 | Role | Name | Username (Email) | Password | Unit / Flat | Status | Details / Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Secretary** | Rahul Verma | `rahul@sunshinecomplex.com` | `Rahul@123` | Flat A-302 | Approved | Society Administrator |
+| **Secretary** | Rahul Verma | `rahul@sunshinecomplex.com` | `Rahul@123` | Flat A-301 | Approved | Society Administrator |
+| **Manager** | Vikram Malhotra | `manager@sunshinecomplex.com` | `Manager@123` | Management Office | Approved | Society Coordinator |
 
 ### 3. Security (Only 1)
 | Role | Name | Username (Email) | Password | Employee ID | Shift | Details / Notes |

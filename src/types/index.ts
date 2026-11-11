@@ -213,6 +213,8 @@ export interface Visitor {
   
   // Redesign fields
   visitorType?: string;
+  isDelivery?: boolean;
+  deliveryCompany?: string;
   visitType?: 'one-time' | 'recurring';
   recurringSchedule?: {
     frequency: 'daily' | 'weekly' | 'monthly';
@@ -425,14 +427,21 @@ export interface EmergencyAlert {
 export interface GatePass {
   id: string;
   name: string;
+  phone?: string;
+  photo?: string;
+  passType?: 'maid' | 'cook' | 'family' | 'guest' | string;
   company?: string;
   purpose: string;
   validFrom: string;
   validTo: string;
+  permittedDays?: string[];
+  allowedTimings?: { from: string; to: string } | string;
   assignedResident: string;
   unit: string;
   building: string;
-  status: 'active' | 'expired' | 'used';
+  otp?: string;
+  qrCodeData?: string;
+  status: 'active' | 'expired' | 'revoked' | 'used';
   createdAt: string;
 }
 
@@ -508,6 +517,10 @@ export interface Helper {
   residentIds: string[];
   joinedAt: string;
   portal: 'society';
+  photo?: string;
+  passId?: string;
+  passStatus?: 'active' | 'expired' | 'revoked';
+  validTo?: string;
 }
 
 export interface HelperAttendance {

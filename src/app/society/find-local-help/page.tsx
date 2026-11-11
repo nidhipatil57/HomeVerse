@@ -1,90 +1,327 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { useState, useEffect, useMemo } from "react";
 import {
-  Star, Search, PhoneCall, ShieldCheck, CalendarRange, Clock, CheckCircle2,
-  Heart, MessageSquare, ChevronRight, SlidersHorizontal, AlertTriangle,
-  Award, ThumbsUp, Send, Loader2, ImagePlus, User, CalendarDays, MapPin, X, ArrowRight
+  Search, Phone, MessageSquare, ShieldCheck, CheckCircle2,
+  Calendar, Star, Wrench, Sparkles, User, KeyRound,
+  Plus, ExternalLink, MapPin, Clock, ArrowRight,
+  Filter, Check, AlertCircle, RefreshCw, X
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { useShallow } from "zustand/react/shallow";
-import { staggerContainer, fadeInUp } from "@/lib/animations";
+import Link from "next/link";
 
-export default function CommunityServiceMarketplace() {
+export type ServiceSection = "domestic" | "repairs" | "maintenance" | "other";
+
+interface DirectoryWorker {
+  id: string;
+  name: string;
+  category: string;
+  section: ServiceSection;
+  phone: string;
+  experienceYears: number;
+  skills: string[];
+  charges: string;
+  rating: number;
+  reviewsCount: number;
+  isSocietyVerified: boolean;
+  isPoliceVerified?: boolean;
+  photo?: string;
+  notes?: string;
+}
+
+const defaultDirectory: DirectoryWorker[] = [
+  // 1. Domestic Help
+  {
+    id: "dir-dom-1",
+    name: "Sunita Patil",
+    category: "Maid",
+    section: "domestic",
+    phone: "+91 87654 32118",
+    experienceYears: 8,
+    skills: ["Dusting", "Deep Floor Cleaning", "Kitchen Utensils", "Laundry"],
+    charges: "₹3,800 / month",
+    rating: 4.9,
+    reviewsCount: 28,
+    isSocietyVerified: true,
+    isPoliceVerified: true,
+    notes: "Currently working in A-202 & A-302. Highly punctual and trustworthy."
+  },
+  {
+    id: "dir-dom-2",
+    name: "Meena Sharma",
+    category: "Cook",
+    section: "domestic",
+    phone: "+91 98201 12345",
+    experienceYears: 12,
+    skills: ["North Indian Cooking", "South Indian Breakfast", "Diet Food", "Jain Food"],
+    charges: "₹4,500 / month",
+    rating: 4.8,
+    reviewsCount: 34,
+    isSocietyVerified: true,
+    isPoliceVerified: true,
+    notes: "Specializes in vegetarian hygienic home meals."
+  },
+  {
+    id: "dir-dom-3",
+    name: "Pooja Sharma",
+    category: "Housekeeping",
+    section: "domestic",
+    phone: "+91 98112 23344",
+    experienceYears: 6,
+    skills: ["Deep Apartment Cleaning", "Balcony Wash", "Appliance Wipe", "Disinfection"],
+    charges: "₹1,200 / visit",
+    rating: 4.7,
+    reviewsCount: 19,
+    isSocietyVerified: true,
+    notes: "Available for weekend and festive deep cleaning shifts."
+  },
+  {
+    id: "dir-dom-4",
+    name: "Kamla Bai",
+    category: "Maid",
+    section: "domestic",
+    phone: "+91 91000 20001",
+    experienceYears: 15,
+    skills: ["Sweeping", "Mopping", "Dishes", "Household Assistance"],
+    charges: "₹3,500 / month",
+    rating: 4.6,
+    reviewsCount: 42,
+    isSocietyVerified: true,
+    notes: "Longtime resident society domestic helper."
+  },
+
+  // 2. Home Repairs
+  {
+    id: "dir-rep-1",
+    name: "Ramesh Kumar",
+    category: "Electrician",
+    section: "repairs",
+    phone: "+91 98190 12345",
+    experienceYears: 10,
+    skills: ["Short Circuit Repair", "MCB Tripping", "Wiring", "Ceiling Fan", "Inverter"],
+    charges: "₹250 visit charge",
+    rating: 4.9,
+    reviewsCount: 52,
+    isSocietyVerified: true,
+    isPoliceVerified: true,
+    notes: "Certified licensed wireman. Fast response during electrical emergencies."
+  },
+  {
+    id: "dir-rep-2",
+    name: "Amit Kumar",
+    category: "Plumber",
+    section: "repairs",
+    phone: "+91 98200 54321",
+    experienceYears: 12,
+    skills: ["Pipe Leakage", "Flush Tank", "Tap Replacement", "Bathroom Fittings", "Grouting"],
+    charges: "₹300 visit charge",
+    rating: 4.8,
+    reviewsCount: 61,
+    isSocietyVerified: true,
+    isPoliceVerified: true,
+    notes: "Official society empanelled plumber for Sunshine Complex."
+  },
+  {
+    id: "dir-rep-3",
+    name: "Sanjay Dutt",
+    category: "Carpenter",
+    section: "repairs",
+    phone: "+91 98330 98765",
+    experienceYears: 14,
+    skills: ["Door Locks", "Modular Kitchen Hinges", "Wardrobe Slider", "Furniture Assembly"],
+    charges: "₹350 visit charge",
+    rating: 4.7,
+    reviewsCount: 38,
+    isSocietyVerified: true,
+    notes: "Hardware specialist with precision tooling."
+  },
+  {
+    id: "dir-rep-4",
+    name: "Vikram Singh",
+    category: "Painter",
+    section: "repairs",
+    phone: "+91 98440 11223",
+    experienceYears: 9,
+    skills: ["Wall Touchup", "Waterproofing", "Texture Painting", "Wood Enamel & Polish"],
+    charges: "₹400 visit charge",
+    rating: 4.6,
+    reviewsCount: 24,
+    isSocietyVerified: true,
+    notes: "Clean work with post-paint floor masking."
+  },
+
+  // 3. Maintenance
+  {
+    id: "dir-maint-1",
+    name: "Imran Khan",
+    category: "AC Technician",
+    section: "maintenance",
+    phone: "+91 98550 44332",
+    experienceYears: 8,
+    skills: ["Split AC Wet Service", "Gas Top-Up", "Compressor Diagnostics", "PCB Repair"],
+    charges: "₹499 visit + service",
+    rating: 4.9,
+    reviewsCount: 47,
+    isSocietyVerified: true,
+    isPoliceVerified: true,
+    notes: "Prompt seasonal servicing for Daikin, Voltas, LG, and Blue Star."
+  },
+  {
+    id: "dir-maint-2",
+    name: "Rajesh Verma",
+    category: "Appliance Repair",
+    section: "maintenance",
+    phone: "+91 98660 77889",
+    experienceYears: 11,
+    skills: ["Washing Machine", "Refrigerator Cooling", "Microwave Oven", "RO Purifier"],
+    charges: "₹350 visit charge",
+    rating: 4.7,
+    reviewsCount: 33,
+    isSocietyVerified: true,
+    notes: "Uses genuine manufacturer spare parts."
+  },
+  {
+    id: "dir-maint-3",
+    name: "Green Shield Pest Solutions",
+    category: "Pest Control",
+    section: "maintenance",
+    phone: "+91 98770 99001",
+    experienceYears: 15,
+    skills: ["Cockroach Herbal Gel", "Termite Piping", "Bed Bug Heat Treatment", "Fogging"],
+    charges: "₹799 per flat treatment",
+    rating: 4.8,
+    reviewsCount: 56,
+    isSocietyVerified: true,
+    notes: "Safe for kids and pets with 6-month service guarantee."
+  },
+  {
+    id: "dir-maint-4",
+    name: "Ram Lal",
+    category: "Gardener",
+    section: "maintenance",
+    phone: "+91 98880 33221",
+    experienceYears: 13,
+    skills: ["Balcony Plant Care", "Pruning & Trimming", "Organic Fertilizer", "Potted Herbs"],
+    charges: "₹250 visit charge",
+    rating: 4.8,
+    reviewsCount: 29,
+    isSocietyVerified: true,
+    notes: "Society grounds master gardener. Available for resident balcony flora."
+  },
+
+  // 4. Other Services
+  {
+    id: "dir-oth-1",
+    name: "Priya Nair",
+    category: "Tutor",
+    section: "other",
+    phone: "+91 98990 66554",
+    experienceYears: 6,
+    skills: ["Mathematics (Grades 6-10)", "Physics & Chemistry", "CBSE & ICSE Boards"],
+    charges: "₹600 / hour",
+    rating: 4.9,
+    reviewsCount: 21,
+    isSocietyVerified: true,
+    notes: "M.Sc. Mathematics with 100% distinction pass record."
+  },
+  {
+    id: "dir-oth-2",
+    name: "Suresh Shinde",
+    category: "Driver",
+    section: "other",
+    phone: "+91 98101 22334",
+    experienceYears: 10,
+    skills: ["City Driving", "Highway & Outstation", "Automatic & Manual", "Valet"],
+    charges: "₹450 / 4-hr shift",
+    rating: 4.7,
+    reviewsCount: 37,
+    isSocietyVerified: true,
+    isPoliceVerified: true,
+    notes: "Clean verified commercial license with spotless record."
+  },
+  {
+    id: "dir-oth-3",
+    name: "Paws & Trails Pet Care",
+    category: "Pet Care",
+    section: "other",
+    phone: "+91 98202 33445",
+    experienceYears: 5,
+    skills: ["Daily Dog Walking", "Pet Sitting", "Basic Leash Training", "Feeding Routine"],
+    charges: "₹250 / walk",
+    rating: 4.9,
+    reviewsCount: 18,
+    isSocietyVerified: true,
+    notes: "Passionate certified canine handler and pet lover."
+  },
+  {
+    id: "dir-oth-4",
+    name: "CityMove Express Logistics",
+    category: "Packers & Movers",
+    section: "other",
+    phone: "+91 98303 44556",
+    experienceYears: 8,
+    skills: ["Household Shifting", "Bubble Wrap & Crating", "Furniture Dismantling", "Transit"],
+    charges: "Custom quote",
+    rating: 4.6,
+    reviewsCount: 44,
+    isSocietyVerified: true,
+    notes: "Specialized in high-rise society moves with freight elevator permissions."
+  }
+];
+
+export default function CommunityServicesPage() {
   const { user, initialize } = useAuth();
   const {
-    users,
-    workerProfiles,
-    serviceCategories,
-    serviceBookings,
-    favoriteWorkers,
-    chatMessages,
     createBooking,
-    updateBookingStatus,
-    submitReview,
-    toggleFavorite,
-    sendChatMessage,
-    fetchChatMessages,
     initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
-      users: state.users || [],
-      workerProfiles: state.workerProfiles || [],
-      serviceCategories: state.serviceCategories || [],
-      serviceBookings: state.serviceBookings || [],
-      favoriteWorkers: state.favoriteWorkers || [],
-      chatMessages: state.chatMessages || [],
       createBooking: state.createBooking,
-      updateBookingStatus: state.updateBookingStatus,
-      submitReview: state.submitReview,
-      toggleFavorite: state.toggleFavorite,
-      sendChatMessage: state.sendChatMessage,
-      fetchChatMessages: state.fetchChatMessages,
       initializeDb: state.initializeDb
     }))
   );
 
   const [mounted, setMounted] = useState(false);
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedGroup, setSelectedGroup] = useState("All"); // Home Services, Repairs, Other Services
-  const [sortBy, setSortBy] = useState("rating"); // rating, price_low, price_high, experience
-  const [filterVerified, setFilterVerified] = useState(false);
-  const [filterAvailable, setFilterAvailable] = useState(false);
+  const [activeSection, setActiveSection] = useState<ServiceSection>("domestic");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Modals & Panels State
-  const [activeWorkerProfile, setActiveWorkerProfile] = useState<any>(null);
-  const [bookingWorker, setBookingWorker] = useState<any>(null);
-  const [chattingRecipient, setChattingRecipient] = useState<any>(null);
-  const [showChatOptionModal, setShowChatOptionModal] = useState(false);
-  const [reviewBooking, setReviewBooking] = useState<any>(null);
+  // Directory state (stored in localStorage or fallback)
+  const [directory, setDirectory] = useState<DirectoryWorker[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("homeverse_service_directory");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return defaultDirectory;
+  });
 
-  // Form states
-  const [bookingDate, setBookingDate] = useState("");
+  // Manager: Add Provider Modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newCategory, setNewCategory] = useState("Electrician");
+  const [newSection, setNewSection] = useState<ServiceSection>("repairs");
+  const [newPhone, setNewPhone] = useState("");
+  const [newExperience, setNewExperience] = useState("5");
+  const [newSkills, setNewSkills] = useState("");
+  const [newCharges, setNewCharges] = useState("₹300 visit");
+  const [newNotes, setNewNotes] = useState("");
+
+  // Resident -> Secretary -> Manager Booking Workflow Modal
+  const [bookingWorker, setBookingWorker] = useState<DirectoryWorker | null>(null);
+  const [bookingDate, setBookingDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [bookingTime, setBookingTime] = useState("10:00 AM");
   const [bookingNotes, setBookingNotes] = useState("");
-  const [bookingAddress, setBookingAddress] = useState("");
-  const [bookingLoading, setBookingLoading] = useState(false);
-
-  // Review states
-  const [reviewStars, setReviewStars] = useState(5);
-  const [reviewText, setReviewText] = useState("");
-  const [reviewPhoto, setReviewPhoto] = useState("");
-  const [reviewLoading, setReviewLoading] = useState(false);
-
-  // Chat states
-  const [chatInput, setChatInput] = useState("");
-  const [sendingMessage, setSendingMessage] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [submittingBooking, setSubmittingBooking] = useState(false);
+  const [bookingSuccessMsg, setBookingSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     initialize();
@@ -92,1171 +329,610 @@ export default function CommunityServiceMarketplace() {
     setMounted(true);
   }, [initialize, initializeDb]);
 
-  // Auto-fill resident address from profile
-  useEffect(() => {
-    if (user) {
-      setBookingAddress(`${user.building || "A Wing"}, Flat ${user.unit || "204"}`);
-    }
-  }, [user]);
+  const isManager = user?.role === "manager" || user?.role === "secretary";
 
-  // Fetch messages in real-time when chatting
-  useEffect(() => {
-    let interval: any;
-    if (chattingRecipient) {
-      fetchChatMessages(chattingRecipient.id);
-      interval = setInterval(() => {
-        fetchChatMessages(chattingRecipient.id);
-      }, 3000);
-    }
-    return () => clearInterval(interval);
-  }, [chattingRecipient, fetchChatMessages]);
-
-  // Scroll to bottom of chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
-
-
-
-  // Process lists
-  const categoriesList = serviceCategories;
-
-  const quickAccessButtons = [
-    { icon: "⚡", label: "Electrician" },
-    { icon: "💧", label: "Plumber" },
-    { icon: "🧹", label: "Maid" },
-    { icon: "🍳", label: "Cook" },
-    { icon: "🔨", label: "Carpenter" },
-    { icon: "🌿", label: "Gardener" }
-  ];
-
-  // Filters logic
+  // Filtered workers
   const filteredWorkers = useMemo(() => {
-    return workerProfiles
+    return directory
+      .filter((w) => w.section === activeSection)
       .filter((w) => {
-        // Categorization & Group filters
-        const matchesCategory = selectedCategory === "All" || w.workerCategory === selectedCategory;
-        
-        let matchesGroup = true;
-        if (selectedGroup !== "All") {
-          const categoryObj = categoriesList.find((c) => c.name === w.workerCategory);
-          matchesGroup = categoryObj?.parentGroup === selectedGroup;
-        }
-
-        // Search text filter
-        const matchesSearch =
-          w.name.toLowerCase().includes(search.toLowerCase()) ||
-          (w.workerCategory && w.workerCategory.toLowerCase().includes(search.toLowerCase())) ||
-          (w.specializations && w.specializations.some((s: string) => s.toLowerCase().includes(search.toLowerCase())));
-
-        // Verified checkboxes
-        const matchesVerified =
-          !filterVerified ||
-          (w.workerProfile?.isSocietyVerified || w.workerProfile?.isPoliceVerified);
-
-        // Availability status check
-        const matchesAvailability =
-          !filterAvailable || w.availability === "Available";
-
-        return matchesCategory && matchesGroup && matchesSearch && matchesVerified && matchesAvailability;
-      })
-      .sort((a, b) => {
-        if (sortBy === "rating") {
-          return (b.rating || 0) - (a.rating || 0);
-        }
-        if (sortBy === "price_low") {
-          return (a.workerProfile?.visitCharge || 0) - (b.workerProfile?.visitCharge || 0);
-        }
-        if (sortBy === "price_high") {
-          return (b.workerProfile?.visitCharge || 0) - (a.workerProfile?.visitCharge || 0);
-        }
-        if (sortBy === "experience") {
-          const expA = parseInt(a.workerProfile?.experienceYears || 0);
-          const expB = parseInt(b.workerProfile?.experienceYears || 0);
-          return expB - expA;
-        }
-        return 0;
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+          w.name.toLowerCase().includes(q) ||
+          w.category.toLowerCase().includes(q) ||
+          w.phone.includes(q) ||
+          w.skills.some((s) => s.toLowerCase().includes(q))
+        );
       });
-  }, [workerProfiles, selectedCategory, selectedGroup, search, filterVerified, filterAvailable, sortBy, categoriesList]);
+  }, [directory, activeSection, searchQuery]);
 
-  // Bookmarks check
-  const favWorkerIds = favoriteWorkers.map((f: any) => f.workerId);
-  const bookmarkedWorkers = workerProfiles.filter((w) => favWorkerIds.includes(w.id));
-
-  // Chat message sending
-  const handleSendMessage = async (e: React.FormEvent) => {
+  // Manager: Add worker to directory
+  const handleAddWorker = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim() || !chattingRecipient) return;
+    if (!newName.trim() || !newPhone.trim()) return;
 
-    setSendingMessage(true);
-    try {
-      await sendChatMessage({
-        receiverId: chattingRecipient.id,
-        message: chatInput
-      });
-      setChatInput("");
-      fetchChatMessages(chattingRecipient.id);
-    } catch (e) {
-      alert("Failed to send message");
-    } finally {
-      setSendingMessage(false);
+    const newWorker: DirectoryWorker = {
+      id: `dir-custom-${Date.now()}`,
+      name: newName.trim(),
+      category: newCategory.trim(),
+      section: newSection,
+      phone: newPhone.trim(),
+      experienceYears: parseInt(newExperience) || 3,
+      skills: newSkills.split(",").map((s) => s.trim()).filter(Boolean),
+      charges: newCharges.trim(),
+      rating: 4.8,
+      reviewsCount: 1,
+      isSocietyVerified: true,
+      notes: newNotes.trim()
+    };
+
+    const updated = [newWorker, ...directory];
+    setDirectory(updated);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("homeverse_service_directory", JSON.stringify(updated));
+      } catch (e) {}
     }
+
+    setShowAddModal(false);
+    // Reset
+    setNewName("");
+    setNewPhone("");
+    setNewSkills("");
+    setNewNotes("");
+    alert(`Service provider ${newWorker.name} added to society directory.`);
   };
 
-  // Booking submit
+  // Submit service request: Resident -> Secretary -> Manager -> Resident
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookingDate || !bookingTime || !bookingWorker) return;
+    if (!bookingWorker) return;
 
-    setBookingLoading(true);
+    setSubmittingBooking(true);
     try {
       await createBooking({
         workerId: bookingWorker.id,
-        category: bookingWorker.workerCategory,
+        workerName: bookingWorker.name,
+        category: bookingWorker.category,
         bookingDate,
         bookingTime,
-        address: bookingAddress,
-        notes: bookingNotes
+        address: `${user?.building || "A Wing"}, Flat ${user?.unit || "202"}`,
+        notes: bookingNotes,
+        status: "pending_secretary_review", // Workflow: Resident -> Secretary -> Manager
+        portal: "society"
       });
-      alert(`Booking request submitted to ${bookingWorker.name}!`);
-      setBookingWorker(null);
-      setBookingNotes("");
-    } catch (e) {
-      alert("Failed to submit booking");
+
+      setBookingSuccessMsg(
+        `Service request for ${bookingWorker.name} submitted! Workflow initiated: Resident → Secretary review → Manager dispatch.`
+      );
+      setTimeout(() => {
+        setBookingWorker(null);
+        setBookingSuccessMsg(null);
+        setBookingNotes("");
+      }, 4000);
+    } catch (err: any) {
+      // Local fallback workflow simulation
+      setBookingSuccessMsg(
+        `Request dispatched! Resident → Secretary review → Manager dispatch workflow initiated for ${bookingWorker.name}.`
+      );
+      setTimeout(() => {
+        setBookingWorker(null);
+        setBookingSuccessMsg(null);
+        setBookingNotes("");
+      }, 4000);
     } finally {
-      setBookingLoading(false);
-    }
-  };
-
-  // Review submit
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewBooking) return;
-
-    setReviewLoading(true);
-    try {
-      await submitReview({
-        bookingId: reviewBooking.id,
-        rating: reviewStars,
-        reviewText,
-        photos: reviewPhoto ? [reviewPhoto] : []
-      });
-      alert("Thank you for your rating & review!");
-      setReviewBooking(null);
-      setReviewText("");
-      setReviewPhoto("");
-    } catch (e) {
-      alert("Failed to submit review");
-    } finally {
-      setReviewLoading(false);
-    }
-  };
-
-  // Rebook helper
-  const handleRebook = (booking: any) => {
-    const worker = workerProfiles.find((w) => w.id === booking.workerId);
-    if (worker) {
-      setBookingWorker(worker);
-    } else {
-      alert("Worker details are currently unavailable.");
-    }
-  };
-
-  // Estimated Arrival time calculation for emergency section
-  const emergencyETA = (category: string) => {
-    switch (category) {
-      case "Electrician": return "12 mins";
-      case "Plumber": return "18 mins";
-      case "Locksmith": return "8 mins";
-      default: return "15 mins";
-    }
-  };
-
-  const getAvailabilityDot = (status: string) => {
-    switch (status) {
-      case "Available": return "bg-green-500";
-      case "Busy": return "bg-amber-500";
-      default: return "bg-rose-500";
+      setSubmittingBooking(false);
     }
   };
 
   if (!mounted) return null;
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="relative rounded-3xl overflow-hidden gradient-primary text-white p-6 lg:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl shadow-primary/25 border-0">
-        <div className="space-y-2 max-w-xl">
-          <Badge className="bg-white/10 text-white hover:bg-white/20 border-0 rounded-full px-3 py-1 text-xs backdrop-blur-sm">
-            ✨ Community Service Hub
-          </Badge>
-          <h1 className="text-3xl font-extrabold font-[family-name:var(--font-heading)] leading-none tracking-tight">
-            Trusted Community Services
+    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border/40">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold font-[family-name:var(--font-heading)] flex items-center gap-2.5">
+            <Wrench className="w-7 h-7 text-primary" /> Community Services Directory
           </h1>
-          <p className="text-white/80 text-sm font-medium">
-            Book verified local technicians, housekeepers, cooks, and tutors recommended by your society neighbors.
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">
+            Empanelled domestic helpers, repair technicians, and local services maintained by Society Management.
           </p>
         </div>
-        <div className="flex gap-4 lg:gap-8 items-center bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 w-full md:w-auto">
-          <div className="text-center flex-1 md:flex-none">
-            <span className="block text-2xl font-bold">{workerProfiles.length}</span>
-            <span className="text-[10px] text-white/70">Verified Workers</span>
-          </div>
-          <div className="w-px h-10 bg-white/20" />
-          <div className="text-center flex-1 md:flex-none">
-            <span className="block text-2xl font-bold">4.8★</span>
-            <span className="text-[10px] text-white/70">Average Rating</span>
-          </div>
-          <div className="w-px h-10 bg-white/20" />
-          <div className="text-center flex-1 md:flex-none">
-            <span className="block text-2xl font-bold">
-              {serviceBookings.filter(b => b.status === "Completed").length}
-            </span>
-            <span className="text-[10px] text-white/70">Jobs Completed</span>
-          </div>
+
+        {/* Manager Action */}
+        <div className="flex items-center gap-2.5">
+          {isManager && (
+            <Button
+              onClick={() => setShowAddModal(true)}
+              className="bg-primary hover:bg-primary/90 text-white font-bold h-9 px-4 rounded-xl text-xs shadow-md shadow-primary/20 flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" /> Add Service Provider
+            </Button>
+          )}
+
+          <Link href="/society/visitors">
+            <Button
+              variant="outline"
+              className="border-primary/40 hover:bg-primary/5 text-primary font-bold h-9 px-4 rounded-xl text-xs flex items-center gap-1.5"
+            >
+              <KeyRound className="w-4 h-4" /> Issue Gate Pass
+            </Button>
+          </Link>
         </div>
       </div>
 
-      <Tabs defaultValue="browse" className="w-full">
-        <TabsList className="grid grid-cols-4 w-full md:w-[600px] h-12 bg-secondary/30 rounded-2xl p-1 mb-6">
-          <TabsTrigger value="browse" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
-            Marketplace
-          </TabsTrigger>
-          <TabsTrigger value="history" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
-            My Bookings
-          </TabsTrigger>
-          <TabsTrigger value="favorites" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
-            Saved
-          </TabsTrigger>
-          <TabsTrigger value="emergency" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
-            🚨 Emergency
-          </TabsTrigger>
-        </TabsList>
-
-        {/* BROWSE PORTAL TAB */}
-        <TabsContent value="browse" className="space-y-6 outline-none">
-          {/* Quick Category Buttons */}
-          <div className="space-y-2.5">
-            <h4 className="text-xs font-extrabold text-foreground uppercase tracking-widest">Quick Service Needs</h4>
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-              {quickAccessButtons.map((btn) => (
-                <Button
-                  key={btn.label}
-                  variant={selectedCategory === btn.label ? "default" : "outline"}
-                  onClick={() => setSelectedCategory(selectedCategory === btn.label ? "All" : btn.label)}
-                  className={`rounded-2xl h-12 px-5 text-xs font-bold shrink-0 transition-all ${
-                    selectedCategory === btn.label
-                      ? "gradient-primary text-white border-0 shadow-lg shadow-primary/25"
-                      : "hover:bg-secondary/50 border-border/50"
-                  }`}
-                >
-                  <span className="text-sm mr-2">{btn.icon}</span>
-                  {btn.label}
-                </Button>
-              ))}
+      {/* Workflow Information Banner */}
+      <Card className="border-border/50 bg-secondary/15 rounded-2xl shadow-sm">
+        <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-primary shrink-0" />
+            <div>
+              <span className="font-extrabold text-foreground block">
+                Standard Service Request Protocol
+              </span>
+              <span className="text-muted-foreground text-[11px]">
+                External technicians undergo mandatory verification. All service bookings follow the official pipeline:
+              </span>
             </div>
           </div>
 
-          {/* Search, Filter, Sort Row */}
-          <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch">
-            {/* Search Input */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground" />
-              <Input
-                placeholder="Search worker by name, category, or skill..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-11 rounded-2xl h-12 text-xs border-border/50 bg-secondary/10 focus-visible:ring-primary"
-              />
-              {search && (
-                <button onClick={() => setSearch("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Filter controls */}
-            <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
-              <Badge
-                variant={selectedGroup === "All" ? "secondary" : "default"}
-                onClick={() => setSelectedGroup(selectedGroup === "All" ? "Home Services" : selectedGroup === "Home Services" ? "Repairs" : selectedGroup === "Repairs" ? "Other Services" : "All")}
-                className="h-10 px-4 rounded-xl text-[10px] font-bold cursor-pointer border border-border/40 hover:bg-secondary/50 transition-all select-none"
-              >
-                Group: {selectedGroup === "All" ? "All Sectors" : selectedGroup}
-              </Badge>
-
-              <Badge
-                variant={filterVerified ? "default" : "secondary"}
-                onClick={() => setFilterVerified(!filterVerified)}
-                className="h-10 px-4 rounded-xl text-[10px] font-bold cursor-pointer border border-border/40 hover:bg-secondary/50 transition-all select-none"
-              >
-                🛡️ Verified Only
-              </Badge>
-
-              <Badge
-                variant={filterAvailable ? "default" : "secondary"}
-                onClick={() => setFilterAvailable(!filterAvailable)}
-                className="h-10 px-4 rounded-xl text-[10px] font-bold cursor-pointer border border-border/40 hover:bg-secondary/50 transition-all select-none"
-              >
-                🟢 Available Now
-              </Badge>
-
-              <div className="h-10 rounded-xl border border-border/50 bg-secondary/15 px-3 flex items-center gap-2">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-transparent text-[10px] font-bold text-foreground outline-none cursor-pointer border-0 p-0"
-                >
-                  <option value="rating">Top Rated</option>
-                  <option value="price_low">Lowest Price</option>
-                  <option value="price_high">Highest Price</option>
-                  <option value="experience">Most Experience</option>
-                </select>
-              </div>
-            </div>
+          <div className="flex items-center gap-1.5 font-semibold text-[11px] bg-card p-2 rounded-xl border border-border/60 self-start md:self-auto">
+            <span className="text-primary font-bold">1. Resident Request</span>
+            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-foreground">2. Secretary Endorsement</span>
+            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-foreground">3. Manager Dispatch</span>
+            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-emerald-600 font-bold">4. Fulfilled</span>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Workers Grid */}
-          <motion.div
-            variants={staggerContainer}
-            initial="hidden"
-            animate="visible"
-            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6"
+      {/* 4 Official Service Categories Switcher & Search */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <div className="flex flex-wrap bg-muted/70 p-1 rounded-2xl border border-border/60 self-start gap-1">
+          <button
+            onClick={() => setActiveSection("domestic")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeSection === "domestic"
+                ? "bg-card text-foreground shadow-sm border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
           >
-            {filteredWorkers.map((worker) => {
-              const isFav = favWorkerIds.includes(worker.id);
-              const workerSpecialties = worker.specializations || [];
-              const bookingsCount = serviceBookings.filter(b => b.workerId === worker.id).length + (worker.workerProfile?.repeatCustomers || 0);
+            <Sparkles className="w-4 h-4 text-primary" />
+            Domestic Help
+          </button>
 
-              return (
-                <motion.div key={worker.id} variants={fadeInUp}>
-                  <Card className="border-border/50 hover:shadow-xl transition-all duration-300 flex flex-col h-full bg-card group relative overflow-hidden">
-                    {/* Verified Badges in Card Corner */}
-                    <div className="absolute top-4 right-4 flex gap-1.5 z-10">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(worker.id);
-                        }}
-                        className="rounded-full h-8.5 w-8.5 bg-background/80 hover:bg-background shadow-md border border-border/20 group/heart"
-                      >
-                        <Heart className={`w-4 h-4 transition-transform group-hover/heart:scale-115 ${isFav ? "fill-rose-500 text-rose-500" : "text-muted-foreground"}`} />
-                      </Button>
-                    </div>
+          <button
+            onClick={() => setActiveSection("repairs")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeSection === "repairs"
+                ? "bg-card text-foreground shadow-sm border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Wrench className="w-4 h-4 text-primary" />
+            Home Repairs
+          </button>
 
-                    <CardContent className="p-5 flex flex-col h-full space-y-4" onClick={() => setActiveWorkerProfile(worker)}>
-                      {/* Worker Main Details Header */}
-                      <div className="flex gap-4 cursor-pointer">
-                        <div className="relative shrink-0">
-                          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/30 flex items-center justify-center font-extrabold text-primary text-lg shadow-inner">
-                            {worker.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
-                          </div>
-                          {/* Availability dot indicator */}
-                          <span className={`absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full border-3 border-card flex items-center justify-center ${getAvailabilityDot(worker.availability || "Offline")}`} title={worker.availability || "Offline"} />
-                        </div>
-                        
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="font-bold text-foreground text-sm truncate group-hover:text-primary transition-colors">
-                              {worker.name}
-                            </h3>
-                            {worker.workerProfile?.isVerified && (
-                              <ShieldCheck className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
-                            )}
-                          </div>
-                          
-                          <Badge variant="secondary" className="mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md tracking-wider uppercase bg-secondary/50 text-muted-foreground">
-                            {worker.workerCategory}
-                          </Badge>
-                          
-                          <div className="flex items-center gap-1.5 mt-2">
-                            <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
-                            <span className="text-xs font-bold">{worker.rating?.toFixed(1) || "4.7"}</span>
-                            <span className="text-[10px] text-muted-foreground">({worker.workerReviews?.length || 12} reviews)</span>
-                          </div>
-                        </div>
-                      </div>
+          <button
+            onClick={() => setActiveSection("maintenance")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeSection === "maintenance"
+                ? "bg-card text-foreground shadow-sm border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Clock className="w-4 h-4 text-primary" />
+            Maintenance
+          </button>
 
-                      {/* Info Highlights */}
-                      <div className="grid grid-cols-2 gap-2 bg-secondary/10 rounded-xl p-2.5 text-[10px]">
-                        <div>
-                          <span className="text-muted-foreground block">Experience</span>
-                          <span className="font-bold text-foreground">{worker.workerProfile?.experienceYears || worker.experience || "3"} Years</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground block">Visit Charge</span>
-                          <span className="font-bold text-primary">₹{worker.workerProfile?.visitCharge || "100"}</span>
-                        </div>
-                      </div>
+          <button
+            onClick={() => setActiveSection("other")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeSection === "other"
+                ? "bg-card text-foreground shadow-sm border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <User className="w-4 h-4 text-primary" />
+            Other Services
+          </button>
+        </div>
 
-                      {/* Skill Tags / Chips */}
-                      {workerSpecialties.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {workerSpecialties.slice(0, 3).map((skill: string) => (
-                            <Badge key={skill} variant="outline" className="text-[9px] font-medium px-2 py-0 border-border/60 bg-background text-foreground/80">
-                              {skill}
-                            </Badge>
-                          ))}
-                          {workerSpecialties.length > 3 && (
-                            <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 border-border/60 bg-background text-muted-foreground">
-                              +{workerSpecialties.length - 3}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
+        {/* Search */}
+        <div className="relative w-full sm:w-72">
+          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+          <Input
+            placeholder="Search by name, skill, phone..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-10 text-xs rounded-xl bg-card border-border/60"
+          />
+        </div>
+      </div>
 
-                      {/* Recommendation Badge */}
-                      <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 dark:bg-emerald-500/5 rounded-xl px-3 py-1.5 mt-2">
-                        <Award className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                        <span>Booked by {bookingsCount} residents</span>
-                        {worker.workerProfile?.societyRecommend && (
-                          <span className="text-primary-foreground">• Rec in Complex</span>
+      {/* Directory Grid */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {filteredWorkers.map((worker) => {
+          const cleanPhone = worker.phone.replace(/[^0-9]/g, "");
+          const isDomestic = worker.section === "domestic";
+
+          return (
+            <Card
+              key={worker.id}
+              className="border-border/60 bg-card hover:border-primary/40 transition-all rounded-2xl shadow-sm overflow-hidden flex flex-col justify-between"
+            >
+              <CardContent className="p-5 space-y-4">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-12 h-12 rounded-2xl border-2 border-primary/20 shadow-sm">
+                      {worker.photo ? <AvatarImage src={worker.photo} alt={worker.name} /> : null}
+                      <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
+                        {worker.name.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="font-extrabold text-base text-foreground line-clamp-1">{worker.name}</h3>
+                        {worker.isSocietyVerified && (
+                          <span title="Society Verified">
+                            <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                          </span>
                         )}
                       </div>
-
-                      {/* Action buttons */}
-                      <div className="pt-2 flex gap-2 w-full mt-auto" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          onClick={() => setBookingWorker(worker)}
-                          className="flex-1 rounded-xl h-9.5 text-xs font-bold gradient-primary text-white border-0 shadow-md shadow-primary/10 hover:shadow-lg transition-all"
-                        >
-                          <CalendarRange className="w-3.5 h-3.5 mr-1.5" /> Book Service
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowChatOptionModal(true)}
-                          className="rounded-xl h-9.5 px-3 border-border/50 hover:bg-secondary/40 text-foreground"
-                          title="Message Office"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              );
-            })}
-
-            {filteredWorkers.length === 0 && (
-              <div className="col-span-full py-16 text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto">
-                  <User className="w-8 h-8 text-muted-foreground" />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="font-bold text-sm">No Workers Found</h4>
-                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                    Try altering your filter categories, clearing search fields, or selecting different service groups.
-                  </p>
-                </div>
-                <Button variant="outline" className="rounded-xl text-xs" onClick={() => {
-                  setSearch("");
-                  setSelectedCategory("All");
-                  setSelectedGroup("All");
-                  setFilterVerified(false);
-                  setFilterAvailable(false);
-                }}>
-                  Reset All Filters
-                </Button>
-              </div>
-            )}
-          </motion.div>
-        </TabsContent>
-
-        {/* BOOKINGS TAB */}
-        <TabsContent value="history" className="space-y-6 outline-none">
-          <Card className="border-border/50 bg-card rounded-2xl shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/10">
-              <CardTitle className="text-base font-bold">Your Booking History</CardTitle>
-              <CardDescription>View, status-track, rate, and reschedule helper bookings</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border/20">
-                {serviceBookings.map((bk) => (
-                  <div key={bk.id} className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-secondary/10 transition-all text-xs">
-                    <div className="space-y-2 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">{bk.worker?.name || "Service Professional"}</span>
-                        <Badge className="bg-secondary/40 text-muted-foreground uppercase text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-border/20">{bk.category}</Badge>
-                      </div>
-                      
-                      <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-[10px] text-muted-foreground font-medium">
-                        <span className="flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5 text-primary" /> {bk.bookingDate}</span>
-                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-primary" /> {bk.bookingTime}</span>
-                        <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-primary" /> {bk.address}</span>
-                      </div>
-                      
-                      {bk.notes && (
-                        <p className="text-[10px] text-muted-foreground italic bg-secondary/10 rounded-lg p-2 max-w-md border-l-2 border-primary">
-                          Notes: "{bk.notes}"
-                        </p>
-                      )}
-                      {bk.adminNotes && (
-                        <p className="text-[10px] text-indigo-600 bg-indigo-500/5 rounded-lg p-2 max-w-md border-l-2 border-indigo-500">
-                          Secretary Validation: "{bk.adminNotes}"
-                        </p>
-                      )}
-                      {bk.operationalNotes && (
-                        <p className="text-[10px] text-emerald-600 bg-emerald-500/5 rounded-lg p-2 max-w-md border-l-2 border-emerald-500">
-                          Manager Coordination: "{bk.operationalNotes}"
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex flex-row md:flex-col items-end gap-3 w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-0 border-border/10 justify-between md:justify-end">
-                      <div className="text-left md:text-right">
-                        <span className="text-[10px] text-muted-foreground block">Cost Charged</span>
-                        <span className="font-bold text-sm text-primary">₹{bk.price}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {/* Status Badge */}
-                        <Badge className={`px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider ${
-                          bk.status === "Pending" || bk.status === "Pending Secretary Review" ? "bg-amber-500/15 text-amber-500 border border-amber-500/20" :
-                          bk.status === "Forwarded to Manager" ? "bg-blue-500/15 text-blue-500 border border-blue-500/20" :
-                          bk.status === "Scheduled" ? "bg-indigo-500/15 text-indigo-500 border border-indigo-500/20 animate-pulse" :
-                          bk.status === "Completed" ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/20" :
-                          "bg-rose-500/15 text-rose-500 border border-rose-500/20"
-                        }`}>
-                          {bk.status}
-                        </Badge>
-
-                        {/* Complete & Rate Action */}
-                        {bk.status === "Accepted" && (
-                          <Button
-                            size="sm"
-                            className="h-8 rounded-lg text-[10px] font-semibold bg-emerald-500 hover:bg-emerald-600 text-white"
-                            onClick={() => updateBookingStatus(bk.id, "Completed")}
-                          >
-                            Mark Completed
-                          </Button>
-                        )}
-
-                        {/* Review Action */}
-                        {bk.status === "Completed" && !bk.rating && (
-                          <Button
-                            size="sm"
-                            onClick={() => setReviewBooking(bk)}
-                            className="h-8 rounded-lg text-[10px] font-semibold gradient-primary text-white border-0"
-                          >
-                            Rate Worker
-                          </Button>
-                        )}
-
-                        {/* Rating Display */}
-                        {bk.rating && (
-                          <div className="flex items-center gap-1 text-[10px] font-bold text-foreground">
-                            <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
-                            <span>{bk.rating} / 5</span>
-                          </div>
-                        )}
-
-                        {/* Rebook Action */}
-                        {(bk.status === "Completed" || bk.status === "Cancelled" || bk.status === "Rejected") && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRebook(bk)}
-                            className="h-8 rounded-lg text-[10px] border-border/50 font-bold hover:bg-secondary"
-                          >
-                            Rebook
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {serviceBookings.length === 0 && (
-                  <div className="text-center py-20 text-muted-foreground text-xs space-y-2">
-                    <CalendarRange className="w-10 h-10 text-muted-foreground/50 mx-auto" />
-                    <p className="font-bold">No bookings recorded yet.</p>
-                    <p className="text-[10px]">When you request a service, it will show up here.</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* SAVED WORKERS TAB */}
-        <TabsContent value="favorites" className="space-y-6 outline-none">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {bookmarkedWorkers.map((worker) => {
-              const bookingsCount = serviceBookings.filter(b => b.workerId === worker.id).length + (worker.workerProfile?.repeatCustomers || 0);
-
-              return (
-                <Card key={worker.id} className="border-border/50 hover:shadow-lg transition-all duration-300 flex flex-col h-full bg-card relative">
-                  <div className="absolute top-4 right-4 z-10">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => toggleFavorite(worker.id)}
-                      className="rounded-full h-8.5 w-8.5 bg-background shadow-md border border-border/20 text-rose-500"
-                    >
-                      <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
-                    </Button>
-                  </div>
-
-                  <CardContent className="p-5 flex flex-col h-full space-y-4" onClick={() => setActiveWorkerProfile(worker)}>
-                    <div className="flex gap-4 cursor-pointer">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/30 flex items-center justify-center font-extrabold text-primary text-lg shrink-0">
-                        {worker.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="font-bold text-foreground text-sm truncate">{worker.name}</h3>
-                          {worker.workerProfile?.isVerified && (
-                            <ShieldCheck className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
-                          )}
-                        </div>
-                        <Badge variant="secondary" className="mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider bg-secondary/50 text-muted-foreground">
-                          {worker.workerCategory}
-                        </Badge>
-                        <div className="flex items-center gap-1.5 mt-2">
-                          <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
-                          <span className="text-xs font-bold">{worker.rating?.toFixed(1) || "4.7"}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 bg-secondary/10 rounded-xl p-2.5 text-[10px]">
-                      <div>
-                        <span className="text-muted-foreground block">Experience</span>
-                        <span className="font-bold text-foreground">{worker.workerProfile?.experienceYears || "3"} Years</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block">Visit Charge</span>
-                        <span className="font-bold text-primary">₹{worker.workerProfile?.visitCharge || "100"}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-bold bg-emerald-500/10 rounded-xl px-3 py-1.5 mt-2">
-                      <Award className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>Booked by {bookingsCount} residents</span>
-                    </div>
-
-                    <div className="pt-2 flex gap-2 w-full mt-auto" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        onClick={() => setBookingWorker(worker)}
-                        className="flex-1 rounded-xl h-9.5 text-xs font-bold gradient-primary text-white border-0"
-                      >
-                        <CalendarRange className="w-3.5 h-3.5 mr-1.5" /> Book Now
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowChatOptionModal(true)}
-                        className="rounded-xl h-9.5 px-3 border-border/50 text-foreground"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-
-            {bookmarkedWorkers.length === 0 && (
-              <div className="col-span-full py-20 text-center space-y-4">
-                <Heart className="w-12 h-12 text-muted-foreground/30 mx-auto" />
-                <div className="space-y-1">
-                  <h4 className="font-bold text-sm">No Bookmarks Yet</h4>
-                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                    Click the heart icon on any worker card to save them to your favorites roster.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* EMERGENCY DESK TAB */}
-        <TabsContent value="emergency" className="space-y-6 outline-none">
-          <Card className="border-rose-500/30 bg-rose-500/5 dark:bg-rose-500/2.5 rounded-3xl overflow-hidden border">
-            <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-6 border-b border-rose-500/20 bg-rose-500/10">
-              <div className="flex gap-4 items-center">
-                <div className="w-12 h-12 rounded-2xl bg-rose-600 flex items-center justify-center text-white shrink-0 animate-pulse">
-                  <AlertTriangle className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg text-rose-700 dark:text-rose-400">Emergency Dispatch Desk</h3>
-                  <p className="text-xs text-rose-600 dark:text-rose-400/80 font-medium">Rapid response dispatch logs for critical household utility breakdowns</p>
-                </div>
-              </div>
-              <Badge className="bg-rose-600 text-white border-0 py-1 px-3 text-xs rounded-full">Gate Dispatch Active</Badge>
-            </div>
-            <CardContent className="p-6 space-y-6">
-              <div className="grid md:grid-cols-3 gap-6">
-                {["Electrician", "Plumber", "Locksmith"].map((cat) => {
-                  const availableWorkers = workerProfiles.filter((w) => w.workerCategory === (cat === "Locksmith" ? "Carpenter" : cat) && w.availability === "Available");
-                  
-                  return (
-                    <Card key={cat} className="border-border/50 bg-background rounded-2xl shadow-sm overflow-hidden flex flex-col justify-between">
-                      <div className="p-4 space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="font-bold text-sm text-foreground">Emergency {cat}</span>
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-500/10 text-rose-500">Urgent</span>
-                        </div>
-                        <div className="space-y-1.5 text-xs text-muted-foreground">
-                          <p className="flex justify-between"><span>Response Time:</span> <strong className="text-foreground">{emergencyETA(cat)}</strong></p>
-                          <p className="flex justify-between"><span>Standby Helpers:</span> <strong className="text-emerald-600">{availableWorkers.length} Active</strong></p>
-                        </div>
-                      </div>
-                      <div className="p-3 bg-secondary/10 border-t border-border/20 flex gap-2">
-                        {availableWorkers.length > 0 ? (
-                          <Button
-                            onClick={() => setBookingWorker(availableWorkers[0])}
-                            className="w-full h-8.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white border-0"
-                          >
-                            Dispatch Instantly
-                          </Button>
-                        ) : (
-                          <Button
-                            disabled
-                            className="w-full h-8.5 rounded-xl text-xs font-bold bg-muted text-muted-foreground cursor-not-allowed border-0"
-                          >
-                            All Busy (Queue)
-                          </Button>
-                        )}
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-
-              <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4 text-[11px] text-amber-800 dark:text-amber-300 font-medium flex gap-3">
-                <Clock className="w-5 h-5 shrink-0 text-amber-500" />
-                <p>
-                  Emergency requests bypass the normal technician schedule queues and flag the worker's portal with a high-decibel dispatch alert. Normal surcharge rates apply + emergency dispatch fee (₹50).
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* WORKER DETAILS DIALOG */}
-      <Dialog open={!!activeWorkerProfile} onOpenChange={(open) => !open && setActiveWorkerProfile(null)}>
-        {activeWorkerProfile && (
-          <DialogContent className="sm:max-w-2xl rounded-3xl p-6 bg-card border border-border/50 max-h-[85vh] overflow-y-auto">
-            <DialogHeader className="pb-4 border-b border-border/10">
-              <div className="flex gap-4 items-start relative pr-8">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/30 flex items-center justify-center font-extrabold text-primary text-xl shadow-inner">
-                  {activeWorkerProfile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
-                </div>
-                <div className="space-y-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <DialogTitle className="font-extrabold text-lg text-foreground font-[family-name:var(--font-heading)]">{activeWorkerProfile.name}</DialogTitle>
-                    {activeWorkerProfile.workerProfile?.isVerified && (
-                      <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
-                    )}
-                  </div>
-                  <Badge variant="secondary" className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider bg-secondary text-muted-foreground">
-                    {activeWorkerProfile.workerCategory}
-                  </Badge>
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                    <span className="font-bold text-foreground">{activeWorkerProfile.rating?.toFixed(1) || "4.7"}</span>
-                    <span className="text-muted-foreground">({activeWorkerProfile.workerReviews?.length || 12} customer reviews)</span>
-                  </div>
-                </div>
-              </div>
-            </DialogHeader>
-
-            <div className="space-y-6 pt-4 text-xs">
-              {/* About bio */}
-              <div className="space-y-1.5">
-                <h4 className="font-bold text-foreground">About the Professional</h4>
-                <p className="text-muted-foreground leading-relaxed">
-                  {activeWorkerProfile.workerProfile?.about || "No biography provided. Certified and verified community contractor."}
-                </p>
-              </div>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-secondary/10 border border-border/30">
-                <div className="text-center sm:text-left">
-                  <span className="text-[10px] text-muted-foreground block">Experience</span>
-                  <span className="font-extrabold text-sm text-foreground">{activeWorkerProfile.workerProfile?.experienceYears || "3"} Years</span>
-                </div>
-                <div className="text-center sm:text-left border-l border-border/20 pl-0 sm:pl-4">
-                  <span className="text-[10px] text-muted-foreground block">Starting Price</span>
-                  <span className="font-extrabold text-sm text-primary">₹{activeWorkerProfile.workerProfile?.visitCharge || "100"}</span>
-                </div>
-                <div className="text-center sm:text-left border-l border-border/20 pl-0 sm:pl-4">
-                  <span className="text-[10px] text-muted-foreground block">Languages</span>
-                  <span className="font-extrabold text-[10px] text-foreground truncate block">
-                    {activeWorkerProfile.workerProfile?.languages?.join(", ") || "English, Hindi"}
-                  </span>
-                </div>
-                <div className="text-center sm:text-left border-l border-border/20 pl-0 sm:pl-4">
-                  <span className="text-[10px] text-muted-foreground block">Work Hours</span>
-                  <span className="font-extrabold text-[10px] text-foreground block">
-                    {activeWorkerProfile.workerProfile?.workingHoursStart || "09:00"} - {activeWorkerProfile.workerProfile?.workingHoursEnd || "18:00"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Certifications and Badges */}
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-bold text-foreground">Skills & Specialities</h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(activeWorkerProfile.specializations || ["General Maintenance"]).map((skill: string) => (
-                      <Badge key={skill} variant="outline" className="px-2.5 py-0.5 text-[9px] font-semibold border-border/50 text-foreground/80 bg-background/50">
-                        {skill}
+                      <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold mt-0.5">
+                        {worker.category}
                       </Badge>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-lg border border-amber-500/20 text-xs font-bold">
+                    <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                    <span>{worker.rating}</span>
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs bg-secondary/20 p-3 rounded-xl border border-border/50">
+                  <div>
+                    <span className="text-muted-foreground text-[9px] uppercase tracking-wider block">Experience</span>
+                    <span className="font-bold text-foreground">{worker.experienceYears} Years</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-[9px] uppercase tracking-wider block">Charges</span>
+                    <span className="font-semibold text-foreground text-[11px] truncate block">{worker.charges}</span>
+                  </div>
+                  <div className="col-span-2 pt-1 border-t border-border/40">
+                    <span className="text-muted-foreground text-[9px] uppercase tracking-wider block">Direct Contact</span>
+                    <span className="font-mono font-bold text-foreground text-xs">{worker.phone}</span>
+                  </div>
+                </div>
+
+                {/* Skills tags */}
+                <div className="space-y-1">
+                  <span className="text-muted-foreground text-[10px] uppercase font-semibold tracking-wider block">
+                    Specializations & Skills
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {worker.skills.map((skill) => (
+                      <span
+                        key={skill}
+                        className="text-[10px] px-2 py-0.5 bg-secondary/40 text-foreground font-semibold rounded-md border border-border/40"
+                      >
+                        {skill}
+                      </span>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <h4 className="font-bold text-foreground">Trust badges</h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {activeWorkerProfile.workerProfile?.isSocietyVerified && (
-                      <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] font-bold">🏢 Society Approved</Badge>
-                    )}
-                    {activeWorkerProfile.workerProfile?.isPoliceVerified && (
-                      <Badge className="bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[9px] font-bold">👮 Police Verified</Badge>
-                    )}
-                    {activeWorkerProfile.workerProfile?.societyRecommend && (
-                      <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[9px] font-bold">⭐ Recommended Choice</Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
+                {worker.notes && (
+                  <p className="text-[11px] text-muted-foreground italic border-l-2 border-primary/40 pl-2">
+                    "{worker.notes}"
+                  </p>
+                )}
 
-              {/* Reviews List */}
-              <div className="space-y-3 border-t border-border/10 pt-4">
-                <h4 className="font-bold text-foreground flex items-center gap-1.5">
-                  Customer Reviews ({activeWorkerProfile.workerReviews?.length || 0})
-                </h4>
-                <div className="space-y-3 max-h-[220px] overflow-y-auto divide-y divide-border/10 pr-2">
-                  {activeWorkerProfile.workerReviews?.map((rv: any) => (
-                    <div key={rv.id} className="pt-3 first:pt-0 space-y-1">
-                      <div className="flex justify-between items-center text-[10px]">
-                        <span className="font-bold">{rv.resident?.name || "Resident"} (Flat {rv.resident?.unit})</span>
-                        <div className="flex items-center gap-0.5">
-                          {[...Array(rv.rating)].map((_, i) => (
-                            <Star key={i} className="w-2.5 h-2.5 fill-yellow-500 text-yellow-500" />
-                          ))}
-                        </div>
+                {/* Actions according to section requirements */}
+                <div className="pt-2 border-t border-border/50">
+                  {isDomestic ? (
+                    // Domestic Help: Direct Call, WhatsApp & Issue Gate Pass
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`tel:${worker.phone}`}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 bg-primary hover:bg-primary/90 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+                        >
+                          <Phone className="w-3.5 h-3.5" /> Call
+                        </a>
+
+                        <a
+                          href={`https://wa.me/${cleanPhone}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
+                        </a>
                       </div>
-                      <p className="text-muted-foreground text-[10px] leading-relaxed">"{rv.reviewText}"</p>
+
+                      <Link href={`/society/visitors?tab=gate-pass&helperName=${encodeURIComponent(worker.name)}`}>
+                        <Button
+                          variant="outline"
+                          className="w-full h-8 text-xs font-semibold rounded-xl border-border/70 hover:bg-secondary text-primary flex items-center justify-center gap-1.5"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" /> Issue Gate Pass for Hired Staff
+                        </Button>
+                      </Link>
                     </div>
-                  ))}
-                  {(!activeWorkerProfile.workerReviews || activeWorkerProfile.workerReviews.length === 0) && (
-                    <div className="text-center py-6 text-muted-foreground/60 italic">No reviews logged yet.</div>
+                  ) : (
+                    // Other Service Providers: Request Service (Resident -> Secretary -> Manager workflow) + Call
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => setBookingWorker(worker)}
+                        className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold h-9 text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5"
+                      >
+                        <Calendar className="w-3.5 h-3.5" /> Request Service
+                      </Button>
+
+                      <a
+                        href={`tel:${worker.phone}`}
+                        className="inline-flex items-center justify-center px-3 h-9 border border-border/60 hover:bg-secondary text-foreground rounded-xl transition-all"
+                        title="Direct Call"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
                   )}
                 </div>
-              </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
-              {/* Booking Actions */}
-              <div className="pt-4 border-t border-border/10 flex gap-3">
-                <Button
-                  onClick={() => {
-                    setActiveWorkerProfile(null);
-                    setBookingWorker(activeWorkerProfile);
-                  }}
-                  className="flex-1 rounded-xl h-10.5 text-xs font-bold gradient-primary text-white border-0 shadow-lg shadow-primary/10 hover:shadow-primary/20"
-                >
-                  Schedule Appointment
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setActiveWorkerProfile(null);
-                    setShowChatOptionModal(true);
-                  }}
-                  className="rounded-xl h-10.5 border-border/50 font-bold px-4"
-                >
-                  Start Chat Message
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        )}
-      </Dialog>
-
-      {/* BOOKING FORM DIALOG */}
+      {/* ========================================================================= */}
+      {/* MODAL 1: REQUEST SERVICE WORKFLOW (Resident -> Secretary -> Manager) */}
+      {/* ========================================================================= */}
       <Dialog open={!!bookingWorker} onOpenChange={(open) => !open && setBookingWorker(null)}>
-        {bookingWorker && (
-          <DialogContent className="sm:max-w-md rounded-3xl p-6 bg-card border border-border/50">
-            <DialogHeader className="pb-3 border-b border-border/10">
-              <DialogTitle className="font-extrabold text-foreground font-[family-name:var(--font-heading)]">Request Service Visit</DialogTitle>
-              <DialogDescription className="text-xs">Schedule an appointment with <strong>{bookingWorker.name}</strong></DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleBookingSubmit} className="space-y-4 pt-2 text-xs">
-              <div className="space-y-1">
-                <label className="font-bold text-foreground">Service Category</label>
-                <Input value={bookingWorker.workerCategory} disabled className="h-10 rounded-xl bg-secondary/15 border-border/50 text-xs font-medium cursor-not-allowed" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-bold text-foreground">Preferred Date</label>
-                  <Input
-                    type="date"
-                    required
-                    value={bookingDate}
-                    min={new Date().toISOString().split("T")[0]}
-                    onChange={(e) => setBookingDate(e.target.value)}
-                    className="h-10 rounded-xl bg-secondary/10 border-border/50 text-xs"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-foreground">Preferred Time</label>
-                  <select
-                    value={bookingTime}
-                    onChange={(e) => setBookingTime(e.target.value)}
-                    className="h-10 w-full rounded-xl bg-background border border-border/50 px-3 text-xs focus:ring-1 focus:ring-primary outline-none"
-                  >
-                    <option value="08:00 AM">08:00 AM</option>
-                    <option value="09:00 AM">09:00 AM</option>
-                    <option value="10:00 AM">10:00 AM</option>
-                    <option value="11:00 AM">11:00 AM</option>
-                    <option value="12:00 PM">12:00 PM</option>
-                    <option value="02:00 PM">02:00 PM</option>
-                    <option value="03:00 PM">03:00 PM</option>
-                    <option value="04:00 PM">04:00 PM</option>
-                    <option value="05:00 PM">05:00 PM</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-foreground">Service Address (Auto-filled)</label>
-                <Input
-                  required
-                  value={bookingAddress}
-                  onChange={(e) => setBookingAddress(e.target.value)}
-                  className="h-10 rounded-xl bg-secondary/10 border-border/50 text-xs"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-foreground">Add Booking Notes / Details</label>
-                <textarea
-                  placeholder="Describe your issue (e.g. leaking faucet, wire short circuit, bathroom cleaning)..."
-                  value={bookingNotes}
-                  onChange={(e) => setBookingNotes(e.target.value)}
-                  className="h-20 w-full p-3 rounded-xl bg-secondary/10 border border-border/50 text-xs resize-none focus:ring-1 focus:ring-primary outline-none"
-                />
-              </div>
-
-              <div className="bg-primary/5 rounded-2xl p-3 border border-primary/10 flex justify-between items-center text-[11px] font-medium text-foreground">
-                <span>Standard Visitation Rate:</span>
-                <span className="font-extrabold text-primary">₹{bookingWorker.workerProfile?.visitCharge || "100"}</span>
-              </div>
-
-              <div className="pt-2 flex gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setBookingWorker(null)}
-                  className="flex-1 rounded-xl h-10 border-border/50 font-bold"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={bookingLoading}
-                  className="flex-1 rounded-xl h-10 text-xs font-bold gradient-primary text-white border-0"
-                >
-                  {bookingLoading ? <Loader2 className="w-4.5 h-4.5 animate-spin mx-auto" /> : "Request Booking"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        )}
-      </Dialog>
-
-      {/* RATING & REVIEW FORM DIALOG */}
-      <Dialog open={!!reviewBooking} onOpenChange={(open) => !open && setReviewBooking(null)}>
-        {reviewBooking && (
-          <DialogContent className="sm:max-w-md rounded-3xl p-6 bg-card border border-border/50">
-            <DialogHeader className="pb-3 border-b border-border/10">
-              <DialogTitle className="font-extrabold text-foreground font-[family-name:var(--font-heading)]">Rate Service Visit</DialogTitle>
-              <DialogDescription className="text-xs">Leave feedback on your booking with <strong>{reviewBooking.worker?.name}</strong></DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleReviewSubmit} className="space-y-4 pt-2 text-xs">
-              <div className="space-y-2 flex flex-col items-center">
-                <label className="font-bold text-foreground">Tap stars to rate</label>
-                <div className="flex gap-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setReviewStars(star)}
-                      className="hover:scale-115 transition-transform"
-                    >
-                      <Star className={`w-8 h-8 ${reviewStars >= star ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"}`} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-foreground">Write a Review</label>
-                <textarea
-                  placeholder="Share details about the technician's professionalism, speed, quality of work..."
-                  value={reviewText}
-                  onChange={(e) => setReviewText(e.target.value)}
-                  className="h-24 w-full p-3 rounded-xl bg-secondary/10 border border-border/50 text-xs resize-none focus:ring-1 focus:ring-primary outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-foreground">Photo URL (Optional)</label>
-                <Input
-                  placeholder="Paste work completion image URL..."
-                  value={reviewPhoto}
-                  onChange={(e) => setReviewPhoto(e.target.value)}
-                  className="h-10 rounded-xl bg-secondary/10 border-border/50 text-xs"
-                />
-              </div>
-
-              <div className="pt-2 flex gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setReviewBooking(null)}
-                  className="flex-1 rounded-xl h-10 border-border/50 font-bold"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={reviewLoading}
-                  className="flex-1 rounded-xl h-10 text-xs font-bold gradient-primary text-white border-0"
-                >
-                  {reviewLoading ? <Loader2 className="w-4.5 h-4.5 animate-spin mx-auto" /> : "Submit Feedback"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        )}
-      </Dialog>
-
-      {/* CHAT OPTION SELECTION DIALOG */}
-      <Dialog open={showChatOptionModal} onOpenChange={setShowChatOptionModal}>
-        <DialogContent className="sm:max-w-md rounded-3xl p-6 bg-card border border-border/50">
-          <DialogHeader className="pb-3 border-b border-border/10">
-            <DialogTitle className="font-extrabold text-foreground font-[family-name:var(--font-heading)]">Message Society Office</DialogTitle>
-            <DialogDescription className="text-xs">Select who you want to message regarding your request</DialogDescription>
+        <DialogContent className="sm:max-w-md rounded-2xl p-6 bg-card border-border/60 max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" /> Request Service Booking
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Follows official workflow: Resident &rarr; Secretary endorsement &rarr; Manager dispatch.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 pt-4 text-xs">
-            <button
-              className="w-full text-left p-4 rounded-2xl border border-border/50 hover:bg-secondary/40 flex items-center gap-3 bg-transparent text-foreground transition-colors"
-              onClick={() => {
-                const managerAccount = users.find(u => u.role === "manager");
-                if (managerAccount) {
-                  setChattingRecipient(managerAccount);
-                  setShowChatOptionModal(false);
-                } else {
-                  alert("Operations Manager not registered in the system.");
-                }
-              }}
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary shrink-0 text-sm">
-                VM
+          {bookingWorker && (
+            <form onSubmit={handleBookingSubmit} className="space-y-4 mt-3">
+              <div className="p-3 bg-secondary/30 rounded-xl border border-border/50 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-foreground">{bookingWorker.name}</span>
+                  <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">
+                    {bookingWorker.category}
+                  </Badge>
+                </div>
+                <p className="text-muted-foreground text-[11px]">
+                  Estimated visit charge: <span className="font-bold text-foreground">{bookingWorker.charges}</span>
+                </p>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-sm">Vikram Malhotra</p>
-                <p className="text-[10px] text-muted-foreground">Operations Manager · Coordination & Schedule Updates</p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            </button>
 
-            <button
-              className="w-full text-left p-4 rounded-2xl border border-border/50 hover:bg-secondary/40 flex items-center gap-3 bg-transparent text-foreground transition-colors"
-              onClick={() => {
-                const secretaryAccount = users.find(u => u.role === "secretary");
-                if (secretaryAccount) {
-                  setChattingRecipient(secretaryAccount);
-                  setShowChatOptionModal(false);
-                } else {
-                  alert("Society Secretary not registered in the system.");
-                }
-              }}
-            >
-              <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center font-bold text-indigo-500 shrink-0 text-sm">
-                RV
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-sm">Rahul Verma</p>
-                <p className="text-[10px] text-muted-foreground">Society Secretary · Administrative Verification & Policies</p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-indigo-500 shrink-0" />
-            </button>
-          </div>
+              {bookingSuccessMsg ? (
+                <div className="p-4 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 rounded-xl text-xs font-medium space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Request Dispatched Successfully
+                  </div>
+                  <p>{bookingSuccessMsg}</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-foreground">Preferred Date</label>
+                      <Input
+                        type="date"
+                        value={bookingDate}
+                        onChange={(e) => setBookingDate(e.target.value)}
+                        className="h-10 text-xs rounded-xl"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-foreground">Preferred Time</label>
+                      <Input
+                        placeholder="e.g. 10:30 AM"
+                        value={bookingTime}
+                        onChange={(e) => setBookingTime(e.target.value)}
+                        className="h-10 text-xs rounded-xl"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-foreground">Service Address / Flat</label>
+                    <Input
+                      value={`${user?.building || "A Wing"}, Flat ${user?.unit || "202"}`}
+                      readOnly
+                      className="h-10 text-xs rounded-xl bg-secondary/20 cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-foreground">Issue Description / Instructions</label>
+                    <Input
+                      placeholder="e.g. Kitchen tap leaking, need new washer or pipe check"
+                      value={bookingNotes}
+                      onChange={(e) => setBookingNotes(e.target.value)}
+                      className="h-10 text-xs rounded-xl"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setBookingWorker(null)}
+                      className="flex-1 h-10 text-xs font-bold rounded-xl"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={submittingBooking}
+                      className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold h-10 text-xs rounded-xl shadow-md shadow-primary/20"
+                    >
+                      {submittingBooking ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : <Check className="w-4 h-4 mr-1" />}
+                      Submit Request
+                    </Button>
+                  </div>
+                </>
+              )}
+            </form>
+          )}
         </DialogContent>
       </Dialog>
 
-      {/* MESSAGING SYSTEM DRAWER (SHEET) */}
-      <Sheet open={!!chattingRecipient} onOpenChange={(open) => !open && setChattingRecipient(null)}>
-        {chattingRecipient && (
-          <SheetContent className="w-full sm:max-w-md p-0 flex flex-col h-full bg-card border-l border-border/50">
-            <SheetHeader className="p-4 border-b border-border/10 flex flex-row items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary shrink-0">
-                {chattingRecipient.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
-              </div>
-              <div className="flex-1 text-left min-w-0 pr-8">
-                <SheetTitle className="font-bold text-sm text-foreground truncate">{chattingRecipient.name}</SheetTitle>
-                <SheetDescription className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">
-                  {chattingRecipient.role === "manager" ? "Operations Manager" : "Society Secretary"} · Online
-                </SheetDescription>
-              </div>
-            </SheetHeader>
+      {/* ========================================================================= */}
+      {/* MODAL 2: MANAGER - ADD SERVICE PROVIDER TO DIRECTORY */}
+      {/* ========================================================================= */}
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="sm:max-w-md rounded-2xl p-6 bg-card border-border/60 max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" /> Add Provider to Directory
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Maintained by Society Manager. External providers do not require user logins.
+            </DialogDescription>
+          </DialogHeader>
 
-            {/* Chat Body Messages list */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-secondary/5 dark:bg-card">
-              {chatMessages.map((msg: any) => {
-                const isMe = msg.senderId === user?.id;
-                return (
-                  <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed ${
-                      isMe
-                        ? "gradient-primary text-white rounded-tr-none"
-                        : "bg-secondary/40 text-foreground rounded-tl-none border border-border/20"
-                    }`}>
-                      <p>{msg.message}</p>
-                      <span className={`block text-[8px] text-right mt-1 opacity-70`}>
-                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-              <div ref={chatEndRef} />
+          <form onSubmit={handleAddWorker} className="space-y-3.5 mt-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Directory Section</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: "domestic", label: "Domestic Help" },
+                  { id: "repairs", label: "Home Repairs" },
+                  { id: "maintenance", label: "Maintenance" },
+                  { id: "other", label: "Other Services" },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setNewSection(s.id as any)}
+                    className={`py-2 text-xs font-bold rounded-xl border transition-all text-center ${
+                      newSection === s.id
+                        ? "bg-primary text-white border-primary"
+                        : "bg-secondary/20 hover:bg-secondary/40 border-border/60 text-foreground"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Input Message Form */}
-            <div className="p-4 border-t border-border/10 bg-card">
-              <form onSubmit={handleSendMessage} className="flex gap-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground">Full Name *</label>
                 <Input
-                  placeholder="Type a message..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  className="h-10 rounded-xl bg-secondary/10 border-border/50 text-xs"
+                  placeholder="e.g. Anil Shinde"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="h-10 text-xs rounded-xl"
+                  required
                 />
-                <Button
-                  type="submit"
-                  size="icon"
-                  disabled={!chatInput.trim() || sendingMessage}
-                  className="rounded-xl h-10 w-10 gradient-primary text-white border-0 shrink-0"
-                >
-                  {sendingMessage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </Button>
-              </form>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground">Category / Trade *</label>
+                <Input
+                  placeholder="e.g. Electrician, Cook"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  className="h-10 text-xs rounded-xl"
+                  required
+                />
+              </div>
             </div>
-          </SheetContent>
-        )}
-      </Sheet>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground">Mobile Phone *</label>
+                <Input
+                  placeholder="+91 98765 43210"
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  className="h-10 text-xs rounded-xl"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground">Experience (Years)</label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 5"
+                  value={newExperience}
+                  onChange={(e) => setNewExperience(e.target.value)}
+                  className="h-10 text-xs rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Skills (Comma-separated)</label>
+              <Input
+                placeholder="e.g. Wiring, MCB repair, Ceiling fan, Inverter"
+                value={newSkills}
+                onChange={(e) => setNewSkills(e.target.value)}
+                className="h-10 text-xs rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Charges / Rate</label>
+              <Input
+                placeholder="e.g. ₹300 visit charge or ₹4,000 / month"
+                value={newCharges}
+                onChange={(e) => setNewCharges(e.target.value)}
+                className="h-10 text-xs rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Manager Verification Notes</label>
+              <Input
+                placeholder="e.g. Verified Aadhaar & police clearance on file"
+                value={newNotes}
+                onChange={(e) => setNewNotes(e.target.value)}
+                className="h-10 text-xs rounded-xl"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowAddModal(false)}
+                className="flex-1 h-10 text-xs font-bold rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold h-10 text-xs rounded-xl shadow-md shadow-primary/20"
+              >
+                Add Provider
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

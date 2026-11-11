@@ -76,7 +76,7 @@ async function getQrImage(): Promise<CanvasImageSource | null> {
  * Generates a high-resolution pass card image as a Blob (PNG)
  */
 export async function generateVisitorPassBlob(
-  visitor: Visitor,
+  visitor: any,
   options?: GeneratePassImageOptions
 ): Promise<Blob> {
   const societyName = options?.societyName || "HomeVerse Society";
@@ -220,7 +220,10 @@ export async function generateVisitorPassBlob(
   const typeY = nameY + 20;
   ctx.font = "500 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   ctx.fillStyle = "#64748b";
-  ctx.fillText(`${visitor.visitorType || "Visitor"} Pass`, logicalWidth / 2, typeY);
+  const typeText = visitor.passType 
+    ? `${visitor.passType} Gate Pass`
+    : (visitor.isDelivery ? `${visitor.deliveryCompany || 'Delivery'} Partner` : `${visitor.visitorType || "Visitor"} Pass`);
+  ctx.fillText(typeText, logicalWidth / 2, typeY);
 
   // 6. Dashed Divider Line
   const dividerY = typeY + 22;
@@ -246,7 +249,7 @@ export async function generateVisitorPassBlob(
 
   ctx.font = "bold 18px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   ctx.fillStyle = "#0f172a";
-  ctx.fillText(visitor.visitingUnit || "N/A", col1X, gridRow1Y + 20);
+  ctx.fillText(visitor.visitingUnit || visitor.unit || "N/A", col1X, gridRow1Y + 20);
 
   // PASS GATE CODE OTP
   ctx.font = "bold 9.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
@@ -260,26 +263,24 @@ export async function generateVisitorPassBlob(
   // Row 2
   const gridRow2Y = gridRow1Y + 48;
 
-  // SCHEDULED DATE
+  // AUTHORIZED ROLE
   ctx.font = "bold 9.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   ctx.fillStyle = "#64748b";
-  ctx.fillText("SCHEDULED DATE", col1X, gridRow2Y);
+  ctx.fillText("AUTHORIZED FOR", col1X, gridRow2Y);
 
-  const formattedDate = visitor.expectedAt
-    ? new Date(visitor.expectedAt).toLocaleDateString()
-    : new Date().toLocaleDateString();
-  ctx.font = "bold 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  const roleText = visitor.passType || visitor.visitorType || (visitor.isDelivery ? `${visitor.deliveryCompany || "Delivery"}` : "Visitor");
+  ctx.font = "bold 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   ctx.fillStyle = "#0f172a";
-  ctx.fillText(formattedDate, col1X, gridRow2Y + 18);
+  ctx.fillText(roleText, col1X, gridRow2Y + 18);
 
-  // VALIDITY
+  // STATUS
   ctx.font = "bold 9.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   ctx.fillStyle = "#64748b";
-  ctx.fillText("VALIDITY", col2X, gridRow2Y);
+  ctx.fillText("STATUS", col2X, gridRow2Y);
 
-  ctx.font = "bold 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillStyle = "#0f172a";
-  ctx.fillText("One-Day Use", col2X, gridRow2Y + 18);
+  ctx.font = "bold 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillStyle = "#16a34a";
+  ctx.fillText("Active Pass", col2X, gridRow2Y + 18);
 
   // 8. Security Instructions Banner at Bottom
   const bannerY = gridRow2Y + 42;

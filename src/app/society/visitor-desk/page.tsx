@@ -44,12 +44,13 @@ const deliveryBrands = [
 export default function SecurityVisitorDeskPage() {
   const { user, initialize } = useAuth();
   const {
-    visitors, checkInVisitor, checkOutVisitor, denyVisitorEntry,
+    visitors, gatePasses, checkInVisitor, checkOutVisitor, denyVisitorEntry,
     submitVisitorRequest, logEmergencyVisitor, complaints, initializeDb,
     helpers, attendance, checkInHelper, checkOutHelper
   } = useCommunityStore(
     useShallow((state) => ({
       visitors: state.visitors || [],
+      gatePasses: state.gatePasses || [],
       checkInVisitor: state.checkInVisitor,
       checkOutVisitor: state.checkOutVisitor,
       denyVisitorEntry: state.denyVisitorEntry,
@@ -152,11 +153,20 @@ export default function SecurityVisitorDeskPage() {
     { id: "dw-4", name: "Rajesh Guard", category: "Driver", schedule: "Daily Helper", assignedUnits: ["A-102"], phone: "+91 98000 11004" }
   ];
 
-  // OTP/QR code verification logic
+  // OTP/QR code verification logic (Both Visitors & GatePasses)
   const handleVerifyPass = () => {
-    if (!otpVerifyCode) return;
+    if (!otpVerifyCode.trim()) return;
+    const cleanCode = otpVerifyCode.trim();
+
+    // 1. Match against Visitors
     const matched = visitors.find(
-      (v) => v.portal === "society" && (v.otp === otpVerifyCode || v.qrCode === otpVerifyCode || v.id === otpVerifyCode)
+      (v) =>
+        v.portal === "society" &&
+        (v.otp === cleanCode ||
+          v.qrCode === cleanCode ||
+          v.id === cleanCode ||
+          ((v as any).qrCodeData && (v as any).qrCodeData === cleanCode) ||
+          cleanCode.includes(v.id))
     );
 
     if (matched) {
@@ -165,14 +175,79 @@ export default function SecurityVisitorDeskPage() {
       } else if (matched.status === "denied") {
         setVerificationResult({ success: false, msg: "Visitor previously flagged as DENIED entry.", visitor: matched });
       } else {
-        setVerificationResult({ success: true, msg: "Pass verified successfully!", visitor: matched });
+        setVerificationResult({ success: true, msg: "Visitor Pass verified successfully!", visitor: matched });
       }
-    } else {
-      setVerificationResult({ success: false, msg: "Invalid OTP or QR Gatepass Code." });
+      return;
     }
+
+    // 2. Match against Official Gate Passes (Domestic Helpers, Cooks, Family, Guests)
+    const matchedGatePass = (gatePasses || []).find(
+      (gp) =>
+        gp.otp === cleanCode ||
+        gp.id === cleanCode ||
+        (gp.qrCodeData && gp.qrCodeData === cleanCode) ||
+        cleanCode.includes(gp.id)
+    );
+
+    if (matchedGatePass) {
+      if (matchedGatePass.status === "revoked") {
+        setVerificationResult({
+          success: false,
+          msg: `ENTRY FORBIDDEN: Gate Pass for ${matchedGatePass.name} was REVOKED by resident.`
+        });
+        return;
+      }
+      if (
+        matchedGatePass.status === "expired" ||
+        (matchedGatePass.validTo && new Date(matchedGatePass.validTo) < new Date())
+      ) {
+        setVerificationResult({
+          success: false,
+          msg: `PASS EXPIRED: Gate Pass for ${matchedGatePass.name} expired on ${matchedGatePass.validTo}. Renewal required.`
+        });
+        return;
+      }
+
+      // Valid active Gate Pass
+      const passVisitorAdapter: any = {
+        id: matchedGatePass.id,
+        name: matchedGatePass.name,
+        phone: matchedGatePass.phone || "",
+        visitingUnit: matchedGatePass.unit,
+        visitingResident: matchedGatePass.assignedResident,
+        visitorType: `${matchedGatePass.passType || "Official"} Pass`,
+        purpose: matchedGatePass.purpose,
+        status: "approved",
+        otp: matchedGatePass.otp
+      };
+      setVerificationResult({
+        success: true,
+        msg: `Official Gate Pass verified for ${matchedGatePass.name} (${matchedGatePass.passType})!`,
+        visitor: passVisitorAdapter
+      });
+      return;
+    }
+
+    setVerificationResult({ success: false, msg: "Invalid OTP or QR Gate Pass code." });
   };
 
   const handleVerifyCheckIn = async (id: string) => {
+    // If it's a Gate Pass
+    if (id.startsWith("GP-")) {
+      const gp = (gatePasses || []).find((p) => p.id === id);
+      if (gp) {
+        // If helper, check in helper
+        const helper = (helpers || []).find((h) => h.passId === id || h.name.toLowerCase() === gp.name.toLowerCase());
+        if (helper) {
+          await checkInHelper(helper.id, helper.name, helper.category, "Security Desk", helper.assignedFlats);
+        }
+      }
+      setOtpVerifyCode("");
+      setVerificationResult(null);
+      alert("Gate Pass verified and entry recorded!");
+      return;
+    }
+
     await checkInVisitor(id, "Pass Code verified");
     setOtpVerifyCode("");
     setVerificationResult(null);

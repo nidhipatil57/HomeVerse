@@ -492,14 +492,14 @@ export default function ComplaintsPage() {
     }
 
     const payload = {
-      title,
-      description,
+      title: title.trim(),
+      description: description.trim(),
       category: category as any,
       priority: finalPriority,
       raisedBy: user?.id || "resident-1",
       raisedByName: user?.name || "Sara Shah",
-      unit: flat || user?.unit || "A-204",
-      building: user?.building || "Tower A",
+      unit: flat || user?.unit || "A-202",
+      building: user?.building || "A Wing",
       wing: wing || "A",
       emergency,
       images: uploadedImages,
@@ -508,7 +508,11 @@ export default function ComplaintsPage() {
       portal: "society" as const,
     };
 
-    await addComplaint(payload);
+    try {
+      await addComplaint(payload);
+    } catch (err) {
+      console.error("Error creating complaint:", err);
+    }
 
     // Reset fields
     setTitle("");

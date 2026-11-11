@@ -125,7 +125,7 @@ export function AIChat({ portalType }: AIChatProps) {
 
   useEffect(() => {
     if (user) {
-      setBookingAddress(`${user.building || "A Wing"}, Flat ${user.unit || "204"}`);
+      setBookingAddress(`${user.building || "A Wing"}, Flat ${user.unit || "202"}`);
     }
   }, [user]);
 

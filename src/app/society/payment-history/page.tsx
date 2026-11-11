@@ -11,6 +11,30 @@ import { useAuth } from "@/lib/store/useAuth";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
 
+function formatPaymentDateTime(dateStr?: string | null): string {
+  if (!dateStr) return "N/A";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const datePart = d.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
+    if (dateStr.includes("T") || dateStr.includes(":") || dateStr.includes(" ")) {
+      const timePart = d.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      });
+      return `${datePart} at ${timePart}`;
+    }
+    return datePart;
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function PaymentHistoryPage() {
   const { user, initialize } = useAuth();
   const {
@@ -33,15 +57,25 @@ export default function PaymentHistoryPage() {
 
   if (!mounted) return null;
 
+  const isManagement = user?.role === "secretary" || user?.role === "manager" || user?.role === "admin";
+  const cleanUserUnit = (user?.unit || "").replace(/^[A-Za-z\s-]+/, "").trim();
+  const cleanUserWing = (user?.building || "").toUpperCase().replace(/[^A-Z]/g, "") ||
+                        (user?.unit || "").toUpperCase().replace(/[^A-Z]/g, "");
+
   const paidTransactions = payments
     .filter(p => {
       if (p.status?.toLowerCase() !== "paid") return false;
-      if (p.residentId === user?.id) return true;
-      if (user?.unit) {
-        const cleanUserUnit = user.unit.replace(/^[A-Za-z\s-]+/, '').trim();
-        const cleanPUnit = (p.unit || '').replace(/^[A-Za-z\s-]+/, '').trim();
-        if (cleanPUnit && cleanPUnit === cleanUserUnit) return true;
-        if (p.unit === user.unit) return true;
+      if (isManagement) return true;
+      if (p.residentId && user?.id && p.residentId === user.id) return true;
+
+      const cleanPUnit = (p.unit || "").replace(/^[A-Za-z\s-]+/, "").trim();
+      const cleanPWing = (p.building || "").toUpperCase().replace(/[^A-Z]/g, "") ||
+                         (p.unit || "").toUpperCase().replace(/[^A-Z]/g, "");
+
+      if (cleanUserUnit && cleanPUnit === cleanUserUnit) {
+        if (!cleanUserWing || !cleanPWing || cleanUserWing === cleanPWing) {
+          return true;
+        }
       }
       return false;
     })
@@ -80,7 +114,8 @@ export default function PaymentHistoryPage() {
                         : p.paymentType}
                     </h4>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      Paid On: {p.paidDate || "Recent"} • Reference: {p.transactionId || p.id}
+                      {isManagement && p.unit && <span className="font-semibold text-foreground mr-1.5">Flat {p.unit} ({p.residentName}) •</span>}
+                      Paid On: {formatPaymentDateTime(p.paidDate)} • Ref: {p.transactionId || p.id}
                     </p>
                   </div>
                 </div>

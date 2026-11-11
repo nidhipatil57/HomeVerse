@@ -1,0 +1,19 @@
+ALTER TABLE "Visitor"
+ADD COLUMN "delivery" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "deliveryCompany" TEXT,
+ADD COLUMN "orderReference" TEXT,
+ADD COLUMN "instructions" TEXT,
+ADD COLUMN "checkedInBy" TEXT,
+ADD COLUMN "checkedOutBy" TEXT;
+
+ALTER TABLE "GatePass"
+ADD COLUMN "phone" TEXT,
+ADD COLUMN "validFrom" TIMESTAMP(3),
+ADD COLUMN "validTo" TIMESTAMP(3),
+ADD COLUMN "workingDays" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN "arrivalTime" TEXT,
+ADD COLUMN "exitTime" TEXT,
+ADD COLUMN "passType" TEXT NOT NULL DEFAULT 'helper',
+ADD COLUMN "workerId" TEXT,
+ADD COLUMN "revokedAt" TIMESTAMP(3);
+

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { io } from "socket.io-client";
 import {
-  Complaint, Visitor, VisitorStatus, UserRole, PortalType, User, Announcement, EmergencyAlert,
+  Complaint, ComplaintTimelineEntry, Visitor, VisitorStatus, UserRole, PortalType, User, Announcement, EmergencyAlert,
   GatePass, VehicleLog, IncidentReport, SocietyExpense, FlatInfo, RentRecord,
   ComplaintPriority, AiAnalysis, ComplaintChatMessage, Helper, HelperAttendance
 } from "@/types";
@@ -29,7 +29,10 @@ import {
   getPrepopulatedFlats,
   getPrepopulatedRentRecords,
   getPrepopulatedCollections,
-  getPrepopulatedPayments
+  getPrepopulatedPayments,
+  getPrepopulatedHelpers,
+  getPrepopulatedHelperAttendance,
+  getPrepopulatedFlatAttendance
 } from "@/data/mock-db-seed";
 
 // ==========================================
@@ -345,6 +348,8 @@ export interface Notification {
   type: "info" | "warning" | "success" | "error" | "alert";
   read: boolean;
   createdAt: string;
+  actionUrl?: string;
+  link?: string;
 }
 
 export interface RoommatePreference {
@@ -446,8 +451,9 @@ interface CommunityState {
   logEmergencyVisitor: (agency: string, reason: string, vehicleNumber?: string) => Promise<void>;
 
   // Daily Helpers & Attendance Transactions
-  registerHelper: (h: Omit<Helper, "id" | "joinedAt">) => Promise<void>;
+  registerHelper: (h: Omit<Helper, "id" | "joinedAt">) => Promise<{ helper: Helper; pass: GatePass }>;
   deleteHelper: (id: string) => Promise<void>;
+  removeHelperFromFlat: (helperId: string, flatNumber: string) => Promise<void>;
   checkInHelper: (workerId: string, workerName: string, category: string, gate: string, assignedFlats: string[]) => Promise<void>;
   checkOutHelper: (attendanceId: string, gate: string) => Promise<void>;
   checkInFlatHelper: (helperId: string, flatNumber: string, residentId: string, residentName: string, servicePerformed: string) => Promise<void>;
@@ -541,7 +547,8 @@ interface CommunityState {
   // Security Operations
   raiseEmergencyAlert: (alert: Omit<EmergencyAlert, "id" | "status" | "createdAt">) => Promise<void>;
   updateEmergencyStatus: (id: string, status: EmergencyAlert["status"], notes?: string) => Promise<void>;
-  issueGatePass: (pass: Omit<GatePass, "id" | "status" | "createdAt">) => Promise<void>;
+  issueGatePass: (pass: Omit<GatePass, "id" | "status" | "createdAt">) => Promise<GatePass>;
+  revokeGatePass: (id: string) => Promise<void>;
   logVehicleEntry: (vehicle: Omit<VehicleLog, "id" | "entryTime" | "status">) => Promise<void>;
   logVehicleExit: (id: string) => Promise<void>;
   addAnnouncement: (ann: Omit<Announcement, "id" | "createdAt">) => Promise<void>;
@@ -600,6 +607,13 @@ const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
               return seeds as unknown as T;
             }
           }
+          if (key === "helpers" || key === "attendance" || key === "flatAttendance") {
+            const seeds = seedFn() as any[];
+            if (parsed.length === 0 && seeds && seeds.length > 0) {
+              localStorage.setItem(`homeverse_${key}`, JSON.stringify(seeds));
+              return seeds as unknown as T;
+            }
+          }
           if (key === "flats") {
             const seeds = seedFn() as any[];
             const hasC301 = parsed.some((f: any) => f.id === "FL-C301");
@@ -608,39 +622,48 @@ const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
               return seeds as unknown as T;
             }
           }
+          if (key === "collections") {
+            localStorage.removeItem("homeverse_collections");
+            return [] as unknown as T;
+          }
           if (key === "payments") {
             const seeds = seedFn() as any[];
-            const hasNewUserOct = parsed.some((p: any) => p.residentId === "user-resident-16" && p.id?.includes("OCT"));
-            if (!hasNewUserOct) {
-              localStorage.setItem("homeverse_payments", JSON.stringify(seeds));
-              return seeds as unknown as T;
-            }
-            const cleaned = parsed.filter(
-              (p: any) =>
-                (p.paymentType === "Maintenance" ||
-                 p.paymentType?.includes("Ganesh") ||
-                 p.paymentType?.includes("Navratri")) &&
-                !(p.paymentType !== "Maintenance" && p.status === "pending")
-            );
-            const hasOctober = cleaned.some((p: any) => p.id?.includes("OCT") || (p.description || "").includes("October 2026"));
-            const hasNavratri = cleaned.some((p: any) => p.paymentType?.includes("Navratri") && p.status === "paid");
-            const hasSeptember = cleaned.some((p: any) => (p.description || "").includes("September 2026"));
-            const finalPayments = (hasOctober && hasNavratri && hasSeptember) ? cleaned : seeds;
-            localStorage.setItem("homeverse_payments", JSON.stringify(finalPayments));
-            return finalPayments as unknown as T;
+            const source = (Array.isArray(parsed) && parsed.length >= 100) ? parsed : seeds;
+            const sanitized = source.map((p: any) => {
+              const isOct = p.id?.includes("OCT") || (p.description || "").includes("October 2026") || (p.dueDate && p.dueDate.startsWith("2026-10"));
+              if (isOct && p.paymentType === "Maintenance") {
+                return p.status === "paid" ? p : { ...p, status: "pending" };
+              }
+              return { ...p, status: "paid" };
+            });
+            localStorage.setItem("homeverse_payments", JSON.stringify(sanitized));
+            return sanitized as unknown as T;
           }
           if (key === "maintenanceBills") {
             const seeds = seedFn() as any[];
-            const hasNewUserOct = parsed.some((b: any) => b.residentId === "user-resident-16" && b.month === "October 2026");
-            if (!hasNewUserOct) {
-              localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(seeds));
-              return seeds as unknown as T;
-            }
-            const hasOctober = parsed.some((b: any) => b.id?.includes("OCT") || b.month === "October 2026");
-            const hasSeptember = parsed.some((b: any) => b.month === "September 2026" && b.status === "paid");
-            const finalBills = (hasOctober && hasSeptember) ? parsed : seeds;
-            localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(finalBills));
-            return finalBills as unknown as T;
+            const source = (Array.isArray(parsed) && parsed.length >= 17) ? parsed : seeds;
+            const sanitized = source.map((b: any) => {
+              if (b.month === "October 2026" || b.id?.includes("OCT")) {
+                return b.status === "paid" ? b : { ...b, status: "pending" };
+              }
+              return { ...b, status: "paid" };
+            });
+            localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(sanitized));
+            return sanitized as unknown as T;
+          }
+          if (key === "helpers") {
+            const seeds = seedFn() as any[];
+            const hasAllFlats = parsed.length >= 20 && parsed.some((h: any) => h.id === "HLP-126");
+            const finalHelpers = hasAllFlats ? parsed : seeds;
+            localStorage.setItem("homeverse_helpers", JSON.stringify(finalHelpers));
+            return finalHelpers as unknown as T;
+          }
+          if (key === "gatePasses") {
+            const seeds = seedFn() as any[];
+            const hasAllPasses = parsed.length >= 20 && parsed.some((p: any) => p.id === "GP-9012");
+            const finalPasses = hasAllPasses ? parsed : seeds;
+            localStorage.setItem("homeverse_gatePasses", JSON.stringify(finalPasses));
+            return finalPasses as unknown as T;
           }
           if (parsed.length > 0) {
             return parsed as unknown as T;
@@ -679,9 +702,9 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   flats: loadLocalOrSeed("flats", getPrepopulatedFlats),
   rentRecords: loadLocalOrSeed("rentRecords", getPrepopulatedRentRecords),
   favorites: [],
-  helpers: [],
-  attendance: [],
-  flatAttendance: [],
+  helpers: loadLocalOrSeed("helpers", getPrepopulatedHelpers),
+  attendance: loadLocalOrSeed("attendance", getPrepopulatedHelperAttendance),
+  flatAttendance: loadLocalOrSeed("flatAttendance", getPrepopulatedFlatAttendance),
   payments: loadLocalOrSeed("payments", getPrepopulatedPayments),
   collections: loadLocalOrSeed("collections", getPrepopulatedCollections),
   serviceCategories: [],
@@ -776,11 +799,87 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         }
         localStorage.setItem("homeverse_flats", JSON.stringify(finalFlats));
         localUpdates.flats = finalFlats;
+
+        // Ensure fresh helpers and gate passes for each flat
+        const storedHelpers = localStorage.getItem("homeverse_helpers");
+        let finalHelpers = getPrepopulatedHelpers();
+        if (storedHelpers) {
+          try {
+            const parsed = JSON.parse(storedHelpers);
+            if (Array.isArray(parsed) && parsed.length >= 20 && parsed.some((h: any) => h.id === "HLP-126")) {
+              finalHelpers = parsed;
+            }
+          } catch (e) {}
+        }
+        localStorage.setItem("homeverse_helpers", JSON.stringify(finalHelpers));
+        localUpdates.helpers = finalHelpers;
+
+        const storedPasses = localStorage.getItem("homeverse_gatePasses");
+        let finalPasses = getPrepopulatedGatePasses();
+        if (storedPasses) {
+          try {
+            const parsed = JSON.parse(storedPasses);
+            if (Array.isArray(parsed) && parsed.length >= 20 && parsed.some((p: any) => p.id === "GP-9012")) {
+              finalPasses = parsed;
+            }
+          } catch (e) {}
+        }
+        localStorage.setItem("homeverse_gatePasses", JSON.stringify(finalPasses));
+        localUpdates.gatePasses = finalPasses;
+
+        const storedAtt = localStorage.getItem("homeverse_attendance");
+        let finalAtt = getPrepopulatedHelperAttendance();
+        if (storedAtt) {
+          try {
+            const parsed = JSON.parse(storedAtt);
+            if (Array.isArray(parsed) && parsed.length >= 4) {
+              finalAtt = parsed;
+            }
+          } catch (e) {}
+        }
+        localStorage.setItem("homeverse_attendance", JSON.stringify(finalAtt));
+        localUpdates.attendance = finalAtt;
+
+        const storedFlatAtt = localStorage.getItem("homeverse_flatAttendance");
+        let finalFlatAtt = getPrepopulatedFlatAttendance();
+        if (storedFlatAtt) {
+          try {
+            const parsed = JSON.parse(storedFlatAtt);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              finalFlatAtt = parsed;
+            }
+          } catch (e) {}
+        }
+        localStorage.setItem("homeverse_flatAttendance", JSON.stringify(finalFlatAtt));
+        localUpdates.flatAttendance = finalFlatAtt;
+        // Guarantee empty collections and clean payments with ONLY October pending
+        localStorage.removeItem("homeverse_collections");
+        localUpdates.collections = [];
+
+        const initStoredPayments = localStorage.getItem("homeverse_payments");
+        let basePayments = getPrepopulatedPayments();
+        if (initStoredPayments) {
+          try {
+            const parsedP = JSON.parse(initStoredPayments);
+            if (Array.isArray(parsedP) && parsedP.length >= 100) {
+              basePayments = parsedP;
+            }
+          } catch (e) {}
+        }
+        const cleanPayments = basePayments.map((p: any) => {
+          const isOct = p.id?.includes("OCT") || (p.description || "").includes("October 2026") || (p.dueDate && p.dueDate.startsWith("2026-10"));
+          if (isOct && p.paymentType === "Maintenance") {
+            return p.status === "paid" ? p : { ...p, status: "pending" };
+          }
+          return { ...p, status: "paid" };
+        });
+        localStorage.setItem("homeverse_payments", JSON.stringify(cleanPayments));
+        localUpdates.payments = cleanPayments;
       } catch (e) {}
     }
 
     const syncKeys = [
-      "payments", "collections", "maintenanceBills", "rentRecords", "expenses",
+      "maintenanceBills", "rentRecords", "expenses",
       "complaints", "visitors", "parcels", "announcements", "users"
     ];
     for (const k of syncKeys) {
@@ -1423,67 +1522,262 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   addComplaint: async (c) => {
-    await fetch("/api/complaints", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(c)
+    const id = `CMP-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+    const now = new Date().toISOString();
+    const newComplaint: Complaint = {
+      ...c,
+      id,
+      status: (c.status as any) || "submitted",
+      portal: c.portal || "society",
+      createdAt: now,
+      updatedAt: now,
+      timeline: [
+        {
+          status: (c.status as any) || "submitted",
+          timestamp: now,
+          by: c.raisedByName || "Resident",
+          note: "Complaint registered and submitted."
+        }
+      ],
+      chat: [],
+      subscribers: []
+    };
+
+    set((state) => {
+      const updated = [newComplaint, ...(state.complaints || [])];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return { complaints: updated };
     });
+
+    try {
+      await fetch("/api/complaints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newComplaint)
+      });
+    } catch (e) {}
   },
 
   updateComplaintStatus: async (id, status, details) => {
-    await fetch(`/api/complaints/${id}/status`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, note: details?.note, by: details?.by })
+    const now = new Date().toISOString();
+    set((state) => {
+      const updated = (state.complaints || []).map((cmp) => {
+        if (cmp.id === id) {
+          const newTimelineItem: ComplaintTimelineEntry = {
+            status,
+            timestamp: now,
+            by: details?.by || "Staff",
+            note: details?.note || `Status changed to ${status}`,
+            afterPhoto: details?.afterPhoto
+          };
+          return {
+            ...cmp,
+            status,
+            updatedAt: now,
+            timeline: [...(cmp.timeline || []), newTimelineItem]
+          };
+        }
+        return cmp;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return { complaints: updated };
     });
+
+    try {
+      await fetch(`/api/complaints/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, note: details?.note, by: details?.by })
+      });
+    } catch (e) {}
   },
 
   assignComplaintWorker: async (id, workerName, workerId, eta) => {
-    await fetch(`/api/complaints/${id}/assign`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assignedTo: workerName, assignedToId: workerId, note: `Assigned ETA: ${eta}` })
+    const now = new Date().toISOString();
+    set((state) => {
+      const updated = (state.complaints || []).map((cmp) => {
+        if (cmp.id === id) {
+          const newTimelineItem: ComplaintTimelineEntry = {
+            status: "assigned" as const,
+            timestamp: now,
+            by: "Management",
+            note: `Assigned to ${workerName} (ETA: ${eta})`
+          };
+          return {
+            ...cmp,
+            status: "assigned" as const,
+            assignedTo: workerName,
+            assignedToId: workerId,
+            eta,
+            updatedAt: now,
+            timeline: [...(cmp.timeline || []), newTimelineItem]
+          };
+        }
+        return cmp;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return { complaints: updated };
     });
+
+    try {
+      await fetch(`/api/complaints/${id}/assign`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedTo: workerName, assignedToId: workerId, note: `Assigned ETA: ${eta}` })
+      });
+    } catch (e) {}
   },
 
   rateComplaint: async (id, rating, review) => {
-    await fetch(`/api/complaints/${id}/rate`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rating, review })
+    set((state) => {
+      const updated = (state.complaints || []).map((cmp) => {
+        if (cmp.id === id) {
+          return { ...cmp, rating, review };
+        }
+        return cmp;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return { complaints: updated };
     });
+
+    try {
+      await fetch(`/api/complaints/${id}/rate`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating, review })
+      });
+    } catch (e) {}
   },
 
   addComplaintChatMessage: async (id, msg) => {
-    await fetch(`/api/complaints/${id}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: msg.message })
+    const now = new Date().toISOString();
+    const newMsg = {
+      id: `MSG-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      timestamp: now,
+      ...msg
+    };
+    set((state) => {
+      const updated = (state.complaints || []).map((cmp) => {
+        if (cmp.id === id) {
+          return {
+            ...cmp,
+            chat: [...(cmp.chat || []), newMsg]
+          };
+        }
+        return cmp;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return { complaints: updated };
     });
+
+    try {
+      await fetch(`/api/complaints/${id}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msg.message, senderId: msg.senderId, senderName: msg.senderName, senderRole: msg.senderRole })
+      });
+    } catch (e) {}
   },
 
   mergeComplaints: async (parentTicketId, duplicateTicketIds) => {
-    await fetch("/api/complaints/merge", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ parentTicketId, duplicateTicketIds })
+    set((state) => {
+      const updated = (state.complaints || []).map((cmp) => {
+        if (duplicateTicketIds.includes(cmp.id)) {
+          return { ...cmp, status: "closed" as const, parentTicketId };
+        }
+        return cmp;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return { complaints: updated };
     });
+
+    try {
+      await fetch("/api/complaints/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentTicketId, duplicateTicketIds })
+      });
+    } catch (e) {}
   },
 
   subscribeToComplaint: async (id, userId, userName, unit) => {
-    await fetch(`/api/complaints/${id}/subscribe`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, userName, unit })
+    set((state) => {
+      const updated = (state.complaints || []).map((cmp) => {
+        if (cmp.id === id) {
+          const subs = cmp.subscribers || [];
+          if (!subs.some((s: any) => s.userId === userId)) {
+            return {
+              ...cmp,
+              subscribers: [...subs, { userId, name: userName, unit }]
+            };
+          }
+        }
+        return cmp;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return { complaints: updated };
     });
+
+    try {
+      await fetch(`/api/complaints/${id}/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, userName, unit })
+      });
+    } catch (e) {}
   },
 
   updateComplaintEta: async (id, eta) => {
-    await fetch(`/api/complaints/${id}/eta`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eta })
+    set((state) => {
+      const updated = (state.complaints || []).map((cmp) => {
+        if (cmp.id === id) {
+          return { ...cmp, eta };
+        }
+        return cmp;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_complaints", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return { complaints: updated };
     });
+
+    try {
+      await fetch(`/api/complaints/${id}/eta`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eta })
+      });
+    } catch (e) {}
   },
 
   submitLeaveRequest: async (req) => {
@@ -1503,51 +1797,190 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   submitVisitorRequest: async (v) => {
-    await fetch("/api/visitors", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(v)
+    const id = `VIS-${Math.floor(100 + Math.random() * 900)}`;
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const newVisitor: Visitor = {
+      ...v,
+      id,
+      otp,
+      qrCode: `HOMEVERSE-PASS-${id}-${otp}`,
+      status: v.status || "approved",
+      date: v.date || new Date().toISOString().split("T")[0],
+      expectedAt: v.expectedAt || new Date().toISOString()
+    };
+
+    set((state) => {
+      const next = [newVisitor, ...(state.visitors || [])];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_visitors", JSON.stringify(next));
+        } catch (e) {}
+      }
+      return { visitors: next };
     });
+
+    try {
+      await fetch("/api/visitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newVisitor)
+      });
+    } catch (e) {}
   },
 
   checkInVisitor: async (id, remarks) => {
-    await fetch(`/api/visitors/${id}/status`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "checked-in", checkInTime: new Date().toISOString(), approvedBy: remarks })
+    const timeNow = new Date().toISOString();
+    set((state) => {
+      let targetVisitor: Visitor | undefined;
+      const nextVisitors = (state.visitors || []).map((v) => {
+        if (v.id === id) {
+          targetVisitor = { ...v, status: "checked-in" as const, checkInTime: timeNow, approvedBy: remarks || v.approvedBy };
+          return targetVisitor;
+        }
+        return v;
+      });
+
+      let nextNotifications = state.notifications || [];
+      if (targetVisitor) {
+        const notif: Notification = {
+          id: `NTF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          userId: targetVisitor.visitingResidentId || "",
+          title: "Visitor Checked In at Gate",
+          message: `${targetVisitor.isDelivery ? (targetVisitor.deliveryCompany || "Delivery Partner") : targetVisitor.name} has checked in at the security gate for Flat ${targetVisitor.visitingUnit}.`,
+          type: "info",
+          read: false,
+          createdAt: timeNow,
+          actionUrl: "/society/visitors"
+        };
+        nextNotifications = [notif, ...nextNotifications];
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_visitors", JSON.stringify(nextVisitors));
+          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifications));
+        } catch (e) {}
+      }
+
+      return { visitors: nextVisitors, notifications: nextNotifications };
     });
+
+    try {
+      await fetch(`/api/visitors/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "checked-in", checkInTime: timeNow, approvedBy: remarks })
+      });
+    } catch (e) {}
   },
 
   checkOutVisitor: async (id) => {
-    await fetch(`/api/visitors/${id}/status`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "checked-out", checkOutTime: new Date().toISOString() })
+    const timeNow = new Date().toISOString();
+    set((state) => {
+      let targetVisitor: Visitor | undefined;
+      const nextVisitors = (state.visitors || []).map((v) => {
+        if (v.id === id) {
+          targetVisitor = { ...v, status: "checked-out" as const, checkOutTime: timeNow };
+          return targetVisitor;
+        }
+        return v;
+      });
+
+      let nextNotifications = state.notifications || [];
+      if (targetVisitor) {
+        const notif: Notification = {
+          id: `NTF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          userId: targetVisitor.visitingResidentId || "",
+          title: "Visitor Checked Out",
+          message: `${targetVisitor.isDelivery ? (targetVisitor.deliveryCompany || "Delivery Partner") : targetVisitor.name} has checked out from Society Premises.`,
+          type: "info",
+          read: false,
+          createdAt: timeNow,
+          actionUrl: "/society/visitors"
+        };
+        nextNotifications = [notif, ...nextNotifications];
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_visitors", JSON.stringify(nextVisitors));
+          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifications));
+        } catch (e) {}
+      }
+
+      return { visitors: nextVisitors, notifications: nextNotifications };
     });
+
+    try {
+      await fetch(`/api/visitors/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "checked-out", checkOutTime: timeNow })
+      });
+    } catch (e) {}
   },
 
   denyVisitorEntry: async (id, reason, remarks) => {
-    await fetch(`/api/visitors/${id}/status`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "denied", approvedBy: `${reason}: ${remarks}` })
+    set((state) => {
+      const nextVisitors = (state.visitors || []).map((v) =>
+        v.id === id ? { ...v, status: "denied" as const, approvedBy: `${reason}: ${remarks || ""}` } : v
+      );
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_visitors", JSON.stringify(nextVisitors));
+        } catch (e) {}
+      }
+      return { visitors: nextVisitors };
     });
+    try {
+      await fetch(`/api/visitors/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "denied", approvedBy: `${reason}: ${remarks}` })
+      });
+    } catch (e) {}
   },
 
   cancelVisitorRequest: async (id) => {
-    await fetch(`/api/visitors/${id}/status`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "cancelled" })
+    set((state) => {
+      const nextVisitors = (state.visitors || []).map((v) =>
+        v.id === id ? { ...v, status: "cancelled" as const } : v
+      );
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_visitors", JSON.stringify(nextVisitors));
+        } catch (e) {}
+      }
+      return { visitors: nextVisitors };
     });
+    try {
+      await fetch(`/api/visitors/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled" })
+      });
+    } catch (e) {}
   },
 
   approveVisitorRequest: async (id) => {
-    await fetch(`/api/visitors/${id}/status`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "approved" })
+    set((state) => {
+      const nextVisitors = (state.visitors || []).map((v) =>
+        v.id === id ? { ...v, status: "approved" as const } : v
+      );
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_visitors", JSON.stringify(nextVisitors));
+        } catch (e) {}
+      }
+      return { visitors: nextVisitors };
     });
+    try {
+      await fetch(`/api/visitors/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "approved" })
+      });
+    } catch (e) {}
   },
 
   addFavoriteVisitor: async (f) => {
@@ -1565,67 +1998,280 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   logEmergencyVisitor: async (agency, reason, vehicleNumber) => {
-    await fetch("/api/visitors", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: agency, purpose: `EMERGENCY: ${reason}`, vehicleNumber, status: "checked-in" })
+    const id = `EMG-VIS-${Date.now()}`;
+    const newV: Visitor = {
+      id,
+      name: agency,
+      phone: "112 / Emergency",
+      purpose: `EMERGENCY: ${reason}`,
+      vehicleNumber,
+      status: "checked-in",
+      visitingUnit: "All Premises",
+      visitingResident: "Security Control",
+      date: new Date().toISOString().split("T")[0],
+      checkInTime: new Date().toISOString(),
+      portal: "society"
+    };
+    set((state) => {
+      const next = [newV, ...(state.visitors || [])];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_visitors", JSON.stringify(next));
+        } catch (e) {}
+      }
+      return { visitors: next };
     });
+    try {
+      await fetch("/api/visitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newV)
+      });
+    } catch (e) {}
   },
 
   registerHelper: async (h) => {
-    await fetch("/api/visitors/helpers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(h)
+    const id = `HLP-${Date.now()}`;
+    const passId = `GP-${Math.floor(1000 + Math.random() * 9000)}`;
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const flatUnit = (h.assignedFlats && h.assignedFlats[0]) || "202";
+    const residentName = (h.assignedResidents && h.assignedResidents[0]) || "Resident";
+
+    const newPass: GatePass = {
+      id: passId,
+      name: h.name,
+      phone: h.phone || "+91 98000 00000",
+      passType: h.category || "Maid",
+      purpose: `${h.category || "Domestic Help"} Gate Pass`,
+      validFrom: new Date().toISOString().split("T")[0],
+      validTo: "Open",
+      permittedDays: h.workingDays || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+      allowedTimings: `${h.expectedArrival || "08:00 AM"} - ${h.expectedExit || "06:00 PM"}`,
+      assignedResident: residentName,
+      unit: flatUnit,
+      building: "A Wing",
+      status: "active",
+      otp,
+      qrCodeData: `HOMEVERSE-PASS-${passId}-${otp}`,
+      createdAt: new Date().toISOString()
+    };
+
+    const newHelper: Helper = {
+      ...h,
+      id,
+      joinedAt: new Date().toISOString().split("T")[0],
+      passId,
+      passStatus: "active"
+    };
+
+    set((state) => {
+      const nextHelpers = [newHelper, ...(state.helpers || [])];
+      const nextPasses = [newPass, ...(state.gatePasses || [])];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_helpers", JSON.stringify(nextHelpers));
+          localStorage.setItem("homeverse_gatePasses", JSON.stringify(nextPasses));
+        } catch (e) {}
+      }
+      return { helpers: nextHelpers, gatePasses: nextPasses };
     });
+
+    try {
+      await fetch("/api/visitors/helpers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newHelper)
+      });
+      await fetch("/api/gatepasses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newPass)
+      });
+    } catch (e) {}
+
+    return { helper: newHelper, pass: newPass };
   },
 
   deleteHelper: async (id) => {
-    await fetch(`/api/visitors/helpers/${id}`, {
-      method: "DELETE"
+    set((state) => {
+      const next = (state.helpers || []).filter(h => h.id !== id);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_helpers", JSON.stringify(next));
+        } catch (e) {}
+      }
+      return { helpers: next };
     });
+    try {
+      await fetch(`/api/visitors/helpers/${id}`, {
+        method: "DELETE"
+      });
+    } catch (e) {}
+  },
+
+  removeHelperFromFlat: async (helperId: string, flatNumber: string) => {
+    const cleanFlat = (flatNumber || "").replace(/^[A-Za-z\s-]+/, '').trim();
+    set((state) => {
+      let passIdToRevoke: string | null = null;
+      const nextHelpers = (state.helpers || []).map((h) => {
+        if (h.id === helperId) {
+          passIdToRevoke = h.passId || null;
+          const remainingFlats = (h.assignedFlats || []).filter((f) => {
+            const clean = f.replace(/^[A-Za-z\s-]+/, '').trim();
+            return clean !== cleanFlat && f !== flatNumber;
+          });
+          return {
+            ...h,
+            assignedFlats: remainingFlats,
+            passStatus: remainingFlats.length === 0 ? ("revoked" as const) : h.passStatus
+          };
+        }
+        return h;
+      }).filter((h) => (h.assignedFlats || []).length > 0);
+
+      let nextPasses = state.gatePasses || [];
+      if (passIdToRevoke) {
+        nextPasses = nextPasses.map((gp) =>
+          gp.id === passIdToRevoke ? { ...gp, status: "revoked" as const } : gp
+        );
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_helpers", JSON.stringify(nextHelpers));
+          localStorage.setItem("homeverse_gatePasses", JSON.stringify(nextPasses));
+        } catch (e) {}
+      }
+
+      return {
+        helpers: nextHelpers,
+        gatePasses: nextPasses
+      };
+    });
+
+    try {
+      await fetch(`/api/visitors/helpers/${helperId}`, {
+        method: "DELETE"
+      });
+    } catch (e) {}
   },
 
   checkInHelper: async (helperId, helperName, category, gate, assignedFlats) => {
-    const res = await fetch("/api/visitors/helpers/checkin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ helperId, helperName, category, gate, assignedFlats })
-    });
-    if (res.ok) {
-      const raw = await res.json();
-      const data = {
-        ...raw,
-        workerId: raw.helperId || raw.workerId,
-        workerName: raw.helperName || raw.workerName,
-        workerCategory: raw.category || raw.workerCategory
+    const timeNow = new Date().toISOString();
+    const todayStr = new Date().toLocaleDateString("en-CA");
+    const attId = `ATT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    const newAtt: HelperAttendance = {
+      id: attId,
+      workerId: helperId,
+      workerName: helperName,
+      workerCategory: category,
+      date: todayStr,
+      checkInTime: timeNow,
+      entryGate: gate || "Society Gate",
+      status: "checked-in",
+      assignedFlats: assignedFlats || []
+    };
+
+    set((state) => {
+      const filtered = (state.attendance || []).filter(
+        (a) => a.id !== attId && !(a.workerId === helperId && a.date === todayStr && !a.checkOutTime)
+      );
+      const nextAtt = [newAtt, ...filtered];
+
+      // Dispatch notifications to residents of assigned flats
+      const newNotifs: Notification[] = (assignedFlats || []).map((flat) => ({
+        id: `NTF-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        userId: "",
+        title: "Domestic Helper Checked In",
+        message: `Your domestic helper ${helperName} (${category}) has checked in at ${gate || "Society Gate"} at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+        type: "info",
+        read: false,
+        createdAt: timeNow,
+        actionUrl: "/society/helpers-entry"
+      }));
+
+      const nextNotifications = [...newNotifs, ...(state.notifications || [])];
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_attendance", JSON.stringify(nextAtt));
+          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifications));
+        } catch (e) {}
+      }
+
+      return {
+        attendance: nextAtt,
+        notifications: nextNotifications
       };
-      set(state => {
-        const filtered = state.attendance.filter(a => a.id !== data.id);
-        return { attendance: [...filtered, data] };
+    });
+
+    try {
+      await fetch("/api/visitors/helpers/checkin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ helperId, helperName, category, gate, assignedFlats })
       });
-    }
+    } catch (e) {}
   },
 
   checkOutHelper: async (attendanceId, gate) => {
-    const res = await fetch("/api/visitors/helpers/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ attendanceId, gate })
-    });
-    if (res.ok) {
-      const raw = await res.json();
-      const data = {
-        ...raw,
-        workerId: raw.helperId || raw.workerId,
-        workerName: raw.helperName || raw.workerName,
-        workerCategory: raw.category || raw.workerCategory
-      };
-      set(state => {
-        const filtered = state.attendance.filter(a => a.id !== data.id);
-        return { attendance: [...filtered, data] };
+    const timeNow = new Date().toISOString();
+
+    set((state) => {
+      let targetAtt: HelperAttendance | undefined;
+      const nextAtt = (state.attendance || []).map((a) => {
+        if (a.id === attendanceId) {
+          const inTime = a.checkInTime ? new Date(a.checkInTime).getTime() : Date.now();
+          const duration = Math.max(1, Math.round((Date.now() - inTime) / (1000 * 60)));
+          targetAtt = {
+            ...a,
+            status: "checked-out" as const,
+            checkOutTime: timeNow,
+            exitGate: gate || "Society Gate",
+            duration
+          };
+          return targetAtt;
+        }
+        return a;
       });
-    }
+
+      let nextNotifications = state.notifications || [];
+      if (targetAtt) {
+        const flats = targetAtt.assignedFlats || [];
+        const newNotifs: Notification[] = flats.map((flat) => ({
+          id: `NTF-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          userId: "",
+          title: "Domestic Helper Checked Out",
+          message: `Your domestic helper ${targetAtt?.workerName} (${targetAtt?.workerCategory}) has checked out at ${gate || "Society Gate"} at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+          type: "info",
+          read: false,
+          createdAt: timeNow,
+          actionUrl: "/society/helpers-entry"
+        }));
+        nextNotifications = [...newNotifs, ...nextNotifications];
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_attendance", JSON.stringify(nextAtt));
+          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifications));
+        } catch (e) {}
+      }
+
+      return {
+        attendance: nextAtt,
+        notifications: nextNotifications
+      };
+    });
+
+    try {
+      await fetch("/api/visitors/helpers/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attendanceId, gate })
+      });
+    } catch (e) {}
   },
 
   checkInFlatHelper: async (helperId, flatNumber, residentId, residentName, servicePerformed) => {
@@ -1996,7 +2642,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   payMaintenanceBill: async (id) => {
-    const paidDate = new Date().toISOString().split("T")[0];
+    const paidDate = new Date().toISOString();
     const txnId = `TXN-BILL-${Math.floor(10000 + Math.random() * 90000)}`;
     set((state) => {
       const nextBills = state.maintenanceBills.map((b) => {
@@ -2162,11 +2808,70 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   issueGatePass: async (pass) => {
-    await fetch("/api/gatepasses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(pass)
+    const id = (pass as any).id || `GP-${Math.floor(1000 + Math.random() * 9000)}`;
+    const otp = (pass as any).otp || String(Math.floor(100000 + Math.random() * 900000));
+    const newPass: GatePass = {
+      ...pass,
+      id,
+      otp,
+      qrCodeData: `HOMEVERSE-PASS-${id}-${otp}`,
+      status: "active",
+      createdAt: new Date().toISOString()
+    };
+
+    set((state) => {
+      const updatedPasses = [newPass, ...(state.gatePasses || [])];
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_gatePasses", JSON.stringify(updatedPasses));
+        } catch (e) {}
+      }
+
+      return {
+        gatePasses: updatedPasses
+      };
     });
+
+    try {
+      await fetch("/api/gatepasses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newPass)
+      });
+    } catch (e) {}
+    return newPass;
+  },
+
+  revokeGatePass: async (id) => {
+    set((state) => {
+      const updatedPasses = (state.gatePasses || []).map((p) =>
+        p.id === id ? { ...p, status: "revoked" as const } : p
+      );
+      const updatedHelpers = (state.helpers || []).map((h) =>
+        h.passId === id ? { ...h, passStatus: "revoked" as const } : h
+      );
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_gatePasses", JSON.stringify(updatedPasses));
+          localStorage.setItem("homeverse_helpers", JSON.stringify(updatedHelpers));
+        } catch (e) {}
+      }
+
+      return {
+        gatePasses: updatedPasses,
+        helpers: updatedHelpers
+      };
+    });
+
+    try {
+      await fetch(`/api/gatepasses/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "revoked" })
+      });
+    } catch (e) {}
   },
 
   logVehicleEntry: async (vehicle) => {
@@ -2478,7 +3183,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   payPayment: async (id, paymentMethod) => {
-    const paidDate = new Date().toISOString().split("T")[0];
+    const paidDate = new Date().toISOString();
     const txnId = `TXN-${paymentMethod || "UPI"}-${Math.floor(10000 + Math.random() * 90000)}`;
     set((state) => {
       let refBillId: string | null = null;
