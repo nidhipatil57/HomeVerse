@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { savePendingGatewayCheckout } from "@/lib/payment-gateway";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Calendar as CalendarIcon, MapPin, Users, Check, Filter, Info, 
@@ -931,19 +933,19 @@ export function SecretaryEventsView({ user }: { user: any }) {
         onOpenChange={(open) => !open && setViewingRegistrationsEvent(null)}
       >
         <DialogContent className="sm:max-w-4xl md:max-w-5xl w-full p-6 md:p-8 max-h-[85vh] overflow-y-auto">
-          <DialogHeader className="pr-12 pb-3 border-b border-border/60">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <DialogTitle className="text-xl font-bold flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+          <DialogHeader className="pr-16 pb-4 border-b border-border/60">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <DialogTitle className="text-xl font-bold flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
                   <Users className="w-5 h-5" />
                 </div>
-                <span>Registered Attendees: {viewingRegistrationsEvent?.title}</span>
+                <span className="truncate">Registered Attendees: {viewingRegistrationsEvent?.title}</span>
               </DialogTitle>
-              <Badge variant="secondary" className="text-xs px-3 py-1 font-semibold">
+              <Badge variant="secondary" className="text-xs px-3 py-1 font-semibold w-fit shrink-0">
                 {(viewingRegistrationsEvent?.registrations || []).length} Flat{((viewingRegistrationsEvent?.registrations || []).length === 1) ? "" : "s"} Registered
               </Badge>
             </div>
-            <DialogDescription className="text-xs text-muted-foreground mt-1">
+            <DialogDescription className="text-xs text-muted-foreground mt-1.5">
               Review confirmed registrations, flat units, guest counts, and payment verification.
             </DialogDescription>
           </DialogHeader>
@@ -1132,6 +1134,7 @@ export function ResidentEventsView({ user }: { user: any }) {
     }))
   );
 
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"upcoming" | "ongoing" | "my-registrations" | "past">("upcoming");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1233,13 +1236,47 @@ export function ResidentEventsView({ user }: { user: any }) {
 
   const handleConfirmRegistration = async () => {
     if (!checkoutEvent) return;
+
+    const totalTickets = 1 + guestCount;
+    const feePerPerson = checkoutEvent.entryFee || 0;
+    const totalPaid = feePerPerson * totalTickets;
+
+    if (feePerPerson > 0 && totalPaid > 0) {
+      savePendingGatewayCheckout({
+        kind: "event-registration",
+        targetId: checkoutEvent.id,
+        title: checkoutEvent.title,
+        subtitle: `${checkoutEvent.date}${checkoutEvent.time ? ` • ${checkoutEvent.time}` : ""} • ${checkoutEvent.location}`,
+        category: "Paid Event Registration",
+        amount: totalPaid,
+        unit: user?.unit || "",
+        building: user?.building || "",
+        residentName: user?.name || "Resident",
+        dueDate: checkoutEvent.date,
+        returnUrl: "/society/events",
+        returnLabel: "Society Events",
+        eventPayload: {
+          eventId: checkoutEvent.id,
+          userId: user?.id || "user-resident-1",
+          userName: user?.name || "Resident",
+          flatNumber: user?.unit || "A-202",
+          contactNumber,
+          guestCount,
+          guestNames,
+          rsvpStatus: "Going",
+          entryFee: feePerPerson,
+          passCount: totalTickets,
+          eventDate: checkoutEvent.date,
+          eventLocation: checkoutEvent.location
+        }
+      });
+      setCheckoutEvent(null);
+      router.push("/society/payment-gateway");
+      return;
+    }
+
     setIsRegistering(true);
-
     try {
-      const totalTickets = 1 + guestCount;
-      const feePerPerson = checkoutEvent.entryFee || 0;
-      const totalPaid = feePerPerson * totalTickets;
-
       await registerForEvent(checkoutEvent.id, {
         userId: user?.id || "user-resident-1",
         userName: user?.name || "Resident",
@@ -1248,16 +1285,16 @@ export function ResidentEventsView({ user }: { user: any }) {
         guestCount,
         guestNames,
         rsvpStatus: "Going",
-        paidAmount: totalPaid,
-        paymentStatus: totalPaid > 0 ? "Paid" : "Free",
-        paymentMethod
+        paidAmount: 0,
+        paymentStatus: "Free",
+        paymentMethod: null
       });
 
       setCheckoutEvent(null);
       alert(`Registration confirmed for "${checkoutEvent.title}"! Your digital pass has been generated.`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Registration failed. Please try again.");
+      alert(err?.message || "Registration failed. Please try again.");
     } finally {
       setIsRegistering(false);
     }
@@ -1671,24 +1708,11 @@ export function ResidentEventsView({ user }: { user: any }) {
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="font-medium">Select Payment Method</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(["UPI", "Card", "Net Banking"] as const).map((m) => (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => setPaymentMethod(m)}
-                          className={`py-2 px-3 rounded-lg border text-center font-medium transition-colors ${
-                            paymentMethod === m
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-muted/40 hover:bg-muted border-border"
-                          }`}
-                        >
-                          {m}
-                        </button>
-                      ))}
-                    </div>
+                  <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3 flex items-start gap-2.5 text-[11px] text-indigo-700 dark:text-indigo-300">
+                    <Shield className="w-4 h-4 shrink-0 mt-0.5 text-indigo-500" />
+                    <span>
+                      You will be securely redirected to <strong>HomeVerse SecurePay Gateway</strong> to pay via UPI, Card, Net Banking or Wallet. Registration confirms immediately upon payment.
+                    </span>
                   </div>
                 </div>
               ) : (
@@ -1718,7 +1742,7 @@ export function ResidentEventsView({ user }: { user: any }) {
                   ) : checkoutEvent.entryFee && checkoutEvent.entryFee > 0 ? (
                     <>
                       <CreditCard className="w-3.5 h-3.5" />
-                      Pay ₹{(checkoutEvent.entryFee * (1 + guestCount)).toLocaleString()} & Register
+                      Proceed to Gateway (₹{(checkoutEvent.entryFee * (1 + guestCount)).toLocaleString()})
                     </>
                   ) : (
                     <>

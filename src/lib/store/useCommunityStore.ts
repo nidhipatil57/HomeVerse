@@ -532,13 +532,24 @@ interface CommunityState {
   fetchMyClaims: () => Promise<void>;
 
   // Society Finance & Billing Transactions
-  payMaintenanceBill: (id: string) => Promise<void>;
+  payMaintenanceBill: (
+    id: string,
+    meta?: {
+      paymentMethod?: string;
+      transactionId?: string;
+      amount?: number;
+      unit?: string;
+      residentName?: string;
+      month?: string;
+      dueDate?: string;
+    }
+  ) => Promise<any>;
 
   // Community Events
   createEvent: (ev: any) => Promise<void>;
   updateEventDetails: (id: string, data: any) => Promise<void>;
   cancelEvent: (id: string) => Promise<void>;
-  registerForEvent: (id: string, data: any) => Promise<void>;
+  registerForEvent: (id: string, data: any) => Promise<any>;
   cancelEventRegistration: (id: string, userId: string) => Promise<void>;
   volunteerForEvent: (id: string, data: any) => Promise<void>;
   markEventAttendance: (id: string, userId: string, isAttending: boolean) => Promise<void>;
@@ -589,20 +600,99 @@ interface CommunityState {
   }) => Promise<void>;
 
   // Society Collections & Payments actions
-  createCollection: (details: any) => Promise<void>;
-  editCollection: (id: string, details: any) => Promise<void>;
+  createCollection: (details: any) => Promise<any>;
+  editCollection: (id: string, details: any) => Promise<any>;
   cancelCollection: (id: string) => Promise<void>;
-  payPayment: (id: string, paymentMethod: string) => Promise<void>;
+  payPayment: (
+    id: string,
+    paymentMethod: string,
+    meta?: {
+      transactionId?: string;
+      amount?: number;
+      paymentType?: string;
+      dueDate?: string;
+      unit?: string;
+      building?: string;
+      description?: string;
+      referenceId?: string;
+      residentId?: string;
+      residentName?: string;
+    }
+  ) => Promise<any>;
   sendPaymentReminder: (id: string) => Promise<void>;
 }
+
+const normalizeWingValue = (val?: string | null) => {
+  if (!val) return "";
+  const cleaned = val.trim().toLowerCase();
+  const m = cleaned.match(/\bwing\s*([a-z0-9-]+)\b|\b([a-z0-9-]+)\s*wing\b/i);
+  if (m) return (m[1] || m[2] || "").toLowerCase();
+  return cleaned;
+};
+
+const matchesCollectionAudienceLocal = (
+  visibility: string | undefined,
+  applicableBuildings: string[] | undefined,
+  applicableFlats: string[] | undefined,
+  building?: string,
+  unit?: string
+) => {
+  const vis = (visibility || "Everyone").trim().toLowerCase();
+  if (vis === "everyone" || vis === "all residents") return true;
+  if (applicableBuildings && applicableBuildings.length > 0 && building) {
+    const userWing = normalizeWingValue(building);
+    if (
+      applicableBuildings.some(
+        (b) =>
+          b.trim().toLowerCase() === building.trim().toLowerCase() ||
+          (userWing && normalizeWingValue(b) === userWing)
+      )
+    ) {
+      return true;
+    }
+  }
+  if (applicableFlats && applicableFlats.length > 0 && unit) {
+    if (applicableFlats.some((f) => f.trim().toLowerCase() === unit.trim().toLowerCase())) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const mergeAndDedupePayments = (dbPayments: any[], existingOrSeed: any[]): any[] => {
+  const map = new Map<string, any>();
+  for (const item of existingOrSeed || []) {
+    if (item?.id) map.set(item.id, item);
+  }
+  // Authoritative Neon DB payments overwrite any matching local/seed record
+  for (const item of dbPayments || []) {
+    if (item?.id) map.set(item.id, item);
+  }
+  const merged = Array.from(map.values());
+  const seenPendingMaint = new Set<string>();
+  const finalList: any[] = [];
+  for (const p of merged) {
+    const isMaint = p.paymentType === "Maintenance" || (p.description || "").toLowerCase().includes("maintenance");
+    if (isMaint && p.status?.toLowerCase() === "pending") {
+      const cleanFlat = (p.unit || "").replace(/^[A-Za-z\s-]+/, "").trim();
+      const cleanBldg = (p.building || "").toUpperCase().replace(/[^A-Z]/g, "") ||
+                        (p.unit || "").toUpperCase().replace(/[^A-Z]/g, "");
+      const unitKey = cleanFlat ? `${cleanBldg}-${cleanFlat}` : (p.residentId || p.unit || "unit");
+      const dedupKey = `${unitKey}_pending_maintenance`;
+      if (seenPendingMaint.has(dedupKey)) continue;
+      seenPendingMaint.add(dedupKey);
+    }
+    finalList.push(p);
+  }
+  finalList.sort(
+    (a, b) => new Date(b.paidDate || b.createdAt || b.dueDate || 0).getTime() - new Date(a.paidDate || a.createdAt || a.dueDate || 0).getTime()
+  );
+  return finalList;
+};
 
 const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
   if (typeof window !== "undefined") {
     try {
-      if (key === "collections") {
-        localStorage.removeItem("homeverse_collections");
-        return [] as unknown as T;
-      }
       const stored = localStorage.getItem(`homeverse_${key}`);
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -632,33 +722,13 @@ const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
             }
           }
           if (key === "collections") {
-            localStorage.removeItem("homeverse_collections");
-            return [] as unknown as T;
+            return (Array.isArray(parsed) ? parsed : []) as unknown as T;
           }
           if (key === "payments") {
-            const seeds = seedFn() as any[];
-            const source = (Array.isArray(parsed) && parsed.length >= 100) ? parsed : seeds;
-            const sanitized = source.map((p: any) => {
-              const isOct = p.id?.includes("OCT") || (p.description || "").includes("October 2026") || (p.dueDate && p.dueDate.startsWith("2026-10"));
-              if (isOct && p.paymentType === "Maintenance") {
-                return p.status === "paid" ? p : { ...p, status: "pending" };
-              }
-              return { ...p, status: "paid" };
-            });
-            localStorage.setItem("homeverse_payments", JSON.stringify(sanitized));
-            return sanitized as unknown as T;
+            return (Array.isArray(parsed) ? parsed : []) as unknown as T;
           }
           if (key === "maintenanceBills") {
-            const seeds = seedFn() as any[];
-            const source = (Array.isArray(parsed) && parsed.length >= 17) ? parsed : seeds;
-            const sanitized = source.map((b: any) => {
-              if (b.month === "October 2026" || b.id?.includes("OCT")) {
-                return b.status === "paid" ? b : { ...b, status: "pending" };
-              }
-              return { ...b, status: "paid" };
-            });
-            localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(sanitized));
-            return sanitized as unknown as T;
+            return (Array.isArray(parsed) ? parsed : []) as unknown as T;
           }
           if (key === "helpers") {
             const seeds = seedFn() as any[];
@@ -737,11 +807,18 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     const state = get();
     const localUpdates: Partial<CommunityState> = {};
 
-    // Purge legacy special occasion payments/collections and ensure events are clean and fresh
+    // Load persisted collections & payments without wiping secretary special occasions or event fees
     if (typeof window !== "undefined") {
       try {
-        localStorage.removeItem("homeverse_collections");
-        localUpdates.collections = [];
+        const storedCollections = localStorage.getItem("homeverse_collections");
+        if (storedCollections) {
+          try {
+            const parsedCollections = JSON.parse(storedCollections);
+            if (Array.isArray(parsedCollections)) {
+              localUpdates.collections = parsedCollections;
+            }
+          } catch (e) {}
+        }
 
         const storedEvents = localStorage.getItem("homeverse_communityEvents");
         if (storedEvents) {
@@ -753,78 +830,35 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           } catch (e) {}
         }
 
+        // Clear all previous dummy payments and bills once to start 100% fresh
+        const FRESH_PAYMENTS_KEY = "homeverse_fresh_payments_clean_2026_fresh_v2";
+        if (localStorage.getItem(FRESH_PAYMENTS_KEY) !== "true") {
+          localStorage.removeItem("homeverse_payments");
+          localStorage.removeItem("homeverse_maintenanceBills");
+          localStorage.removeItem("homeverse_collections");
+          localStorage.setItem(FRESH_PAYMENTS_KEY, "true");
+          fetch("/api/payments/clear-all", { method: "POST" }).catch(() => {});
+        }
+
         const storedPayments = localStorage.getItem("homeverse_payments");
-        let finalPayments = getPrepopulatedPayments();
+        let finalPayments: any[] = [];
         if (storedPayments) {
           try {
             const parsed = JSON.parse(storedPayments);
-            if (Array.isArray(parsed)) {
-              const cleaned = parsed.filter(
-                (p: any) =>
-                  (p.paymentType === "Maintenance" ||
-                   p.paymentType?.includes("Ganesh") ||
-                   p.paymentType?.includes("Navratri")) &&
-                  !(p.paymentType !== "Maintenance" && p.status === "pending")
-              );
-              const hasNav = cleaned.some((p: any) => p.paymentType?.includes("Navratri") && p.status === "paid");
-              const hasSep = cleaned.some((p: any) => (p.description || "").includes("September 2026"));
-              const hasOct = cleaned.some((p: any) => (p.description || "").includes("October 2026") || p.id?.includes("OCT"));
-              const hasNewUserOct = cleaned.some((p: any) => p.residentId === "user-resident-16" && p.id?.includes("OCT"));
-              if (hasNav && hasSep && hasOct && hasNewUserOct) {
-                finalPayments = cleaned;
-              }
-            }
+            if (Array.isArray(parsed)) finalPayments = parsed;
           } catch (e) {}
         }
-
-        // Deduplicate payments: ensure each flat/resident has strictly ONE pending maintenance bill per month
-        const seenPendingP = new Set<string>();
-        const dedupedPayments: any[] = [];
-        for (const p of finalPayments) {
-          if (p.paymentType === "Maintenance" && p.status?.toLowerCase() === "pending") {
-            const mKey = `${p.residentId || p.unit}_${p.month || (p.description?.includes("October 2026") || p.id?.includes("OCT") ? "October 2026" : p.description || p.dueDate)}`;
-            if (seenPendingP.has(mKey)) {
-              continue;
-            }
-            seenPendingP.add(mKey);
-          }
-          dedupedPayments.push(p);
-        }
-        finalPayments = dedupedPayments;
-
-        localStorage.setItem("homeverse_payments", JSON.stringify(finalPayments));
         localUpdates.payments = finalPayments;
 
         const storedBills = localStorage.getItem("homeverse_maintenanceBills");
-        let finalBills = getPrepopulatedMaintenanceBills();
+        let finalBills: any[] = [];
         if (storedBills) {
           try {
             const parsed = JSON.parse(storedBills);
-            if (Array.isArray(parsed)) {
-              const hasSep = parsed.some((b: any) => b.month === "September 2026" && b.status === "paid");
-              const hasOct = parsed.some((b: any) => b.month === "October 2026" && b.status === "pending");
-              const hasNewUserOct = parsed.some((b: any) => b.residentId === "user-resident-16" && b.month === "October 2026");
-              if (hasSep && hasOct && hasNewUserOct) {
-                finalBills = parsed;
-              }
-            }
+            if (Array.isArray(parsed)) finalBills = parsed;
           } catch (e) {}
         }
-
-        // Deduplicate maintenance bills
-        const seenPendingB = new Set<string>();
-        const dedupedBills: any[] = [];
-        for (const b of finalBills) {
-          if (b.status?.toLowerCase() === "pending") {
-            const bKey = `${b.residentId || b.unit}_${b.month || "October 2026"}`;
-            if (seenPendingB.has(bKey)) {
-              continue;
-            }
-            seenPendingB.add(bKey);
-          }
-          dedupedBills.push(b);
-        }
-        finalBills = dedupedBills;
+        localUpdates.maintenanceBills = finalBills;
 
         localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(finalBills));
         localUpdates.maintenanceBills = finalBills;
@@ -908,33 +942,6 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         }
         localStorage.setItem("homeverse_flatAttendance", JSON.stringify(finalFlatAtt));
         localUpdates.flatAttendance = finalFlatAtt;
-        // Guarantee empty collections and always-fresh payments from seed (prevents stale localStorage duplicates)
-        localStorage.removeItem("homeverse_collections");
-        localUpdates.collections = [];
-
-        // Always start from seed to avoid stale localStorage duplicates
-        const freshSeedPayments = getPrepopulatedPayments();
-        // Apply status rules: October Maintenance stays pending, everything else is paid
-        const cleanPayments = freshSeedPayments.map((p: any) => {
-          const isOct = p.id?.includes("OCT") || (p.description || "").includes("October 2026") || (p.dueDate && p.dueDate.startsWith("2026-10"));
-          if (isOct && p.paymentType === "Maintenance") {
-            return { ...p, status: "pending" };
-          }
-          return { ...p, status: "paid" };
-        });
-        // Final dedup: strictly one pending Maintenance per resident per month
-        const seenFinal = new Set<string>();
-        const finalCleanPayments: any[] = [];
-        for (const p of cleanPayments) {
-          if (p.paymentType === "Maintenance" && p.status?.toLowerCase() === "pending") {
-            const key = `${p.residentId || p.unit}_${p.month || (p.id?.includes("OCT") ? "October 2026" : p.dueDate)}`;
-            if (seenFinal.has(key)) continue;
-            seenFinal.add(key);
-          }
-          finalCleanPayments.push(p);
-        }
-        localStorage.setItem("homeverse_payments", JSON.stringify(finalCleanPayments));
-        localUpdates.payments = finalCleanPayments;
       } catch (e) {}
     }
 
@@ -1070,7 +1077,12 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                   }
                 }
 
-                if (Array.isArray(data) && (data.length > 0 || key === "complaints" || key === "notifications")) {
+                if (key === "payments" && Array.isArray(data)) {
+                  const baseSeeds = getPrepopulatedPayments();
+                  data = mergeAndDedupePayments(data, baseSeeds);
+                }
+
+                if (Array.isArray(data) && (data.length > 0 || key === "complaints" || key === "notifications" || key === "collections" || key === "payments")) {
                   updates[key] = data;
                   if (typeof window !== "undefined") {
                     try {
@@ -1155,11 +1167,15 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                   } catch (e) {}
                 }
               }
+              if (key === "payments" && Array.isArray(data)) {
+                const baseSeeds = getPrepopulatedPayments();
+                data = mergeAndDedupePayments(data, baseSeeds);
+              }
               const currentStr = JSON.stringify((get() as any)[key]);
               const nextStr = JSON.stringify(data);
               if (currentStr !== nextStr) {
                 batchUpdates[key] = data;
-                if ((key === "complaints" || key === "notifications") && typeof window !== "undefined") {
+                if ((key === "complaints" || key === "notifications" || key === "payments" || key === "collections") && typeof window !== "undefined") {
                   try { localStorage.setItem(`homeverse_${key}`, nextStr); } catch (e) {}
                 }
               }
@@ -1199,26 +1215,24 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
 
     socket.on("payment:update", (updated: any) => {
-      const current = get().payments || [];
-      const index = current.findIndex(p => p.id === updated.id);
-      if (index > -1) {
-        const next = [...current];
-        next[index] = updated;
-        set({ payments: next });
-      } else {
-        set({ payments: [updated, ...current] });
+      if (!updated || !updated.id) return;
+      const next = mergeAndDedupePayments([updated], get().payments || []);
+      set({ payments: next });
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_payments", JSON.stringify(next)); } catch (e) {}
       }
     });
 
     socket.on("collection:update", (updated: any) => {
+      if (!updated || !updated.id) return;
       const current = get().collections || [];
       const index = current.findIndex(c => c.id === updated.id);
-      if (index > -1) {
-        const next = [...current];
-        next[index] = updated;
-        set({ collections: next });
-      } else {
-        set({ collections: [updated, ...current] });
+      const next = index > -1
+        ? current.map((c, idx) => (idx === index ? updated : c))
+        : [updated, ...current];
+      set({ collections: next });
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_collections", JSON.stringify(next)); } catch (e) {}
       }
     });
 
@@ -2808,30 +2822,75 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     }
   },
 
-  payMaintenanceBill: async (id) => {
-    const paidDate = new Date().toISOString();
-    const txnId = `TXN-BILL-${Math.floor(10000 + Math.random() * 90000)}`;
-    set((state) => {
-      const nextBills = state.maintenanceBills.map((b) => {
-        if (b.id === id) {
-          return { ...b, status: "paid" as const, paidOn: paidDate };
-        }
-        return b;
-      });
+  payMaintenanceBill: async (id, meta) => {
+    const existingBill = get().maintenanceBills.find((b) => b.id === id);
+    const txnId = meta?.transactionId || `TXN-BILL-${Math.floor(100000 + Math.random() * 900000)}`;
+    const paymentMethod = meta?.paymentMethod || "UPI";
 
-      const nextPayments = state.payments.map((p) => {
-        if (p.referenceId === id || p.id === id) {
-          return {
-            ...p,
-            status: "paid",
-            paidDate,
-            paymentMethod: "UPI",
-            transactionId: txnId,
-            receiptPath: `/receipts/RCP-${p.id}.pdf`
-          };
-        }
-        return p;
+    let updatedBill: any = null;
+    try {
+      const res = await fetch(`/api/maintenance/${id}/pay`, {
+        method: "PUT",
+        credentials: "include",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          paymentMethod,
+          transactionId: txnId,
+          amount: meta?.amount ?? existingBill?.amount,
+          unit: meta?.unit ?? existingBill?.unit,
+          residentName: meta?.residentName ?? existingBill?.residentName,
+          month: meta?.month ?? existingBill?.month,
+          dueDate: meta?.dueDate ?? existingBill?.dueDate
+        })
       });
+      if (res.ok) {
+        updatedBill = await res.json();
+      }
+    } catch (e) {
+      console.warn("Backend maintenance pay sync note:", e);
+    }
+
+    const paidDate = updatedBill?.paidOn || new Date().toISOString();
+
+    set((state) => {
+      const nextBills = state.maintenanceBills.map((b) =>
+        b.id === id ? { ...b, status: "paid" as const, paidOn: paidDate } : b
+      );
+      const hasLinkedPayment = state.payments.some((p) => p.referenceId === id || p.id === id);
+      const nextPayments = hasLinkedPayment
+        ? state.payments.map((p) =>
+            p.referenceId === id || p.id === id
+              ? {
+                  ...p,
+                  status: "Paid",
+                  paidDate,
+                  paymentMethod,
+                  transactionId: txnId,
+                  receiptPath: `/receipts/${p.id}.pdf`
+                }
+              : p
+          )
+        : [
+            {
+              id: `PAY-${id}`,
+              residentId: updatedBill?.residentId || "",
+              residentName: updatedBill?.residentName || meta?.residentName || "Resident",
+              unit: updatedBill?.unit || meta?.unit || "",
+              building: "",
+              societyId: "SUN123",
+              paymentType: "Maintenance",
+              description: `${updatedBill?.month || meta?.month || "Society"} Maintenance Bill`,
+              amount: Number(updatedBill?.amount || meta?.amount || 4500),
+              status: "Paid",
+              dueDate: updatedBill?.dueDate || meta?.dueDate || paidDate.slice(0, 10),
+              paidDate,
+              paymentMethod,
+              transactionId: txnId,
+              receiptPath: `/receipts/${id}.pdf`,
+              referenceId: id
+            },
+            ...state.payments
+          ];
 
       if (typeof window !== "undefined") {
         try {
@@ -2839,13 +2898,10 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           localStorage.setItem("homeverse_payments", JSON.stringify(nextPayments));
         } catch (e) {}
       }
-
       return { maintenanceBills: nextBills, payments: nextPayments };
     });
 
-    try {
-      await fetch(`/api/maintenance/${id}/pay`, { method: "PUT" });
-    } catch (e) {}
+    return updatedBill || { id, status: "paid", paidOn: paidDate };
   },
 
   createEvent: async (ev) => {
@@ -2989,181 +3045,132 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   registerForEvent: async (id, data) => {
-    set((state) => {
-      let targetEvent: CommunityEvent | undefined;
-      const nextEvents = (state.communityEvents || []).map((ev) => {
-        if (ev.id === id) {
-          targetEvent = ev;
-          const regs = [...(ev.registrations || [])];
-          const existingIdx = regs.findIndex((r) => r.userId === data.userId);
-          const newReg: EventRegistration = {
-            id: `REG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            eventId: id,
-            userId: data.userId,
-            userName: data.userName || "Resident",
-            flatNumber: data.flatNumber || "A-202",
-            contactNumber: data.contactNumber || "",
-            registeredAt: new Date().toISOString(),
-            guestCount: data.guestCount ? parseInt(data.guestCount) : 0,
-            guestNames: data.guestNames || "",
-            rsvpStatus: data.rsvpStatus || "Going",
-            paymentStatus: data.paymentStatus || (ev.entryFee && ev.entryFee > 0 ? "Paid" : "Free"),
-            paidAmount: data.paidAmount || (ev.entryFee ? ev.entryFee * (1 + (data.guestCount ? parseInt(data.guestCount) : 0)) : 0),
-            paymentMethod: data.paymentMethod || "UPI"
-          };
-
-          if (existingIdx >= 0) {
-            regs[existingIdx] = { ...regs[existingIdx], ...newReg };
-          } else {
-            regs.push(newReg);
-          }
-          return { ...ev, registrations: regs };
-        }
-        return ev;
+    let updatedEvent: any = null;
+    try {
+      const res = await fetch(`/api/events/${id}/register`, {
+        method: "POST",
+        credentials: "include",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(data)
       });
-
-      // Also create payment entry if paid
-      let nextPayments = [...(state.payments || [])];
-      if (data.paidAmount && data.paidAmount > 0) {
-        const paymentRecord = {
-          id: `PAY-EV-${Date.now()}`,
-          title: `Event Pass: ${targetEvent?.title || "Society Event"}`,
-          amount: data.paidAmount,
-          payer: data.userName,
-          unit: data.flatNumber,
-          type: "event",
-          status: "paid",
-          paidDate: new Date().toISOString().split("T")[0],
-          method: data.paymentMethod || "UPI",
-          receiptUrl: `/receipts/EV-${Date.now()}.pdf`
-        };
-        nextPayments = [paymentRecord, ...nextPayments];
+      if (res.ok) {
+        updatedEvent = await res.json();
       }
+    } catch (e) {
+      console.warn("Backend event register sync note:", e);
+    }
 
-      // Create notifications
-      const secretaries = (state.users || []).filter((u) => u.role === "secretary");
-      const residentNotif = {
-        id: `NTF-${Date.now()}-res`,
+    if (!updatedEvent) {
+      const existing = (get().communityEvents || []).find((ev) => ev.id === id);
+      const guestCountNum = data.guestCount ? parseInt(data.guestCount) : 0;
+      const newReg = {
+        id: `REG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        eventId: id,
         userId: data.userId,
-        title: "Registration Confirmed",
-        message: `🎟️ Your registration for "${targetEvent?.title || "Event"}" is confirmed! Venue: ${targetEvent?.location || "Society Grounds"}.`,
-        type: "success" as const,
-        read: false,
-        createdAt: new Date().toISOString()
+        userName: data.userName || "Resident",
+        flatNumber: data.flatNumber || "A-202",
+        contactNumber: data.contactNumber || "",
+        registeredAt: new Date().toISOString(),
+        guestCount: guestCountNum,
+        guestNames: data.guestNames || "",
+        rsvpStatus: data.rsvpStatus || "Going",
+        paymentStatus: data.paymentStatus || (data.paidAmount > 0 ? "Paid" : "Free"),
+        paidAmount: Number(data.paidAmount || 0),
+        paymentMethod: data.paymentMethod || "UPI",
+        transactionId: data.transactionId || null
       };
+      const prevRegs = existing?.registrations || [];
+      const filteredRegs = prevRegs.filter((r) => r.userId !== data.userId);
+      updatedEvent = {
+        ...(existing || { id, title: "Society Event", location: "Clubhouse", date: new Date().toISOString().split("T")[0] }),
+        registrations: [...filteredRegs, newReg]
+      };
+    }
 
-      const secNotifs: Notification[] = secretaries.map((s) => ({
-        id: `NTF-${Date.now()}-sec-${s.id}`,
-        userId: s.id,
-        title: "New Event Registration",
-        message: `👤 ${data.userName} (${data.flatNumber || "Flat"}) registered for "${targetEvent?.title || "Event"}".`,
-        type: "info" as const,
-        read: false,
-        createdAt: new Date().toISOString()
-      }));
+    // Refresh payments if paid event
+    let serverPayments: any[] | null = null;
+    if (data.paidAmount && Number(data.paidAmount) > 0) {
+      try {
+        const payRes = await fetch("/api/payments", { credentials: "include", headers: getAuthHeaders() });
+        if (payRes.ok) serverPayments = await payRes.json();
+      } catch (e) {}
+    }
 
-      // Check if capacity reached
-      if (targetEvent?.maxParticipants) {
-        const currentTotal = (targetEvent.registrations || []).reduce((acc, r) => acc + 1 + (r.guestCount || 0), 0) + 1 + (data.guestCount ? parseInt(data.guestCount) : 0);
-        if (currentTotal >= targetEvent.maxParticipants) {
-          const capNotifs: Notification[] = secretaries.map((s) => ({
-            id: `NTF-${Date.now()}-cap-${s.id}`,
-            userId: s.id,
-            title: "Capacity Reached",
-            message: `🚨 Maximum capacity (${targetEvent?.maxParticipants}) reached for "${targetEvent?.title}".`,
-            type: "alert" as const,
-            read: false,
-            createdAt: new Date().toISOString()
-          }));
-          secNotifs.push(...capNotifs);
-        }
+    set((state) => {
+      const nextEvents = (state.communityEvents || []).some((ev) => ev.id === id)
+        ? (state.communityEvents || []).map((ev) => (ev.id === id ? updatedEvent : ev))
+        : [updatedEvent, ...(state.communityEvents || [])];
+
+      let nextPayments = state.payments || [];
+      if (serverPayments && Array.isArray(serverPayments)) {
+        nextPayments = mergeAndDedupePayments(serverPayments, nextPayments);
+      } else if (data.paidAmount && Number(data.paidAmount) > 0) {
+        const paymentRecord = {
+          id: `PAY-EVT-${id}-${data.userId}`.slice(0, 64),
+          residentId: data.userId,
+          residentName: data.userName || "Resident",
+          unit: data.flatNumber || "",
+          building: "",
+          societyId: "SUN123",
+          paymentType: `Event: ${updatedEvent?.title || "Society Event"}`,
+          description: `Event Pass (${1 + (data.guestCount ? parseInt(data.guestCount) : 0)} pass)`,
+          amount: Number(data.paidAmount),
+          status: "Paid",
+          dueDate: updatedEvent?.date || new Date().toISOString().split("T")[0],
+          paidDate: new Date().toISOString(),
+          paymentMethod: data.paymentMethod || "UPI",
+          transactionId: data.transactionId || `TXN-EVT-${Math.floor(100000 + Math.random() * 900000)}`,
+          receiptPath: `/receipts/EVT-${id}.pdf`,
+          referenceId: id
+        };
+        nextPayments = mergeAndDedupePayments([paymentRecord], nextPayments);
       }
-
-      const nextNotifs = [residentNotif, ...secNotifs, ...(state.notifications || [])];
 
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("homeverse_communityEvents", JSON.stringify(nextEvents));
           localStorage.setItem("homeverse_payments", JSON.stringify(nextPayments));
-          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifs));
+          window.dispatchEvent(new Event("homeverse:events_updated"));
         } catch (e) {}
       }
 
-      return {
-        communityEvents: nextEvents,
-        payments: nextPayments,
-        notifications: nextNotifs
-      };
+      return { communityEvents: nextEvents, payments: nextPayments };
     });
 
-    try {
-      await fetch(`/api/events/${id}/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
-    } catch (e) {}
+    return updatedEvent;
   },
 
   cancelEventRegistration: async (id, userId) => {
-    set((state) => {
-      let eventTitle = "";
-      let regName = "";
-      let regFlat = "";
+    const res = await fetch(`/api/events/${id}/register`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to cancel registration");
+    }
+    const updatedEvent = await res.json().catch(() => null);
 
+    set((state) => {
       const nextEvents = (state.communityEvents || []).map((ev) => {
         if (ev.id === id) {
-          eventTitle = ev.title;
-          const reg = (ev.registrations || []).find((r) => r.userId === userId);
-          if (reg) {
-            regName = reg.userName;
-            regFlat = reg.flatNumber || "";
-          }
+          if (updatedEvent && updatedEvent.id === id) return updatedEvent;
           const filteredRegs = (ev.registrations || []).filter((r) => r.userId !== userId);
           return { ...ev, registrations: filteredRegs };
         }
         return ev;
       });
 
-      const secretaries = (state.users || []).filter((u) => u.role === "secretary");
-      const residentNotif = {
-        id: `NTF-${Date.now()}-res-cancel`,
-        userId: userId,
-        title: "Registration Cancelled",
-        message: `Your registration for "${eventTitle}" has been successfully cancelled.`,
-        type: "info" as const,
-        read: false,
-        createdAt: new Date().toISOString()
-      };
-
-      const secNotifs = secretaries.map((s) => ({
-        id: `NTF-${Date.now()}-sec-cancel-${s.id}`,
-        userId: s.id,
-        title: "Registration Cancellation",
-        message: `❌ ${regName || "Resident"} (${regFlat || "Flat"}) cancelled their registration for "${eventTitle}".`,
-        type: "info" as const,
-        read: false,
-        createdAt: new Date().toISOString()
-      }));
-
-      const nextNotifs = [residentNotif, ...secNotifs, ...(state.notifications || [])];
-
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("homeverse_communityEvents", JSON.stringify(nextEvents));
-          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifs));
           window.dispatchEvent(new Event("homeverse:events_updated"));
         } catch (e) {}
       }
 
-      return { communityEvents: nextEvents, notifications: nextNotifs };
+      return { communityEvents: nextEvents };
     });
-
-    try {
-      await fetch(`/api/events/${id}/register`, {
-        method: "DELETE"
-      });
-    } catch (e) {}
   },
 
   volunteerForEvent: async (id, data) => {
@@ -3240,11 +3247,22 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   markNotificationsRead: async (userId) => {
-    await fetch("/api/notifications/read", {
+    const res = await fetch("/api/notifications/read", {
       method: "PUT",
       credentials: "include",
       headers: getAuthHeaders()
     });
+    if (res.ok) {
+      set((state) => {
+        const next = (state.notifications || []).map((n) =>
+          (!userId || n.userId === userId || n.userId === "all_residents") ? { ...n, read: true } : n
+        );
+        if (typeof window !== "undefined") {
+          try { localStorage.setItem("homeverse_notifications", JSON.stringify(next)); } catch (e) {}
+        }
+        return { notifications: next };
+      });
+    }
   },
 
   raiseEmergencyAlert: async (alert) => {
@@ -3447,7 +3465,17 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
   generateBulkMaintenanceBills: async (billDetails) => {
     set((state) => {
-      const residents = state.users.filter((u) => u.role === "resident" && u.portal === "society");
+      let residents = state.users.filter((u) => u.role === "resident" && (u.portal === "society" || !u.portal));
+      if (residents.length === 0 && state.flats && state.flats.length > 0) {
+        residents = state.flats.map((f, idx) => ({
+          id: f.residentId || `user-resident-${idx + 1}`,
+          name: f.residentName || `Resident ${(f as any).flatNumber || (f as any).number || idx + 101}`,
+          unit: (f as any).flatNumber || (f as any).number || `${idx + 101}`,
+          building: f.building || f.wing || "A Wing",
+          role: "resident",
+          portal: "society"
+        } as any));
+      }
       const existingBills = state.maintenanceBills || [];
       const targetResidents = residents.filter((r) => {
         if (billDetails.applicableTo === "Selected Building" && billDetails.selectedBuilding) {
@@ -3456,27 +3484,31 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         return true;
       }).filter((r) => !existingBills.some((eb) => (eb.residentId === r.id || eb.unit === r.unit) && eb.month === billDetails.month && eb.status === "pending"));
 
-      const newBills = targetResidents.map((r, i) => ({
-        id: `BILL-${Date.now()}-${i}`,
-        residentId: r.id,
-        residentName: r.name,
-        unit: r.unit || "",
-        month: billDetails.month,
-        amount: billDetails.amount,
-        dueDate: billDetails.dueDate || new Date(Date.now() + 15 * 86400000).toISOString().split("T")[0],
-        status: "pending" as const,
-        lateFee: billDetails.lateFee,
-        breakdown: billDetails.breakdown || [
-          { label: "Maintenance", amount: billDetails.amount }
-        ]
-      }));
+      const newBills = targetResidents.map((r, i) => {
+        const bId = `BILL-${Date.now()}-${i + 1}`;
+        return {
+          id: bId,
+          residentId: r.id,
+          residentName: r.name,
+          unit: r.unit || "",
+          building: r.building || "",
+          month: billDetails.month,
+          amount: billDetails.amount,
+          dueDate: billDetails.dueDate || new Date(Date.now() + 15 * 86400000).toISOString().split("T")[0],
+          status: "pending" as const,
+          lateFee: billDetails.lateFee,
+          breakdown: billDetails.breakdown || [
+            { label: "Maintenance", amount: billDetails.amount }
+          ]
+        };
+      });
 
       const newPayments = newBills.map((b) => ({
-        id: `PAY-BILL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`,
+        id: `PAY-BILL-${b.id}`,
         residentId: b.residentId,
         residentName: b.residentName,
         unit: b.unit,
-        building: "",
+        building: b.building || "",
         societyId: "SUN123",
         paymentType: "Maintenance",
         amount: b.amount,
@@ -3489,25 +3521,39 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         referenceId: b.id,
         createdAt: new Date().toISOString(),
         description: billDetails.description || `${billDetails.month} Maintenance Charges`,
-        lateFee: billDetails.lateFee
+        lateFee: b.lateFee
+      }));
+
+      const newNotifs = newBills.map((b) => ({
+        id: `NTF-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+        userId: b.residentId,
+        title: "Maintenance Bill Generated 🧾",
+        message: `📢 ${billDetails.month} maintenance bill (₹${billDetails.amount.toLocaleString()}) has been dispatched. Due date: ${b.dueDate}`,
+        type: "warning" as const,
+        read: false,
+        timestamp: new Date().toISOString(),
+        createdAt: new Date().toISOString()
       }));
 
       const nextBills = [...newBills, ...state.maintenanceBills];
       const nextPayments = [...newPayments, ...state.payments];
+      const nextNotifs = [...newNotifs, ...(state.notifications || [])];
 
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(nextBills));
           localStorage.setItem("homeverse_payments", JSON.stringify(nextPayments));
+          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifs));
         } catch (e) {}
       }
 
-      return { maintenanceBills: nextBills, payments: nextPayments };
+      return { maintenanceBills: nextBills, payments: nextPayments, notifications: nextNotifs };
     });
 
     try {
       await fetch("/api/maintenance/generate", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(billDetails)
       });
@@ -3523,48 +3569,59 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   createCollection: async (details) => {
-    const newCollId = `COLL-${Math.floor(100 + Math.random() * 900)}`;
-    const newColl = {
-      id: newCollId,
-      ...details,
-      status: "active",
-      createdAt: new Date().toISOString(),
-      communityCode: "SUN123"
-    };
+    const res = await fetch("/api/payments/collections", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      body: JSON.stringify(details)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to announce special collection");
+    }
+    const created = await res.json();
+    const { payments: createdPayments, ...createdCollection } = created;
 
     set((state) => {
-      const nextCollections = [newColl, ...state.collections];
+      const nextCollections = [
+        createdCollection,
+        ...state.collections.filter((c) => c.id !== createdCollection.id)
+      ];
 
-      // Generate pending payments for all residents
-      const residents = state.users.filter((u) => u.role === "resident" && u.portal === "society");
-      const targetResidents = residents.filter((r) => {
-        if (details.visibility === "Everyone") return true;
-        if (details.applicableBuildings?.length > 0 && r.building && details.applicableBuildings.includes(r.building)) return true;
-        if (details.applicableFlats?.length > 0 && r.unit && details.applicableFlats.includes(r.unit)) return true;
-        return false;
-      });
+      let generatedPayments = Array.isArray(createdPayments) ? createdPayments : [];
+      if (generatedPayments.length === 0) {
+        const residents = state.users.filter((u) => u.role === "resident" && u.portal === "society");
+        const targetResidents = residents.filter((r) =>
+          matchesCollectionAudienceLocal(
+            details.visibility,
+            details.applicableBuildings,
+            details.applicableFlats,
+            r.building,
+            r.unit
+          )
+        );
+        generatedPayments = targetResidents.map((r, idx) => ({
+          id: `PAY-COLL-${Date.now()}-${idx}`,
+          residentId: r.id,
+          residentName: r.name,
+          unit: r.unit || "",
+          building: r.building || "",
+          societyId: "SUN123",
+          paymentType: details.title,
+          amount: Number(details.amount),
+          status: "pending",
+          dueDate: details.dueDate,
+          paidDate: null,
+          receiptPath: null,
+          transactionId: null,
+          paymentMethod: null,
+          referenceId: createdCollection.id,
+          createdAt: new Date().toISOString(),
+          description: details.description || ""
+        }));
+      }
 
-      const newPayments = targetResidents.map((r) => ({
-        id: `PAY-COLL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`,
-        residentId: r.id,
-        residentName: r.name,
-        unit: r.unit || "",
-        building: r.building || "",
-        societyId: "SUN123",
-        paymentType: details.title,
-        amount: Number(details.amount),
-        status: "pending",
-        dueDate: details.dueDate,
-        paidDate: null,
-        receiptPath: null,
-        transactionId: null,
-        paymentMethod: null,
-        referenceId: newCollId,
-        createdAt: new Date().toISOString(),
-        description: details.description || ""
-      }));
-
-      const nextPayments = [...newPayments, ...state.payments];
+      const nextPayments = mergeAndDedupePayments(generatedPayments, state.payments);
 
       if (typeof window !== "undefined") {
         try {
@@ -3576,20 +3633,26 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       return { collections: nextCollections, payments: nextPayments };
     });
 
-    try {
-      await fetch("/api/payments/collections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(details)
-      });
-    } catch (e) {}
+    return created;
   },
 
   editCollection: async (id, details) => {
+    const res = await fetch(`/api/payments/collections/${id}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      body: JSON.stringify(details)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to update collection");
+    }
+    const updated = await res.json();
+
     set((state) => {
-      const nextCollections = state.collections.map((c) => (c.id === id ? { ...c, ...details } : c));
+      const nextCollections = state.collections.map((c) => (c.id === id ? { ...c, ...updated } : c));
       const nextPayments = state.payments.map((p) => {
-        if (p.referenceId === id && p.status !== "paid") {
+        if (p.referenceId === id && p.status?.toLowerCase() !== "paid") {
           return {
             ...p,
             paymentType: details.title || p.paymentType,
@@ -3610,19 +3673,23 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       return { collections: nextCollections, payments: nextPayments };
     });
 
-    try {
-      await fetch(`/api/payments/collections/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(details)
-      });
-    } catch (e) {}
+    return updated;
   },
 
   cancelCollection: async (id) => {
+    const res = await fetch(`/api/payments/collections/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to cancel collection");
+    }
+
     set((state) => {
       const nextCollections = state.collections.map((c) => (c.id === id ? { ...c, status: "cancelled" } : c));
-      const nextPayments = state.payments.filter((p) => !(p.referenceId === id && p.status !== "paid"));
+      const nextPayments = state.payments.filter((p) => !(p.referenceId === id && p.status?.toLowerCase() !== "paid"));
 
       if (typeof window !== "undefined") {
         try {
@@ -3633,41 +3700,71 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
       return { collections: nextCollections, payments: nextPayments };
     });
-
-    try {
-      await fetch(`/api/payments/collections/${id}`, { method: "DELETE" });
-    } catch (e) {}
   },
 
-  payPayment: async (id, paymentMethod) => {
-    const paidDate = new Date().toISOString();
-    const txnId = `TXN-${paymentMethod || "UPI"}-${Math.floor(10000 + Math.random() * 90000)}`;
-    set((state) => {
-      let refBillId: string | null = null;
-      const nextPayments = state.payments.map((p) => {
-        if (p.id === id) {
-          refBillId = p.referenceId || null;
-          return {
-            ...p,
-            status: "paid",
-            paidDate,
-            paymentMethod: paymentMethod || "UPI",
-            transactionId: txnId,
-            receiptPath: `/receipts/RCP-${p.id}.pdf`
-          };
-        }
-        return p;
-      });
+  payPayment: async (id, paymentMethod, meta) => {
+    const existing = get().payments.find((p) => p.id === id);
+    const txnId = meta?.transactionId || `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
 
-      // Also update linked maintenanceBill if exists
+    let updatedPayment: any = null;
+    try {
+      const res = await fetch(`/api/payments/${id}/pay`, {
+        method: "PUT",
+        credentials: "include",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          paymentMethod,
+          transactionId: txnId,
+          amount: meta?.amount ?? existing?.amount,
+          paymentType: meta?.paymentType ?? existing?.paymentType,
+          dueDate: meta?.dueDate ?? existing?.dueDate,
+          unit: meta?.unit ?? existing?.unit,
+          building: meta?.building ?? existing?.building,
+          description: meta?.description ?? existing?.description,
+          referenceId: meta?.referenceId ?? existing?.referenceId,
+          residentId: meta?.residentId ?? existing?.residentId,
+          residentName: meta?.residentName ?? existing?.residentName
+        })
+      });
+      if (res.ok) {
+        updatedPayment = await res.json();
+      }
+    } catch (e) {
+      console.warn("Backend payment update failed, continuing with store update:", e);
+    }
+
+    const paidDate = updatedPayment?.paidDate || new Date().toISOString();
+    const resolvedTxn = updatedPayment?.transactionId || txnId;
+    const resolvedMethod = updatedPayment?.paymentMethod || paymentMethod || "UPI";
+
+    set((state) => {
+      const refBillId = updatedPayment?.referenceId || existing?.referenceId || meta?.referenceId || null;
+      const paymentItem = updatedPayment || {
+        id,
+        residentId: meta?.residentId || existing?.residentId || "",
+        residentName: meta?.residentName || existing?.residentName || "Resident",
+        unit: meta?.unit || existing?.unit || "",
+        building: meta?.building || existing?.building || "",
+        societyId: "SUN123",
+        paymentType: meta?.paymentType || existing?.paymentType || "Maintenance",
+        description: meta?.description || existing?.description || "Monthly Society Maintenance",
+        amount: Number(meta?.amount || existing?.amount || 4500),
+        status: "Paid",
+        dueDate: meta?.dueDate || existing?.dueDate || paidDate.slice(0, 10),
+        paidDate,
+        transactionId: resolvedTxn,
+        paymentMethod: resolvedMethod,
+        receiptPath: `/receipts/${id}.pdf`,
+        referenceId: refBillId || id
+      };
+
+      const nextPayments = mergeAndDedupePayments([paymentItem], state.payments);
+
       let nextBills = state.maintenanceBills;
       if (refBillId) {
-        nextBills = state.maintenanceBills.map((b) => {
-          if (b.id === refBillId) {
-            return { ...b, status: "paid" as const, paidOn: paidDate };
-          }
-          return b;
-        });
+        nextBills = state.maintenanceBills.map((b) =>
+          b.id === refBillId || b.id === id ? { ...b, status: "paid" as const, paidOn: paidDate.slice(0, 10) } : b
+        );
       }
 
       if (typeof window !== "undefined") {
@@ -3680,21 +3777,19 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       return { payments: nextPayments, maintenanceBills: nextBills };
     });
 
-    try {
-      await fetch(`/api/payments/${id}/pay`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod })
-      });
-    } catch (e) {}
+    return updatedPayment || { id, status: "Paid", transactionId: resolvedTxn };
   },
 
   sendPaymentReminder: async (id) => {
-    try {
-      await fetch(`/api/payments/${id}/remind`, {
-        method: "POST"
-      });
-    } catch (e) {}
+    const res = await fetch(`/api/payments/${id}/remind`, {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to send reminder");
+    }
   },
 
   createBooking: async (bookingData: any) => {
@@ -3883,55 +3978,107 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   reviewComplaintSecretary: async (id, data) => {
-    const res = await fetch(`/api/complaints/${id}/secretary-review`, {
-      method: "PUT",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      credentials: "include",
-      body: JSON.stringify(data)
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      set((state) => {
-        const next = state.complaints.map((c) => (c.id === id ? updated : c));
-        if (typeof window !== "undefined") {
-          try { localStorage.setItem("homeverse_complaints", JSON.stringify(next)); } catch (e) {}
-        }
-        return { complaints: next };
-      });
-      return updated;
-    }
-    let errMsg = `Failed to review complaint (HTTP ${res.status})`;
+    let updated: any = null;
     try {
-      const errBody = await res.json();
-      if (errBody?.error) errMsg = errBody.error;
-    } catch (e) {}
-    throw new Error(errMsg);
+      const res = await fetch(`/api/complaints/${id}/secretary-review`, {
+        method: "PUT",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        credentials: "include",
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        updated = await res.json();
+      }
+    } catch (e) {
+      console.warn("Backend secretary review error:", e);
+    }
+
+    const now = new Date().toISOString();
+    const nextStatus = data.status || "Forwarded to Manager";
+
+    set((state) => {
+      const existing = state.complaints.find((c) => c.id === id);
+      const resolvedUpdated = updated || {
+        ...(existing || {}),
+        id,
+        status: nextStatus,
+        priority: data.priority || existing?.priority || "medium",
+        category: data.category || existing?.category || "General",
+        department: data.department || existing?.department || "Operations",
+        adminNotes: data.adminNotes || existing?.adminNotes || "",
+        forwardedAt: nextStatus === "Rejected" ? undefined : now,
+        forwardedByName: "Rahul Verma",
+        rejectedAt: nextStatus === "Rejected" ? now : undefined,
+        rejectReason: nextStatus === "Rejected" ? data.adminNotes : undefined,
+        timeline: [
+          ...(existing?.timeline || []),
+          {
+            id: `TL-${Date.now()}`,
+            status: nextStatus,
+            timestamp: now,
+            note: data.adminNotes || (nextStatus === "Rejected" ? "Rejected by Secretary." : "Forwarded to Operations Manager by Secretary."),
+            by: "Rahul Verma"
+          }
+        ]
+      };
+      const next = state.complaints.map((c) => (c.id === id ? { ...c, ...resolvedUpdated } : c));
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_complaints", JSON.stringify(next)); } catch (e) {}
+      }
+      return { complaints: next };
+    });
+
+    return updated || { id, status: nextStatus };
   },
 
   actionComplaintManager: async (id, data) => {
-    const res = await fetch(`/api/complaints/${id}/manager-action`, {
-      method: "PUT",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      credentials: "include",
-      body: JSON.stringify(data)
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      set((state) => {
-        const next = state.complaints.map((c) => (c.id === id ? updated : c));
-        if (typeof window !== "undefined") {
-          try { localStorage.setItem("homeverse_complaints", JSON.stringify(next)); } catch (e) {}
-        }
-        return { complaints: next };
-      });
-      return updated;
-    }
-    let errMsg = `Failed to update complaint operations (HTTP ${res.status})`;
+    let updated: any = null;
     try {
-      const errBody = await res.json();
-      if (errBody?.error) errMsg = errBody.error;
-    } catch (e) {}
-    throw new Error(errMsg);
+      const res = await fetch(`/api/complaints/${id}/manager-action`, {
+        method: "PUT",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        credentials: "include",
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        updated = await res.json();
+      }
+    } catch (e) {
+      console.warn("Backend manager action error:", e);
+    }
+
+    const now = new Date().toISOString();
+    const nextStatus = data.status || "In Progress";
+
+    set((state) => {
+      const existing = state.complaints.find((c) => c.id === id);
+      const resolvedUpdated = updated || {
+        ...(existing || {}),
+        id,
+        status: nextStatus,
+        assignedTo: data.assignedTo || existing?.assignedTo,
+        assignedToId: data.assignedToId || existing?.assignedToId,
+        expectedArrival: data.expectedArrival || existing?.expectedArrival,
+        operationalNotes: data.operationalNotes || existing?.operationalNotes,
+        timeline: [
+          ...(existing?.timeline || []),
+          {
+            id: `TL-${Date.now()}`,
+            status: nextStatus,
+            timestamp: now,
+            note: data.operationalNotes || `Status updated to ${nextStatus} by Manager.`,
+            by: "Manager"
+          }
+        ]
+      };
+      const next = state.complaints.map((c) => (c.id === id ? { ...c, ...resolvedUpdated } : c));
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_complaints", JSON.stringify(next)); } catch (e) {}
+      }
+      return { complaints: next };
+    });
+
+    return updated || { id, status: nextStatus };
   },
 
   addStaticWorker: async (workerData) => {

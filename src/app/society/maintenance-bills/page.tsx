@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { savePendingGatewayCheckout } from "@/lib/payment-gateway";
 import { motion } from "motion/react";
 import { IndianRupee, CreditCard, AlertTriangle, CheckCircle2, Download, Receipt } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,6 +14,7 @@ import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { staggerContainer, fadeInUp } from "@/lib/animations";
 
 export default function MaintenanceBillsPage() {
+  const router = useRouter();
   const { user, initialize } = useAuth();
   const {
     maintenanceBills,
@@ -108,8 +111,22 @@ export default function MaintenanceBillsPage() {
                       <Button
                         size="sm"
                         onClick={() => {
-                          payMaintenanceBill(b.id);
-                          alert(`Payment of ₹${b.amount} received successfully for ${b.month}! Receipt generated.`);
+                          savePendingGatewayCheckout({
+                            kind: "maintenance-bill",
+                            targetId: b.id,
+                            title: `${b.month} Maintenance Bill`,
+                            subtitle: b.dueDate ? `Due Date: ${b.dueDate}` : undefined,
+                            category: "Monthly Maintenance",
+                            amount: Number(b.amount || 0),
+                            unit: b.unit || user?.unit || "",
+                            building: user?.building || "",
+                            residentName: b.residentName || user?.name || "Resident",
+                            dueDate: b.dueDate,
+                            month: b.month,
+                            returnUrl: "/society/maintenance-bills",
+                            returnLabel: "Maintenance Bills"
+                          });
+                          router.push("/society/payment-gateway");
                         }}
                         className="rounded-xl h-8 text-[10px] font-semibold gradient-primary text-white border-0"
                       >

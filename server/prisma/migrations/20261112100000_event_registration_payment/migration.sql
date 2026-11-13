@@ -1,0 +1,5 @@
+ALTER TABLE "EventRegistration" ADD COLUMN IF NOT EXISTS "paymentStatus" TEXT NOT NULL DEFAULT 'Free';
+ALTER TABLE "EventRegistration" ADD COLUMN IF NOT EXISTS "paidAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE "EventRegistration" ADD COLUMN IF NOT EXISTS "paymentMethod" TEXT;
+ALTER TABLE "EventRegistration" ADD COLUMN IF NOT EXISTS "transactionId" TEXT;
+

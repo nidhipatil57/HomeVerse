@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { savePendingGatewayCheckout } from "@/lib/payment-gateway";
 import { 
   CreditCard, Search, DollarSign, AlertTriangle, ArrowUpRight, CheckCircle2, 
   IndianRupee, Download, Receipt, Plus, Users, Calendar, Trash2, Edit2, 
-  Send, BarChart3, TrendingUp, Info, HelpCircle
+  Send, BarChart3, TrendingUp, Info, HelpCircle, Landmark, RotateCcw, CheckCheck, Building2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +47,7 @@ function formatPaymentDateTime(dateStr?: string | null): string {
 }
 
 export default function PaymentsPage() {
+  const router = useRouter();
   const { user, initialize } = useAuth();
   const {
     payments, collections, maintenanceBills, createCollection, editCollection, cancelCollection,
@@ -143,17 +146,17 @@ export default function PaymentsPage() {
       return false;
     });
 
-    // Deduplicate pending maintenance bills so there is strictly ONLY ONE pending bill per month (e.g. October 2026)
-    const seenPendingMonth = new Set<string>();
+    // Strictly allow ONLY ONE current pending maintenance bill for the resident (October 2026)
+    let hasPendingMaintenance = false;
     const deduplicated: typeof filtered = [];
 
     for (const p of filtered) {
-      if (p.paymentType === "Maintenance" && p.status?.toLowerCase() === "pending") {
-        const monthKey = p.month || (p.description?.includes("October 2026") || p.id?.includes("OCT") ? "October 2026" : p.description || p.dueDate);
-        if (seenPendingMonth.has(monthKey)) {
+      const isMaint = p.paymentType === "Maintenance" || (p.description || "").toLowerCase().includes("maintenance");
+      if (isMaint && p.status?.toLowerCase() === "pending") {
+        if (hasPendingMaintenance) {
           continue; // Skip duplicate pending maintenance
         }
-        seenPendingMonth.add(monthKey);
+        hasPendingMaintenance = true;
       }
       deduplicated.push(p);
     }
@@ -237,35 +240,54 @@ export default function PaymentsPage() {
     };
   }, [payments]);
 
-  // Secretary Ledger Invoices: only current month's maintenance bills (pending October payments)
-  // or new occasion ones for that month if any, sorted in wing & flat order.
+  // Secretary Filters & Controls
+  const [secFilterStatus, setSecFilterStatus] = useState<"all" | "paid" | "pending">("all");
+  const [secFilterWing, setSecFilterWing] = useState<string>("all");
+
+  const handleResetPaymentsClean = async () => {
+    if (confirm("Reset and clear all payment records, bills, and collections across the portal? This will make the entire payments section completely fresh.")) {
+      try {
+        localStorage.removeItem("homeverse_payments");
+        localStorage.removeItem("homeverse_maintenanceBills");
+        localStorage.removeItem("homeverse_collections");
+        useCommunityStore.setState({ payments: [], maintenanceBills: [], collections: [] });
+        await fetch("/api/payments/clear-all", { method: "POST" });
+        alert("Payments portal has been reset to completely fresh!");
+      } catch (e) {
+        useCommunityStore.setState({ payments: [], maintenanceBills: [], collections: [] });
+        alert("Payments portal reset locally!");
+      }
+    }
+  };
+
+  // Secretary Ledger Invoices: all payments in society ledger
   const secretaryLedgerInvoices = useMemo(() => {
     return payments
       .filter(p => {
-        const isCurrentMaintenance = p.paymentType === "Maintenance" && 
-          (p.status.toLowerCase() === "pending" || (p.description || "").includes("October 2026") || (p.dueDate && p.dueDate.startsWith("2026-10")));
-        const isCurrentOccasion = p.paymentType !== "Maintenance" &&
-          p.status.toLowerCase() === "pending" &&
-          p.dueDate && (p.dueDate.startsWith("2026-10") || p.dueDate.startsWith("2026-11"));
-        return isCurrentMaintenance || isCurrentOccasion;
-      })
-      .filter(p => {
+        if (secFilterStatus === "paid" && p.status?.toLowerCase() !== "paid") return false;
+        if (secFilterStatus === "pending" && p.status?.toLowerCase() === "paid") return false;
+        if (secFilterWing !== "all") {
+          const wing = (p.building || "").toUpperCase().replace(/[^A-Z]/g, "") ||
+                       (p.unit || "").toUpperCase().replace(/[^A-Z]/g, "");
+          if (wing !== secFilterWing) return false;
+        }
         if (!search) return true;
         const q = search.toLowerCase();
-        return (p.unit && p.unit.toLowerCase().includes(q)) ||
-               (p.residentName && p.residentName.toLowerCase().includes(q)) ||
-               (p.building && p.building.toLowerCase().includes(q)) ||
-               (p.paymentType && p.paymentType.toLowerCase().includes(q));
+        return (
+          (p.unit && p.unit.toLowerCase().includes(q)) ||
+          (p.residentName && p.residentName.toLowerCase().includes(q)) ||
+          (p.building && p.building.toLowerCase().includes(q)) ||
+          (p.description && p.description.toLowerCase().includes(q)) ||
+          (p.transactionId && p.transactionId.toLowerCase().includes(q)) ||
+          (p.paymentType && p.paymentType.toLowerCase().includes(q))
+        );
       })
       .sort((a, b) => {
-        const wingA = (a.building || "").toUpperCase();
-        const wingB = (b.building || "").toUpperCase();
-        if (wingA !== wingB) return wingA.localeCompare(wingB);
-        const numA = parseInt((a.unit || "").replace(/\D/g, ""), 10) || 0;
-        const numB = parseInt((b.unit || "").replace(/\D/g, ""), 10) || 0;
-        return numA - numB;
+        const timeB = new Date(b.paidDate || b.createdAt || b.dueDate || 0).getTime();
+        const timeA = new Date(a.paidDate || a.createdAt || a.dueDate || 0).getTime();
+        return timeB - timeA;
       });
-  }, [payments, search]);
+  }, [payments, search, secFilterStatus, secFilterWing]);
 
   // Receipt download
   const handleDownloadReceipt = (payment: any) => {
@@ -467,18 +489,25 @@ export default function PaymentsPage() {
     printWindow.document.close();
   };
 
-  const handlePayNow = async () => {
-    if (!selectedPayRequest) return;
-    setIsProcessingPayment(true);
-    try {
-      await payPayment(selectedPayRequest.id, paymentProvider);
-      setIsProcessingPayment(false);
-      setSelectedPayRequest(null);
-      alert("Payment processed successfully!");
-    } catch (e) {
-      setIsProcessingPayment(false);
-      alert("Payment failed. Please try again.");
-    }
+  const handleRedirectToGateway = (item: any, categoryLabel: string) => {
+    savePendingGatewayCheckout({
+      kind: "resident-payment",
+      targetId: item.id,
+      title: item.paymentType === "Maintenance"
+        ? (item.description?.split("(")[0]?.trim() || "Monthly Society Maintenance")
+        : item.paymentType,
+      subtitle: item.description || (item.dueDate ? `Due by ${item.dueDate}` : undefined),
+      category: categoryLabel,
+      amount: Number(item.amount || 0),
+      unit: item.unit || user?.unit || "",
+      building: item.building || user?.building || "",
+      residentName: item.residentName || user?.name || "Resident",
+      dueDate: item.dueDate,
+      returnUrl: "/society/payments",
+      returnLabel: "Payments & Dues",
+      referenceId: item.referenceId || item.id
+    });
+    router.push("/society/payment-gateway");
   };
 
   const handlePublishCollection = async (e: React.FormEvent) => {
@@ -495,22 +524,26 @@ export default function PaymentsPage() {
       visibility: collVisibility
     };
 
-    if (editingColl) {
-      await editCollection(editingColl.id, details);
-      alert("Collection request edited successfully!");
-      setEditingColl(null);
-    } else {
-      await createCollection(details);
-      alert("New society collection published!");
-    }
+    try {
+      if (editingColl) {
+        await editCollection(editingColl.id, details);
+        alert("Collection request edited successfully!");
+        setEditingColl(null);
+      } else {
+        await createCollection(details);
+        alert("Special occasion collection announced to applicable residents!");
+      }
 
-    setCollTitle("");
-    setCollDesc("");
-    setCollAmount("");
-    setCollDueDate("");
-    setCollVisibility("Everyone");
-    setCollBuildings([]);
-    setCollFlats("");
+      setCollTitle("");
+      setCollDesc("");
+      setCollAmount("");
+      setCollDueDate("");
+      setCollVisibility("Everyone");
+      setCollBuildings([]);
+      setCollFlats("");
+    } catch (err: any) {
+      alert(err?.message || "Failed to publish special collection. Please try again.");
+    }
   };
 
   const handleGenerateBulkBills = async (e: React.FormEvent) => {
@@ -535,53 +568,138 @@ export default function PaymentsPage() {
 
   // Render Secretary Portal View
   if (user.role === "secretary") {
+    const totalBilled = secretaryStats.collected + secretaryStats.outstanding;
+
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-            Payments & Collections Tracker 💰
-          </h1>
-          <p className="text-muted-foreground mt-1 text-xs">
-            Monitor complex outstanding maintenance logs, create special collection programs, and run bulk invoice dispatching.
-          </p>
+        {/* Executive Treasury Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-blue-900/10 via-sky-800/5 to-slate-900/10 dark:from-blue-950/40 dark:via-slate-900/40 dark:to-slate-950/40 border border-blue-500/20 backdrop-blur-xl shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/25 shrink-0">
+              <Landmark className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl lg:text-3xl font-extrabold font-[family-name:var(--font-heading)] text-foreground tracking-tight">
+                  Society Treasury & Ledger
+                </h1>
+                <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider">
+                  Admin Central
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Official society accounting ledger, bulk maintenance cycle dispatching, and community special programs
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline" className="h-8 px-3 rounded-xl border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-xs flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Fiscal 2026–27 • Active Ledger
+            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleResetPaymentsClean}
+              className="h-8 px-3 rounded-xl text-xs font-semibold text-rose-600 border-rose-300 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+              title="Purge all dummy records and keep payments ledger 100% fresh"
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1" /> Reset Fresh Ledger
+            </Button>
+          </div>
         </div>
 
-        {/* Financial Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { label: "Collected This Fiscal Year", value: `₹${secretaryStats.collected.toLocaleString()}`, color: "text-emerald-500 bg-emerald-500/10", icon: CheckCircle2 },
-            { label: "Outstanding Dues Balance", value: `₹${secretaryStats.outstanding.toLocaleString()}`, color: "text-rose-500 bg-rose-500/10", icon: AlertTriangle },
-            { label: "Payment Completion Success", value: `${secretaryStats.collectionRate}%`, color: "text-blue-500 bg-blue-500/10", icon: CreditCard }
-          ].map((s, idx) => (
-            <Card key={idx} className="border-border/50 bg-card">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${s.color}`}>
-                  <s.icon className="w-5 h-5" />
+        {/* 4 Executive Financial Summary Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="border-border/60 bg-card hover:shadow-md transition-shadow">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                <Receipt className="w-6 h-6" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-extrabold font-[family-name:var(--font-heading)] text-foreground truncate">
+                  ₹{totalBilled.toLocaleString()}
+                </p>
+                <p className="text-[11px] font-medium text-muted-foreground">Total Invoices Billed</p>
+                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">{payments.length} Records Issued</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60 bg-card hover:shadow-md transition-shadow">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-extrabold font-[family-name:var(--font-heading)] text-emerald-600 dark:text-emerald-400 truncate">
+                  ₹{secretaryStats.collected.toLocaleString()}
+                </p>
+                <p className="text-[11px] font-medium text-muted-foreground">Realized Collections</p>
+                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">{secretaryStats.paidCount} Units Settled</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60 bg-card hover:shadow-md transition-shadow">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-extrabold font-[family-name:var(--font-heading)] text-rose-600 dark:text-rose-400 truncate">
+                  ₹{secretaryStats.outstanding.toLocaleString()}
+                </p>
+                <p className="text-[11px] font-medium text-muted-foreground">Outstanding Arrears</p>
+                <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">{secretaryStats.pendingCount} Pending Dues</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60 bg-card hover:shadow-md transition-shadow">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div className="min-w-0 w-full">
+                <div className="flex items-center justify-between">
+                  <p className="text-xl font-extrabold font-[family-name:var(--font-heading)] text-indigo-600 dark:text-indigo-400">
+                    {secretaryStats.collectionRate}%
+                  </p>
+                  <span className="text-[10px] font-bold text-muted-foreground">Recovery Rate</span>
                 </div>
-                <div>
-                  <p className="text-lg font-bold font-[family-name:var(--font-heading)]">{s.value}</p>
-                  <p className="text-[10px] text-muted-foreground">{s.label}</p>
+                <div className="w-full h-2 rounded-full bg-secondary mt-1.5 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.max(5, secretaryStats.collectionRate))}%` }}
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+                <p className="text-[10px] text-muted-foreground mt-1">Settlement Efficiency</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Tab Controls */}
         <div className="flex border-b border-border/40 gap-4 text-xs font-semibold">
           {[
-            { id: "ledger", label: "Maintenance Ledger" },
-            { id: "collections", label: "Special Collections" },
-            { id: "analytics", label: "Analytics & Trends" }
+            { id: "ledger", label: "Maintenance Master Ledger", count: payments.length },
+            { id: "collections", label: "Special Collections Programs", count: activeCollections.length },
+            { id: "analytics", label: "Financial Analytics & Trends" }
           ].map(t => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id as any)}
-              className={`pb-2.5 px-1 border-b-2 transition-all ${
-                activeTab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground"
+              className={`pb-2.5 px-1 border-b-2 transition-all flex items-center gap-1.5 ${
+                activeTab === t.id ? "border-blue-600 text-blue-600 dark:text-blue-400 font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t.label}
+              <span>{t.label}</span>
+              {t.count !== undefined && (
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${activeTab === t.id ? "bg-blue-600 text-white" : "bg-muted text-muted-foreground"}`}>
+                  {t.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -590,41 +708,106 @@ export default function PaymentsPage() {
         {activeTab === "ledger" && (
           <div className="grid lg:grid-cols-12 gap-6">
             <div className="lg:col-span-7 space-y-4">
-              {/* Invoices List */}
-              <Card className="border-border/50">
-                <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base font-bold">Ledger Invoice Records</CardTitle>
-                    <CardDescription>Roster of all maintenance bill states</CardDescription>
+              {/* Invoices List with Full Interactive Filters */}
+              <Card className="border-border/60 shadow-sm">
+                <CardHeader className="pb-3 border-b space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-base font-bold flex items-center gap-2">
+                        <span>Society Master Ledger Records</span>
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Audit roster of all dispatched monthly bills, settlement timestamps, and receipts
+                      </CardDescription>
+                    </div>
+
+                    <div className="relative w-full sm:w-48">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                      <Input
+                        placeholder="Search flat, resident..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="h-8 pl-8 text-xs rounded-lg"
+                      />
+                    </div>
                   </div>
-                  <div className="relative w-48">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                    <Input
-                      placeholder="Search flat..."
-                      value={search}
-                      onChange={e => setSearch(e.target.value)}
-                      className="h-8 pl-7 text-[10px] rounded-lg"
-                    />
+
+                  {/* Filter Pills & Wing Selector */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap pt-1 text-xs">
+                    <div className="flex items-center gap-1.5 p-1 rounded-xl bg-secondary/40 border border-border/40">
+                      {(
+                        [
+                          { id: "all", label: "All Invoices", count: payments.length },
+                          { id: "paid", label: "Paid", count: secretaryStats.paidCount },
+                          { id: "pending", label: "Pending", count: secretaryStats.pendingCount }
+                        ] as const
+                      ).map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setSecFilterStatus(tab.id)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                            secFilterStatus === tab.id
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {tab.label} ({tab.count})
+                        </button>
+                      ))}
+                    </div>
+
+                    <select
+                      value={secFilterWing}
+                      onChange={(e) => setSecFilterWing(e.target.value)}
+                      className="h-8 rounded-lg border border-border/60 bg-card px-2.5 text-xs text-foreground font-medium"
+                    >
+                      <option value="all">All Wings & Buildings</option>
+                      <option value="A">Wing A Only</option>
+                      <option value="B">Wing B Only</option>
+                      <option value="C">Wing C Only</option>
+                    </select>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="divide-y divide-border/30 max-h-[480px] overflow-y-auto">
+                  <div className="divide-y divide-border/30 max-h-[520px] overflow-y-auto">
                     {secretaryLedgerInvoices.map((p) => (
-                      <div key={p.id} className="p-4 flex items-center justify-between hover:bg-secondary/15 transition-colors text-xs">
-                        <div>
-                          <h4 className="font-bold">Flat {p.unit} ({p.residentName})</h4>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            {p.building || "Sunshine Complex"} • {p.paymentType} • Due date: {p.dueDate}
+                      <div key={p.id} className="p-4 flex items-center justify-between hover:bg-secondary/15 transition-colors text-xs gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-foreground">
+                              Flat {p.unit} ({p.residentName})
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] px-1.5 py-0 border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold"
+                            >
+                              {p.building || "Sunshine Complex"}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            {p.description || `${p.paymentType} Cycle`} • Due: <strong className="text-foreground">{p.dueDate}</strong>
                           </p>
                           {p.status.toLowerCase() === "paid" && p.paidDate && (
-                            <p className="text-[9px] text-emerald-600 font-medium mt-0.5">Paid On: {formatPaymentDateTime(p.paidDate)} ({p.paymentMethod || "UPI"})</p>
+                            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                              <CheckCheck className="w-3 h-3" /> Paid on {formatPaymentDateTime(p.paidDate)} via {p.paymentMethod || "UPI"} • Ref: <span className="font-mono text-[9px]">{p.transactionId || "N/A"}</span>
+                            </p>
                           )}
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold">₹{p.amount.toLocaleString()}</span>
-                          <Badge variant={p.status.toLowerCase() === "paid" ? "default" : "destructive"} className="text-[9px] font-bold">
-                            {p.status}
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-sm font-extrabold text-foreground">₹{p.amount.toLocaleString()}</span>
+                          <Badge
+                            variant={p.status.toLowerCase() === "paid" ? "default" : "destructive"}
+                            className={`text-[10px] font-bold ${
+                              p.status.toLowerCase() === "paid"
+                                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                : "bg-rose-500 hover:bg-rose-600 text-white"
+                            }`}
+                          >
+                            {p.status.toUpperCase()}
                           </Badge>
+
                           {p.status.toLowerCase() === "pending" && (
                             <Button
                               size="sm"
@@ -633,17 +816,33 @@ export default function PaymentsPage() {
                                 sendPaymentReminder(p.id);
                                 alert(`Reminder notification dispatched to ${p.residentName} (Flat ${p.unit}).`);
                               }}
-                              className="h-7 text-[9px] px-2 rounded-lg"
+                              className="h-7 text-[10px] px-2.5 rounded-lg border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300"
                             >
                               <Send className="w-3 h-3 mr-1" /> Remind
+                            </Button>
+                          )}
+
+                          {p.status.toLowerCase() === "paid" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDownloadReceipt(p)}
+                              className="h-7 text-[10px] px-2 rounded-lg"
+                              title="Download digital payment receipt"
+                            >
+                              <Receipt className="w-3 h-3 mr-1" /> Receipt
                             </Button>
                           )}
                         </div>
                       </div>
                     ))}
                     {secretaryLedgerInvoices.length === 0 && (
-                      <div className="text-center py-20 text-muted-foreground text-xs">
-                        No maintenance ledgers found for this billing period.
+                      <div className="text-center py-24 px-4 text-muted-foreground text-xs space-y-2">
+                        <Receipt className="w-10 h-10 mx-auto text-muted-foreground/40" />
+                        <p className="font-semibold text-foreground text-sm">No maintenance invoices in current view</p>
+                        <p className="max-w-sm mx-auto text-[11px]">
+                          The society ledger is completely fresh. When you dispatch monthly bills using the Bulk Invoicing Generator, they will appear here and in all resident portals.
+                        </p>
                       </div>
                     )}
                   </div>
@@ -652,40 +851,76 @@ export default function PaymentsPage() {
             </div>
 
             <div className="lg:col-span-5 space-y-4">
-              {/* Bulk generator */}
-              <Card className="border-border/50">
-                <CardHeader>
+              {/* Bulk generator matching User Reference Design */}
+              <Card className="border-border/60 shadow-sm">
+                <CardHeader className="pb-3">
                   <CardTitle className="text-base font-bold">Bulk Invoicing Generator</CardTitle>
-                  <CardDescription>Dispatch billing cycles to all approved flats</CardDescription>
+                  <CardDescription className="text-xs">Dispatch billing cycles to all approved flats</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleGenerateBulkBills} className="space-y-4 text-xs">
                     <div>
                       <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Billing Month Cycle</label>
-                      <Input value={billingMonth} onChange={e => setBillingMonth(e.target.value)} className="h-9 rounded-lg" placeholder="e.g. July 2026" required />
+                      <Input
+                        value={billingMonth}
+                        onChange={e => setBillingMonth(e.target.value)}
+                        className="h-9 rounded-lg text-xs"
+                        placeholder="e.g. August 2026"
+                        required
+                      />
                     </div>
                     <div>
                       <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Billing Description</label>
-                      <Input value={billingDescription} onChange={e => setBillingDescription(e.target.value)} className="h-9 rounded-lg" placeholder="Monthly Maintenance Charges" required />
+                      <Input
+                        value={billingDescription}
+                        onChange={e => setBillingDescription(e.target.value)}
+                        className="h-9 rounded-lg text-xs"
+                        placeholder="Monthly Maintenance Charges"
+                        required
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Maintenance Charge (₹)</label>
-                        <Input type="number" value={chargeMaintenance} onChange={e => setChargeMaintenance(Number(e.target.value))} className="h-9 rounded-lg" required />
+                        <Input
+                          type="number"
+                          value={chargeMaintenance}
+                          onChange={e => setChargeMaintenance(Number(e.target.value))}
+                          className="h-9 rounded-lg text-xs"
+                          required
+                        />
                       </div>
                       <div>
                         <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Water Tariff Charge (₹)</label>
-                        <Input type="number" value={chargeWater} onChange={e => setChargeWater(Number(e.target.value))} className="h-9 rounded-lg" required />
+                        <Input
+                          type="number"
+                          value={chargeWater}
+                          onChange={e => setChargeWater(Number(e.target.value))}
+                          className="h-9 rounded-lg text-xs"
+                          required
+                        />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Due Date</label>
-                        <Input value={billingDueDate} onChange={e => setBillingDueDate(e.target.value)} className="h-9 rounded-lg" placeholder="e.g. 15 July" required />
+                        <Input
+                          value={billingDueDate}
+                          onChange={e => setBillingDueDate(e.target.value)}
+                          className="h-9 rounded-lg text-xs"
+                          placeholder="e.g. 15 August 2026"
+                          required
+                        />
                       </div>
                       <div>
                         <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Late Fee (₹/day, optional)</label>
-                        <Input type="number" value={billingLateFee} onChange={e => setBillingLateFee(e.target.value)} className="h-9 rounded-lg" placeholder="e.g. 100" />
+                        <Input
+                          type="number"
+                          value={billingLateFee}
+                          onChange={e => setBillingLateFee(e.target.value)}
+                          className="h-9 rounded-lg text-xs"
+                          placeholder="e.g. 100"
+                        />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -694,7 +929,7 @@ export default function PaymentsPage() {
                         <select
                           value={billingApplicableTo}
                           onChange={e => setBillingApplicableTo(e.target.value)}
-                          className="w-full h-9 rounded-lg border border-border bg-card px-2 text-xs"
+                          className="w-full h-9 rounded-lg border border-border/70 bg-card px-2 text-xs text-foreground"
                         >
                           <option value="Entire Society">Entire Society</option>
                           <option value="Selected Building">Selected Building</option>
@@ -706,7 +941,7 @@ export default function PaymentsPage() {
                           <select
                             value={billingSelectedBuilding}
                             onChange={e => setBillingSelectedBuilding(e.target.value)}
-                            className="w-full h-9 rounded-lg border border-border bg-card px-2 text-xs"
+                            className="w-full h-9 rounded-lg border border-border/70 bg-card px-2 text-xs text-foreground"
                           >
                             <option value="Wing A">Wing A</option>
                             <option value="Wing B">Wing B</option>
@@ -715,11 +950,14 @@ export default function PaymentsPage() {
                         </div>
                       )}
                     </div>
-                    <div className="p-3 bg-amber-500/10 text-amber-600 rounded-xl border border-amber-500/20 text-[10px] flex items-center gap-1.5">
-                      <AlertTriangle className="w-4.5 h-4.5 shrink-0" />
-                      This triggers bill generation for targeted approved flats.
+                    <div className="p-3 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-500/20 text-[11px] flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>This triggers bill generation for targeted approved flats.</span>
                     </div>
-                    <Button type="submit" className="w-full h-9 rounded-xl gradient-primary text-white border-0 font-semibold shadow-md">
+                    <Button
+                      type="submit"
+                      className="w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white border-0 font-bold shadow-md shadow-blue-500/20 active:scale-[0.99] transition-all"
+                    >
                       Dispatch Bulk Invoices
                     </Button>
                   </form>
@@ -881,7 +1119,7 @@ export default function PaymentsPage() {
                     </div>
 
                     <div className="flex gap-2">
-                      <Button type="submit" className="flex-1 h-9 rounded-xl gradient-primary text-white border-0 font-semibold shadow-md">
+                      <Button type="submit" className="flex-1 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white border-0 font-semibold shadow-md">
                         {editingColl ? "Save Changes" : "Publish Program"}
                       </Button>
                       {editingColl && (
@@ -1263,8 +1501,8 @@ export default function PaymentsPage() {
                     <div className="flex items-center gap-4 shrink-0">
                       <span className="text-lg font-bold text-foreground">₹{bill.amount.toLocaleString()}</span>
                       <Button 
-                        onClick={() => setSelectedPayRequest(bill)}
-                        className="rounded-xl h-8 text-[10px] font-semibold gradient-primary text-white border-0"
+                        onClick={() => handleRedirectToGateway(bill, "Maintenance Charges")}
+                        className="rounded-xl h-8 text-[10px] font-semibold bg-blue-600 hover:bg-blue-700 text-white border-0 shadow-sm"
                       >
                         <CreditCard className="w-3.5 h-3.5 mr-1" /> Pay Now
                       </Button>
@@ -1308,10 +1546,10 @@ export default function PaymentsPage() {
                       <div className="flex items-center gap-4 shrink-0">
                         <span className="text-sm font-bold text-foreground">₹{sc.amount.toLocaleString()}</span>
                         <Button 
-                          onClick={() => setSelectedPayRequest(sc)}
-                          className="rounded-xl h-8 text-[10px] font-semibold gradient-primary text-white border-0"
+                          onClick={() => handleRedirectToGateway(sc, "Special Collection")}
+                          className="rounded-xl h-8 text-[10px] font-semibold bg-blue-600 hover:bg-blue-700 text-white border-0 shadow-sm"
                         >
-                          Pay Now
+                          <CreditCard className="w-3.5 h-3.5 mr-1" /> Pay Now
                         </Button>
                       </div>
                     </div>
@@ -1483,63 +1721,6 @@ export default function PaymentsPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Simulated Payment Gateway Dialog */}
-      <Dialog open={selectedPayRequest !== null} onOpenChange={(open) => !open && setSelectedPayRequest(null)}>
-        <DialogContent className="max-w-md bg-card border-border/50 text-xs">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-1.5">
-              <CreditCard className="w-4 h-4 text-primary" /> Security Payment Gateway
-            </DialogTitle>
-          </DialogHeader>
-
-          {selectedPayRequest && (
-            <div className="space-y-4 mt-2">
-              <div className="p-3 bg-secondary/15 rounded-xl space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Paying For:</span>
-                  <span className="font-bold">{selectedPayRequest.paymentType}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Flat Reference:</span>
-                  <span className="font-bold">Flat ${selectedPayRequest.unit}</span>
-                </div>
-                <div className="flex justify-between border-t border-border/30 pt-1.5 font-bold">
-                  <span>Grand Total Dues:</span>
-                  <span className="text-primary">₹{selectedPayRequest.amount.toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-semibold text-muted-foreground block">Select Payment Method</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {["UPI (GPay / PhonePe)", "Stripe Payments", "Credit/Debit Card", "NetBanking"].map(method => (
-                    <button
-                      key={method}
-                      onClick={() => setPaymentProvider(method)}
-                      className={`p-2.5 rounded-xl border text-center font-semibold transition-all ${
-                        paymentProvider === method 
-                          ? "border-primary bg-primary/10 text-primary" 
-                          : "border-border hover:bg-secondary/10"
-                      }`}
-                    >
-                      {method}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <Button
-                disabled={isProcessingPayment}
-                onClick={handlePayNow}
-                className="w-full h-10 rounded-xl gradient-primary text-white border-0 font-semibold text-xs shadow-md mt-2"
-              >
-                {isProcessingPayment ? "Securing Tunnel..." : `Confirm Payment (₹${selectedPayRequest.amount.toLocaleString()})`}
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

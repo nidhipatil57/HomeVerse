@@ -86,7 +86,7 @@ export default function HostelComplaintsPage() {
 
   const selected = selectedCompId ? complaints.find(c => c.id === selectedCompId) : null;
 
-  const handleRaise = (e: React.FormEvent) => {
+  const handleRaise = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) return;
 
@@ -99,46 +99,65 @@ export default function HostelComplaintsPage() {
       priority = "high";
     }
 
-    addComplaint({
-      title,
-      description,
-      category: category.toLowerCase() as any,
-      status: "submitted",
-      priority,
-      raisedBy: user?.id || "user-student-1",
-      raisedByName: user?.name || "Aarav Mehta",
-      unit: user?.unit || "204",
-      building: user?.building || "Block B",
-      priorityScore: priority === "critical" ? 95 : priority === "high" ? 70 : 40,
-      portal: "hostel"
-    });
-
-    setTitle("");
-    setDescription("");
-    setDialogOpen(false);
+    try {
+      await addComplaint({
+        title: title.trim(),
+        description: description.trim(),
+        category: category.toLowerCase() as any,
+        status: "submitted",
+        priority,
+        raisedBy: user?.id || "user-student-1",
+        raisedByName: user?.name || "Aarav Mehta",
+        unit: user?.unit || "204",
+        building: user?.building || "Block B",
+        priorityScore: priority === "critical" ? 95 : priority === "high" ? 70 : 40,
+        portal: "hostel"
+      });
+      setTitle("");
+      setDescription("");
+      setDialogOpen(false);
+    } catch (err: any) {
+      alert("Error submitting complaint: " + (err?.message || "Please log in again and retry."));
+    }
   };
 
-  const handleWardenAssign = () => {
+  const handleWardenAssign = async () => {
     if (!selected) return;
-    assignComplaintWorker(selected.id, workerName, "worker-gen-id", eta);
-    setWardenRemark("");
+    try {
+      await assignComplaintWorker(selected.id, workerName, "worker-gen-id", eta);
+      setWardenRemark("");
+    } catch (err: any) {
+      alert("Error assigning worker: " + (err?.message || "Failed to assign worker"));
+    }
   };
 
-  const handleWardenReject = () => {
+  const handleWardenReject = async () => {
     if (!selected) return;
-    updateComplaintStatus(selected.id, "closed", { by: user?.name, note: wardenRemark || "Rejected by Warden" });
-    setWardenRemark("");
+    try {
+      await updateComplaintStatus(selected.id, "closed", { by: user?.name, note: wardenRemark || "Rejected by Warden" });
+      setWardenRemark("");
+    } catch (err: any) {
+      alert("Error closing complaint: " + (err?.message || "Failed to close complaint"));
+    }
   };
 
-  const handleWardenResolve = () => {
+  const handleWardenResolve = async () => {
     if (!selected) return;
-    updateComplaintStatus(selected.id, "resolved", { by: user?.name, note: wardenRemark || "Marked as resolved by Warden" });
-    setWardenRemark("");
+    try {
+      await updateComplaintStatus(selected.id, "resolved", { by: user?.name, note: wardenRemark || "Marked as resolved by Warden" });
+      setWardenRemark("");
+    } catch (err: any) {
+      alert("Error resolving complaint: " + (err?.message || "Failed to resolve complaint"));
+    }
   };
 
-  const handleStudentRate = () => {
+  const handleStudentRate = async () => {
     if (!selected) return;
-    rateComplaint(selected.id, userRating);
+    try {
+      await rateComplaint(selected.id, userRating);
+    } catch (err: any) {
+      alert("Error submitting rating: " + (err?.message || "Failed to rate complaint"));
+    }
   };
 
   return (

@@ -475,6 +475,10 @@ model EventRegistration {
   guestCount     Int            @default(0)
   guestNames     String?
   rsvpStatus     String         @default("Going") // Going, Maybe, Not Going
+  paymentStatus  String         @default("Free")  // Free, Paid
+  paidAmount     Float          @default(0)
+  paymentMethod  String?
+  transactionId  String?
   
   event          CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
