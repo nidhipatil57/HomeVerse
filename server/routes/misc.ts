@@ -4240,87 +4240,242 @@ router.post("/flats", authenticateToken, async (req: any, res) => {
   }
 });
 
-// Facility Bookings
+// Facility configuration and bookings
+const FACILITY_SLOTS = [
+  "06:00 AM - 07:00 AM", "07:00 AM - 08:00 AM", "08:00 AM - 09:00 AM",
+  "09:00 AM - 10:00 AM", "10:00 AM - 11:00 AM", "11:00 AM - 12:00 PM",
+  "04:00 PM - 05:00 PM", "05:00 PM - 06:00 PM", "06:00 PM - 07:00 PM",
+  "07:00 PM - 08:00 PM", "08:00 PM - 09:00 PM", "09:00 PM - 10:00 PM"
+];
+
+const DEFAULT_FACILITIES = [
+  { name: "Badminton Court", category: "Sports", hours: "06:00 AM - 10:00 PM", capacity: "4 Players" },
+  { name: "Gymnasium & Fitness Center", category: "Fitness", hours: "06:00 AM - 10:00 PM", capacity: "25 Residents" },
+  { name: "Swimming Pool", category: "Aquatics", hours: "06:30 AM - 09:30 PM", capacity: "30 Swimmers" },
+  { name: "Clubhouse Lounge", category: "Recreation", hours: "08:00 AM - 11:00 PM", capacity: "50 Persons" },
+  { name: "Community Banquet & Party Hall", category: "Events", hours: "10:00 AM - 11:00 PM", capacity: "120 Guests" }
+];
+
+function parseFacilityTime(value: string): number | null {
+  const match = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+  let hour = Number(match[1]) % 12;
+  if (match[3].toUpperCase() === "PM") hour += 12;
+  return hour * 60 + Number(match[2]);
+}
+
+function slotFitsHours(slot: string, hours: string): boolean {
+  const [slotStart, slotEnd] = slot.split(" - ");
+  const [open, close] = hours.split(" - ");
+  const startMinutes = parseFacilityTime(slotStart || "");
+  const endMinutes = parseFacilityTime(slotEnd || "");
+  const openMinutes = parseFacilityTime(open || "");
+  const closeMinutes = parseFacilityTime(close || "");
+  return startMinutes !== null && endMinutes !== null && openMinutes !== null && closeMinutes !== null
+    && startMinutes >= openMinutes && endMinutes <= closeMinutes;
+}
+
+function dateInIndia(date: string, slot: string): Date | null {
+  const start = slot.split(" - ")[0];
+  const minutes = parseFacilityTime(start);
+  if (minutes === null) return null;
+  const hour = String(Math.floor(minutes / 60)).padStart(2, "0");
+  const minute = String(minutes % 60).padStart(2, "0");
+  const parsed = new Date(`${date}T${hour}:${minute}:00+05:30`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+async function currentFacilityUser(req: any) {
+  if (req.user?.portal !== "society" || !["resident", "manager"].includes(req.user?.role)) return null;
+  return prisma.user.findUnique({ where: { id: req.user.id } });
+}
+
+async function ensureFacilityDefaults(communityCode: string) {
+  await prisma.$transaction(DEFAULT_FACILITIES.map((facility) => prisma.facilityConfiguration.upsert({
+    where: { communityCode_name: { communityCode, name: facility.name } },
+    create: {
+      id: `facility-${communityCode}-${facility.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+      communityCode,
+      ...facility,
+      status: "Operational",
+      timeSlots: FACILITY_SLOTS.filter((slot) => slotFitsHours(slot, facility.hours)),
+      cancellationNoticeMinutes: 60,
+      maxSessionsPerDay: 2
+    },
+    update: {}
+  })));
+}
+
+router.get("/facility-configurations", authenticateToken, async (req: any, res) => {
+  try {
+    const user = await currentFacilityUser(req);
+    if (!user?.communityCode) return res.status(403).json({ error: "Facility access is limited to society residents and managers." });
+    await ensureFacilityDefaults(user.communityCode);
+    const facilities = await prisma.facilityConfiguration.findMany({
+      where: { communityCode: user.communityCode },
+      orderBy: { name: "asc" }
+    });
+    res.json(facilities);
+  } catch (error) {
+    console.error("Facility configuration fetch failed:", error);
+    res.status(500).json({ error: "Failed to fetch facility configuration" });
+  }
+});
+
+router.put("/facility-configurations/:id/status", authenticateToken, async (req: any, res) => {
+  try {
+    const user = await currentFacilityUser(req);
+    if (req.user?.role !== "manager" || !user?.communityCode) return res.status(403).json({ error: "Only the society manager can configure facility availability." });
+    const { status } = req.body;
+    if (status !== "Operational" && status !== "Maintenance") return res.status(400).json({ error: "Invalid facility status" });
+    const updated = await prisma.facilityConfiguration.updateMany({
+      where: { id: req.params.id, communityCode: user.communityCode },
+      data: { status }
+    });
+    if (!updated.count) return res.status(404).json({ error: "Facility not found" });
+    const facility = await prisma.facilityConfiguration.findUnique({ where: { id: req.params.id } });
+    res.json(facility);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update facility status" });
+  }
+});
+
 router.get("/facility-bookings", authenticateToken, async (req: any, res) => {
   try {
+    const user = await currentFacilityUser(req);
+    if (!user?.communityCode) return res.status(403).json({ error: "Facility access is limited to society residents and managers." });
     const list = await prisma.facilityBooking.findMany({
-      include: { user: true }
+      where: { communityCode: user.communityCode },
+      include: { user: true },
+      orderBy: [{ date: "asc" }, { timeSlot: "asc" }]
     });
-    const mapped = list.map(b => ({
-      id: b.id,
-      facility: b.facilityName,
-      userId: b.residentId,
-      userName: b.residentName || b.user?.name || "Resident",
-      unit: b.user?.unit || "A-101",
-      date: b.date,
-      slot: b.timeSlot,
-      status: b.status as any
+    const isManager = req.user.role === "manager";
+    res.json(list.map((booking) => {
+      const ownBooking = booking.residentId === user.id;
+      return {
+        id: booking.id,
+        facility: booking.facilityName,
+        userId: isManager || ownBooking ? booking.residentId : "",
+        userName: isManager ? (booking.residentName || booking.user?.name || "Resident") : ownBooking ? "You" : "Occupied",
+        unit: isManager || ownBooking ? (booking.user?.unit || "") : "",
+        date: booking.date,
+        slot: booking.timeSlot,
+        status: booking.status
+      };
     }));
-    res.json(mapped);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch facility bookings" });
   }
 });
 
 router.post("/facility-bookings", authenticateToken, async (req: any, res) => {
-  const { facility, date, slot } = req.body;
-  if (!facility || !date || !slot) {
-    return res.status(400).json({ error: "Facility, date, and slot are required" });
+  const user = await currentFacilityUser(req);
+  if (req.user?.role !== "resident" || !user?.communityCode || !user.unit) {
+    return res.status(403).json({ error: "Only a society resident with an assigned unit can book facilities." });
   }
+  const communityCode = user.communityCode;
+  const residentUnit = user.unit;
+  const { facility, date } = req.body;
+  const slots: string[] = Array.isArray(req.body.slots) ? req.body.slots : req.body.slot ? [req.body.slot] : [];
+  if (!facility || !/^\d{4}-\d{2}-\d{2}$/.test(date || "") || !slots.length || new Set(slots).size !== slots.length) {
+    return res.status(400).json({ error: "Facility, valid date, and one or more unique time slots are required." });
+  }
+
   try {
-    // Check for existing active booking on same facility, date and slot
-    const existing = await prisma.facilityBooking.findFirst({
-      where: {
-        facilityName: facility,
-        date,
-        timeSlot: slot,
-        status: "booked"
-      }
+    await ensureFacilityDefaults(communityCode);
+    const config = await prisma.facilityConfiguration.findFirst({
+      where: { communityCode, name: facility }
     });
+    if (!config) return res.status(400).json({ error: "Choose a configured facility." });
+    if (config.status !== "Operational") return res.status(409).json({ error: "This facility is unavailable while under maintenance." });
+    if (slots.some((slot) => !config.timeSlots.includes(slot))) return res.status(400).json({ error: "One or more selected time slots are not available for this facility." });
 
-    if (existing) {
-      return res.status(409).json({ error: "This slot is already booked. Please choose another time slot." });
+    const requestedDay = new Date(`${date}T00:00:00Z`);
+    if (Number.isNaN(requestedDay.getTime()) || requestedDay.toISOString().slice(0, 10) !== date) {
+      return res.status(400).json({ error: "Invalid booking date." });
     }
+    const now = new Date();
+    if (slots.some((slot) => {
+      const start = dateInIndia(date, slot);
+      return !start || start <= now;
+    })) return res.status(400).json({ error: "Bookings must be made before the selected time slot begins." });
+    if (slots.length > config.maxSessionsPerDay) return res.status(400).json({ error: `A flat may book at most ${config.maxSessionsPerDay} sessions per day.` });
 
-    const id = `FBK-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
-    const newBooking = await prisma.facilityBooking.create({
-      data: {
-        id,
-        facilityName: facility,
-        residentName: req.user.name || "Resident",
-        residentId: req.user.id,
-        date,
-        timeSlot: slot,
-        purpose: "General booking",
-        status: "booked",
-        communityCode: req.user.communityCode || "SUN123"
+    const created = await prisma.$transaction(async (tx) => {
+      const sameFlatUsers = await tx.user.findMany({
+        where: { communityCode, unit: residentUnit, portal: "society", role: "resident" },
+        select: { id: true }
+      });
+      const residentIds = sameFlatUsers.map((resident) => resident.id);
+      const existingForFlat = await tx.facilityBooking.count({
+        where: { communityCode, residentId: { in: residentIds }, date, status: "booked" }
+      });
+      if (existingForFlat + slots.length > config.maxSessionsPerDay) throw new Error("FACILITY_DAILY_LIMIT");
+
+      const conflicting = await tx.facilityBooking.findFirst({
+        where: { communityCode, facilityName: facility, date, timeSlot: { in: slots }, status: "booked" }
+      });
+      if (conflicting) throw new Error("FACILITY_SLOT_TAKEN");
+
+      const bookings = [];
+      for (const slot of slots) {
+        bookings.push(await tx.facilityBooking.create({
+          data: {
+            id: `FBK-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+            facilityName: facility,
+            residentName: user.name,
+            residentId: user.id,
+            date,
+            timeSlot: slot,
+            purpose: "General booking",
+            status: "booked",
+            communityCode
+          }
+        }));
       }
-    });
+      return bookings;
+    }, { isolationLevel: "Serializable" });
 
-    const mappedBooking = {
-      id: newBooking.id,
-      facility: newBooking.facilityName,
-      userId: newBooking.residentId,
-      userName: newBooking.residentName,
-      unit: req.user.unit || "A-101",
-      date: newBooking.date,
-      slot: newBooking.timeSlot,
-      status: "booked" as const
-    };
-
-    broadcastUpdate("booking:update", mappedBooking);
-    res.status(201).json(mappedBooking);
-  } catch (error) {
+    res.status(201).json(created.map((booking) => ({
+      id: booking.id,
+      facility: booking.facilityName,
+      userId: user.id,
+      userName: "You",
+      unit: residentUnit,
+      date: booking.date,
+      slot: booking.timeSlot,
+      status: "booked"
+    })));
+  } catch (error: any) {
+    if (error?.message === "FACILITY_SLOT_TAKEN" || error?.code === "P2034") {
+      return res.status(409).json({ error: "One or more selected slots were just booked. Refresh availability and choose again." });
+    }
+    if (error?.message === "FACILITY_DAILY_LIMIT") {
+      return res.status(409).json({ error: "This flat has reached its daily facility booking limit." });
+    }
+    console.error("Facility booking failed:", error);
     res.status(500).json({ error: "Failed to book facility" });
   }
 });
 
 router.delete("/facility-bookings/:id", authenticateToken, async (req: any, res) => {
-  const { id } = req.params;
+  const user = await currentFacilityUser(req);
+  if (req.user?.role !== "resident" || !user?.communityCode) return res.status(403).json({ error: "Only the resident who made a booking can cancel it." });
   try {
-    await prisma.facilityBooking.delete({ where: { id } });
-    broadcastUpdate("booking:delete", { id });
-    res.json({ success: true });
+    const booking = await prisma.facilityBooking.findFirst({
+      where: { id: req.params.id, residentId: user.id, communityCode: user.communityCode, status: "booked" }
+    });
+    if (!booking) return res.status(404).json({ error: "Active booking not found for this resident." });
+    const startsAt = dateInIndia(booking.date, booking.timeSlot);
+    const facilityConfig = await prisma.facilityConfiguration.findFirst({
+      where: { communityCode: user.communityCode, name: booking.facilityName }
+    });
+    const cancellationWindowMs = (facilityConfig?.cancellationNoticeMinutes ?? 60) * 60 * 1000;
+    if (!startsAt || startsAt.getTime() - Date.now() < cancellationWindowMs) {
+      return res.status(409).json({ error: `Bookings must be cancelled at least ${facilityConfig?.cancellationNoticeMinutes ?? 60} minutes before their start time.` });
+    }
+    await prisma.facilityBooking.delete({ where: { id: booking.id } });
+    res.json({ success: true, id: booking.id });
   } catch (error) {
     res.status(500).json({ error: "Failed to cancel booking" });
   }

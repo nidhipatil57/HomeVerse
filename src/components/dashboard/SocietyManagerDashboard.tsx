@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { motion } from "motion/react";
 import {
-  Wrench, Calendar, Users, AlertTriangle, Package, Activity, Clock, ShieldAlert,
+  Wrench, Users, AlertTriangle, Package, Activity, Clock, ShieldAlert,
   ClipboardCheck, TrendingUp, BarChart3, Bell, ArrowUpRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -59,10 +59,6 @@ export function SocietyManagerDashboard({ manager }: { manager: any }) {
       return etaLower.includes("today") || etaLower.includes(todayStr) || etaLower.includes(todayLocaleStr.toLowerCase());
     }).length;
 
-    const activeServiceRequests = serviceBookings.filter(b =>
-      b.status === "Forwarded to Manager" || b.status === "Pending"
-    ).length;
-
     const scheduledMaintenance = serviceBookings.filter(b => b.status === "Scheduled").length + 
       complaints.filter(c => c.status === "Scheduled").length;
 
@@ -89,7 +85,6 @@ export function SocietyManagerDashboard({ manager }: { manager: any }) {
     return {
       pendingComplaints,
       complaintsDueToday,
-      activeServiceRequests,
       scheduledMaintenance,
       emergencyRequests,
       workersAssigned,
@@ -171,7 +166,6 @@ export function SocietyManagerDashboard({ manager }: { manager: any }) {
           { label: "Pending Complaints", value: stats.pendingComplaints, icon: Wrench, color: "#3b82f6", desc: "Escalated for manager action", link: "/society/complaints" },
           { label: "Complaints Due Today", value: stats.complaintsDueToday, icon: Clock, color: "#a855f7", desc: "Scheduled tech arrival today", link: "/society/schedules" },
           { label: "Emergency Complaints", value: stats.emergencyRequests, icon: ShieldAlert, color: "#ef4444", desc: "Active critical urgency alerts", link: "/society/emergency" },
-          { label: "Active Service Requests", value: stats.activeServiceRequests, icon: Calendar, color: "#f59e0b", desc: "Waiting for coordinator setup", link: "/society/services" },
           { label: "Scheduled Maintenance", value: stats.scheduledMaintenance, icon: Clock, color: "#10b981", desc: "Plumbers, electricians on shift", link: "/society/schedules" },
           { label: "Helpers Inside Society", value: stats.helperAttendance, icon: ClipboardCheck, color: "#06b6d4", desc: "Active helper checkins today", link: "/society/daily-operations" },
           { label: "Pending Parcels", value: stats.pendingParcels, icon: Package, color: "#ec4899", desc: "Packages logged at main gate", link: "/society/dashboard" },

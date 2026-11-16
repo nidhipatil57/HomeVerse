@@ -87,7 +87,21 @@ export interface FacilityBooking {
   unit: string;
   date: string;
   slot: string;
-  status: "booked" | "cancelled";
+  status: "booked" | "cancelled" | "available";
+}
+
+export interface FacilityConfiguration {
+  id: string;
+  communityCode: string;
+  name: string;
+  category: string;
+  hours: string;
+  capacity: string;
+  status: "Operational" | "Maintenance";
+  maxAdvanceDays: number;
+  timeSlots: string[];
+  cancellationNoticeMinutes: number;
+  maxSessionsPerDay: number;
 }
 
 export interface MarketplaceEnquiry {
@@ -401,12 +415,15 @@ export interface RoommatePreference {
 }
 
 interface CommunityState {
+  isDataHydrated: boolean;
+  secretaryResidentView: boolean;
   complaints: Complaint[];
   leaveRequests: LeaveRequest[];
   visitors: Visitor[];
   laundrySlots: LaundrySlot[];
   parcels: Parcel[];
   facilityBookings: FacilityBooking[];
+  facilityConfigurations: FacilityConfiguration[];
   marketplaceItems: MarketplaceItem[];
   marketplaceEnquiries: MarketplaceEnquiry[];
   marketplaceSavedIds: string[];
@@ -462,6 +479,7 @@ interface CommunityState {
   deleteStaticWorker: (id: string) => Promise<any>;
 
   initializeDb: () => void;
+  setSecretaryResidentView: (enabled: boolean) => void;
   saveDb: () => void;
   addRegisteredUser: (u: User & Record<string, any>) => Promise<void>;
   
@@ -519,7 +537,10 @@ interface CommunityState {
   submitRoommatePreference: (pref: RoommatePreference) => Promise<void>;
 
   // Facility Bookings
-  bookFacility: (booking: Omit<FacilityBooking, "id" | "status">) => Promise<boolean>;
+  loadFacilityBookings: () => Promise<void>;
+  loadFacilityConfigurations: () => Promise<FacilityConfiguration[]>;
+  updateFacilityConfigurationStatus: (id: string, status: FacilityConfiguration["status"]) => Promise<void>;
+  bookFacility: (booking: { facility: string; date: string; slots: string[] }) => Promise<boolean>;
   cancelFacilityBooking: (id: string) => Promise<void>;
 
   // Marketplace Transactions (Buy & Sell)
@@ -740,13 +761,86 @@ export const mergeAndDedupeMarketplaceItems = (incoming: any[], existingOrSeed: 
   );
 };
 
+const SERVER_BACKED_KEYS = new Set([
+  "complaints", "leaveRequests", "visitors", "laundrySlots", "parcels", "marketplaceItems",
+  "lostFoundItems", "lostReports", "itemMatches", "maintenanceBills", "communityEvents",
+  "notifications", "users", "emergencies", "gatePasses", "vehicleLogs", "incidents",
+  "announcements", "expenses", "flats", "rentRecords", "helpers", "attendance",
+  "flatAttendance", "payments", "collections", "roomChangeRequests", "roommatePreferences",
+  "favorites", "serviceCategories", "workerProfiles", "serviceBookings", "favoriteWorkers"
+]);
+
+const SERVER_CACHE_VERSION_KEY = "homeverse_server_cache_version";
+const SERVER_CACHE_OWNER_KEY = "homeverse_server_cache_owner";
+const REMOVED_RESIDENT_EMAILS = new Set([
+  "santosh@sunshinecomplex.com",
+  "sumit@sunshinecomplex.com"
+]);
+const REMOVED_RESIDENT_NAMES = new Set(["santosh mishra", "sumit yadav"]);
+const REMOVED_EVENT_IDS = new Set(["EV-001", "EV-002", "EV-003"]);
+const REMOVED_EVENT_TITLES = new Set([
+  "society annual general meeting (agm)",
+  "independence day cultural fest",
+  "weekend yoga & wellness camp"
+]);
+
+function normalizeGatePass(pass: any): GatePass {
+  const createdAt = pass.createdAt || pass.validOn || new Date().toISOString();
+  const status = String(pass.status || "active").toLowerCase();
+  return {
+    ...pass,
+    name: String(pass.name || pass.visitorName || "Visitor"),
+    assignedResident: String(pass.assignedResident || pass.residentName || "Resident"),
+    purpose: String(pass.purpose || "Visitor pass"),
+    validFrom: String(pass.validFrom || pass.validOn || createdAt),
+    validTo: String(pass.validTo || "Open"),
+    unit: String(pass.unit || ""),
+    building: String(pass.building || ""),
+    status: (["active", "expired", "revoked", "used"].includes(status) ? status : "active") as GatePass["status"],
+    createdAt: String(createdAt)
+  };
+}
+
+function isRemovedSampleEvent(event: any): boolean {
+  return REMOVED_EVENT_IDS.has(String(event?.id || ""))
+    || REMOVED_EVENT_TITLES.has(String(event?.title || "").trim().toLowerCase());
+}
+
+function isRemovedResident(user: any): boolean {
+  const email = String(user?.email || "").trim().toLowerCase();
+  const name = String(user?.name || "").trim().toLowerCase();
+  const building = String(user?.building || "").trim().toLowerCase();
+  const unit = String(user?.unit || "").replace(/\D/g, "");
+  return REMOVED_RESIDENT_EMAILS.has(email)
+    || (REMOVED_RESIDENT_NAMES.has(name) && unit === "401" && building.includes("c"));
+}
+
+function getStoredDataOwner(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const user = JSON.parse(localStorage.getItem("homeverse_auth") || "null");
+    return String(user?.id || user?.email || "");
+  } catch {
+    return "";
+  }
+}
+
+function hasTrustedServerCache(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(SERVER_CACHE_VERSION_KEY) === "6"
+    && localStorage.getItem(SERVER_CACHE_OWNER_KEY) === getStoredDataOwner()
+    && Boolean(getStoredDataOwner());
+}
+
 const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
   if (typeof window !== "undefined") {
     try {
+      if (SERVER_BACKED_KEYS.has(key) && !hasTrustedServerCache()) return [] as unknown as T;
       const stored = localStorage.getItem(`homeverse_${key}`);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
+          if (SERVER_BACKED_KEYS.has(key)) return parsed as unknown as T;
           if (key === "users") {
             const seeds = seedFn() as any[];
             const hasNewUser = parsed.some((u: any) => u.id === "user-resident-16");
@@ -815,12 +909,15 @@ const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
 };
 
 export const useCommunityStore = create<CommunityState>((set, get) => ({
+  isDataHydrated: false,
+  secretaryResidentView: false,
   complaints: loadLocalOrSeed("complaints", () => [] as Complaint[]),
   leaveRequests: loadLocalOrSeed("leaveRequests", getPrepopulatedLeaveRequests),
   visitors: loadLocalOrSeed("visitors", getPrepopulatedVisitors),
   laundrySlots: loadLocalOrSeed("laundrySlots", getPrepopulatedLaundrySlots),
   parcels: loadLocalOrSeed("parcels", getPrepopulatedParcels),
   facilityBookings: [],
+  facilityConfigurations: [],
   marketplaceItems: loadLocalOrSeed("marketplaceItems", getPrepopulatedMarketplaceItems),
   marketplaceEnquiries: loadLocalOrSeed("marketplaceEnquiries", () => []),
   marketplaceSavedIds: loadLocalOrSeed("marketplaceSaved", () => []),
@@ -857,188 +954,28 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   favoriteWorkers: [],
   chatMessages: [],
 
+  setSecretaryResidentView: (enabled) => set({ secretaryResidentView: enabled }),
+
   initializeDb: () => {
     if (typeof window === "undefined") return;
 
-    // Load any localStorage data if store currently has empty arrays
-    const state = get();
-    const localUpdates: Partial<CommunityState> = {};
-
-    // Load persisted collections & payments without wiping secretary special occasions or event fees
-    if (typeof window !== "undefined") {
+    const cleanUsers = (get().users || []).filter((user: any) => !isRemovedResident(user));
+    const cleanEvents = (get().communityEvents || []).filter((event: any) => !isRemovedSampleEvent(event));
+    set({ users: cleanUsers, communityEvents: cleanEvents });
+    for (const storageKey of ["homeverse_users", "homeverse_registered_users"]) {
       try {
-        const storedCollections = localStorage.getItem("homeverse_collections");
-        if (storedCollections) {
-          try {
-            const parsedCollections = JSON.parse(storedCollections);
-            if (Array.isArray(parsedCollections)) {
-              localUpdates.collections = parsedCollections;
-            }
-          } catch (e) {}
+        const storedUsers = JSON.parse(localStorage.getItem(storageKey) || "[]");
+        if (Array.isArray(storedUsers)) {
+          localStorage.setItem(storageKey, JSON.stringify(storedUsers.filter((user: any) => !isRemovedResident(user))));
         }
-
-        const storedEvents = localStorage.getItem("homeverse_communityEvents");
-        if (storedEvents) {
-          try {
-            const parsedEvents = JSON.parse(storedEvents);
-            if (Array.isArray(parsedEvents)) {
-              localUpdates.communityEvents = parsedEvents;
-            }
-          } catch (e) {}
-        }
-
-        // Clear all previous cached payments and bills in browser localStorage to start fresh with October pending bills
-        const FRESH_PAYMENTS_KEY = "homeverse_fresh_payments_october_pending_clean_v4";
-        if (localStorage.getItem(FRESH_PAYMENTS_KEY) !== "true") {
-          localStorage.removeItem("homeverse_payments");
-          localStorage.removeItem("homeverse_maintenanceBills");
-          localStorage.removeItem("homeverse_collections");
-          localStorage.setItem(FRESH_PAYMENTS_KEY, "true");
-        }
-
-        // Clear all previous dummy marketplace records once to start 100% fresh and prevent duplicate key collisions
-        const FRESH_MARKETPLACE_KEY = "homeverse_fresh_marketplace_clean_2026_v2";
-        if (localStorage.getItem(FRESH_MARKETPLACE_KEY) !== "true") {
-          localStorage.removeItem("homeverse_marketplaceItems");
-          localStorage.removeItem("homeverse_marketplaceEnquiries");
-          localStorage.removeItem("homeverse_marketplaceSaved");
-          localStorage.setItem(FRESH_MARKETPLACE_KEY, "true");
-          fetch("/api/marketplace/clear-all", { method: "POST" }).catch(() => {});
-        }
-
-        const storedPayments = localStorage.getItem("homeverse_payments");
-        let finalPayments: any[] = [];
-        if (storedPayments) {
-          try {
-            const parsed = JSON.parse(storedPayments);
-            if (Array.isArray(parsed)) finalPayments = parsed;
-          } catch (e) {}
-        }
-        localUpdates.payments = finalPayments;
-
-        const storedBills = localStorage.getItem("homeverse_maintenanceBills");
-        let finalBills: any[] = [];
-        if (storedBills) {
-          try {
-            const parsed = JSON.parse(storedBills);
-            if (Array.isArray(parsed)) finalBills = parsed;
-          } catch (e) {}
-        }
-        localUpdates.maintenanceBills = finalBills;
-
-        localStorage.setItem("homeverse_maintenanceBills", JSON.stringify(finalBills));
-        localUpdates.maintenanceBills = finalBills;
-
-        // Ensure users and flats are updated
-        const storedUsers = localStorage.getItem("homeverse_users");
-        let finalUsers = getPrepopulatedUsers();
-        if (storedUsers) {
-          try {
-            const parsed = JSON.parse(storedUsers);
-            if (Array.isArray(parsed) && parsed.some((u: any) => u.id === "user-resident-16") && parsed.some((u: any) => u.id === "user-secretary-1" && u.unit === "301")) {
-              finalUsers = parsed;
-            }
-          } catch (e) {}
-        }
-        localStorage.setItem("homeverse_users", JSON.stringify(finalUsers));
-        localUpdates.users = finalUsers;
-
-        const storedFlats = localStorage.getItem("homeverse_flats");
-        let finalFlats = getPrepopulatedFlats();
-        if (storedFlats) {
-          try {
-            const parsed = JSON.parse(storedFlats);
-            if (Array.isArray(parsed) && parsed.some((f: any) => f.id === "FL-C301") && parsed.length >= 17) {
-              finalFlats = parsed;
-            }
-          } catch (e) {}
-        }
-        localStorage.setItem("homeverse_flats", JSON.stringify(finalFlats));
-        localUpdates.flats = finalFlats;
-
-        // Invalidate previous cached helpers/passes to ensure clean, isolated wing-specific helpers
-        const FRESH_HELPERS_KEY = "homeverse_fresh_helpers_clean_v8";
-        if (localStorage.getItem(FRESH_HELPERS_KEY) !== "true") {
-          localStorage.removeItem("homeverse_helpers");
-          localStorage.removeItem("homeverse_gatePasses");
-          localStorage.setItem(FRESH_HELPERS_KEY, "true");
-        }
-
-        // Ensure fresh helpers and gate passes for each flat
-        const storedHelpers = localStorage.getItem("homeverse_helpers");
-        let finalHelpers = getPrepopulatedHelpers();
-        if (storedHelpers) {
-          try {
-            const parsed = JSON.parse(storedHelpers);
-            if (Array.isArray(parsed) && parsed.length >= 20 && parsed.some((h: any) => h.id === "HLP-126")) {
-              finalHelpers = parsed;
-            }
-          } catch (e) {}
-        }
-        localStorage.setItem("homeverse_helpers", JSON.stringify(finalHelpers));
-        localUpdates.helpers = finalHelpers;
-
-        const storedPasses = localStorage.getItem("homeverse_gatePasses");
-        let finalPasses = getPrepopulatedGatePasses();
-        if (storedPasses) {
-          try {
-            const parsed = JSON.parse(storedPasses);
-            if (Array.isArray(parsed) && parsed.length >= 20 && parsed.some((p: any) => p.id === "GP-9012")) {
-              finalPasses = parsed;
-            }
-          } catch (e) {}
-        }
-        localStorage.setItem("homeverse_gatePasses", JSON.stringify(finalPasses));
-        localUpdates.gatePasses = finalPasses;
-
-        const storedAtt = localStorage.getItem("homeverse_attendance");
-        let finalAtt = getPrepopulatedHelperAttendance();
-        if (storedAtt) {
-          try {
-            const parsed = JSON.parse(storedAtt);
-            if (Array.isArray(parsed) && parsed.length >= 4) {
-              finalAtt = parsed;
-            }
-          } catch (e) {}
-        }
-        localStorage.setItem("homeverse_attendance", JSON.stringify(finalAtt));
-        localUpdates.attendance = finalAtt;
-
-        const storedFlatAtt = localStorage.getItem("homeverse_flatAttendance");
-        let finalFlatAtt = getPrepopulatedFlatAttendance();
-        if (storedFlatAtt) {
-          try {
-            const parsed = JSON.parse(storedFlatAtt);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              finalFlatAtt = parsed;
-            }
-          } catch (e) {}
-        }
-        localStorage.setItem("homeverse_flatAttendance", JSON.stringify(finalFlatAtt));
-        localUpdates.flatAttendance = finalFlatAtt;
-      } catch (e) {}
+      } catch {}
     }
-
-    const syncKeys = [
-      "maintenanceBills", "rentRecords", "expenses",
-      "complaints", "visitors", "parcels", "announcements", "users"
-    ];
-    for (const k of syncKeys) {
-      if (!state[k as keyof CommunityState] || (state[k as keyof CommunityState] as any[]).length === 0) {
-        try {
-          const raw = localStorage.getItem(`homeverse_${k}`);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              localUpdates[k as keyof CommunityState] = parsed as any;
-            }
-          }
-        } catch (e) {}
+    try {
+      const storedEvents = JSON.parse(localStorage.getItem("homeverse_communityEvents") || "[]");
+      if (Array.isArray(storedEvents)) {
+        localStorage.setItem("homeverse_communityEvents", JSON.stringify(storedEvents.filter((event: any) => !isRemovedSampleEvent(event))));
       }
-    }
-    if (Object.keys(localUpdates).length > 0) {
-      set(localUpdates as any);
-    }
+    } catch {}
 
     const currentToken = getStoredAuthToken() || "";
     const alreadyInitialized = Boolean((globalThis as any).__homeverse_db_initialized);
@@ -1046,6 +983,8 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     if (alreadyInitialized && !tokenChanged) return;
     (globalThis as any).__homeverse_db_initialized = true;
     (globalThis as any).__homeverse_last_token = currentToken;
+    const hasCache = hasTrustedServerCache();
+    set({ isDataHydrated: hasCache });
 
     // 1. Initial REST state fetch
     const fetchInitialState = async () => {
@@ -1086,7 +1025,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           { key: "favoriteWorkers", path: "/api/community-services/favorites" }
         ];
 
-        const updates: Record<string, any> = {};
+        let successfulEndpoints = 0;
         const reqInit: RequestInit = { credentials: "include", headers: getAuthHeaders() };
 
         await Promise.all(
@@ -1103,25 +1042,66 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                     workerCategory: att.category || att.workerCategory
                   }));
                 }
+                if (key === "gatePasses" && Array.isArray(data)) {
+                  data = data.map(normalizeGatePass);
+                }
                 if (key === "users" && Array.isArray(data)) {
+                  data = data.filter((user: any) => !isRemovedResident(user));
+                  const demoUsers = getPrepopulatedUsers();
+                  const demoByEmail = new Map(demoUsers.map((user: any) => [String(user.email).toLowerCase(), user]));
+                  const portal = (() => {
+                    try {
+                      return JSON.parse(localStorage.getItem("homeverse_auth") || "null")?.portal;
+                    } catch {
+                      return undefined;
+                    }
+                  })();
+                  const mergedUsers = new Map<string, any>();
+                  for (const user of demoUsers) {
+                    if (!portal || user.portal === portal) mergedUsers.set(String(user.email).toLowerCase(), user);
+                  }
+                  for (const user of data) {
+                    const email = String(user.email || "").toLowerCase();
+                    const demoUser = demoByEmail.get(email);
+                    mergedUsers.set(email, demoUser ? { ...user, ...demoUser } : user);
+                  }
+                  data = Array.from(mergedUsers.values());
                   if (typeof window !== "undefined") {
                     try {
                       const localRegs = JSON.parse(localStorage.getItem("homeverse_registered_users") || "[]");
                       const dbEmails = new Set(data.map((u: any) => u.email.toLowerCase()));
-                      const uniqueLocal = localRegs.filter((u: any) => !dbEmails.has(u.email.toLowerCase()));
+                      const cleanLocalRegs = localRegs.filter((u: any) => !isRemovedResident(u));
+                      localStorage.setItem("homeverse_registered_users", JSON.stringify(cleanLocalRegs));
+                      const uniqueLocal = cleanLocalRegs.filter((u: any) => !dbEmails.has(u.email.toLowerCase()));
                       data = [...data, ...uniqueLocal];
                     } catch (e) {}
                   }
                 }
+                if (key === "flats" && Array.isArray(data)) {
+                  const canonicalFlats = getPrepopulatedFlats();
+                  const getAddressKey = (flat: any) => {
+                    const wing = String(flat.wing || flat.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || "";
+                    const number = String(flat.flatNumber || "").replace(/\D/g, "");
+                    return `${wing}-${number}`;
+                  };
+                  const flatsByAddress = new Map<string, any>(canonicalFlats.map((flat: any) => [getAddressKey(flat), flat]));
+                  for (const flat of data) {
+                    const addressKey = getAddressKey(flat);
+                    if (addressKey && !flatsByAddress.has(addressKey)) flatsByAddress.set(addressKey, flat);
+                  }
+                  data = Array.from(flatsByAddress.values());
+                }
                 if (key === "communityEvents" && Array.isArray(data)) {
+                  data = data.filter((event: any) => !isRemovedSampleEvent(event));
                   if (typeof window !== "undefined") {
                     try {
                       const stored = localStorage.getItem("homeverse_communityEvents");
                       if (stored) {
                         const localEvents = JSON.parse(stored);
                         if (Array.isArray(localEvents) && localEvents.length > 0) {
+                          const cleanedLocalEvents = localEvents.filter((event: any) => !isRemovedSampleEvent(event));
                           const dbIds = new Set(data.map((e: any) => e.id));
-                          const uniqueLocal = localEvents.filter((e: any) => !dbIds.has(e.id));
+                          const uniqueLocal = cleanedLocalEvents.filter((e: any) => !dbIds.has(e.id));
                           data = [...data, ...uniqueLocal];
                         }
                       }
@@ -1151,47 +1131,9 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                   }
                 }
 
-                if (key === "payments" && Array.isArray(data)) {
-                  const baseSeeds = getPrepopulatedPayments();
-                  data = mergeAndDedupePayments(data, baseSeeds);
-                }
-
-                if (key === "marketplaceItems" && Array.isArray(data)) {
-                  data = mergeAndDedupeMarketplaceItems(data, (get() as any).marketplaceItems || []);
-                }
-
-                if (key === "helpers" && Array.isArray(data)) {
-                  const currentHelpers = (get() as any).helpers || getPrepopulatedHelpers();
-                  const helperMap = new Map((currentHelpers || []).map((h: any) => [h.id, h]));
-                  for (const h of data) {
-                    const prev = helperMap.get(h.id);
-                    helperMap.set(h.id, prev ? { ...prev, ...h } : h);
-                  }
-                  data = Array.from(helperMap.values());
-                }
-
-                if (key === "users" && Array.isArray(data)) {
-                  const currentUsers = (get() as any).users || getPrepopulatedUsers();
-                  const userMap = new Map((currentUsers || []).map((u: any) => [u.id, u]));
-                  for (const u of data) {
-                    const prev = userMap.get(u.id);
-                    userMap.set(u.id, prev ? { ...prev, ...u } : u);
-                  }
-                  data = Array.from(userMap.values());
-                }
-
-                if (key === "flats" && Array.isArray(data)) {
-                  const currentFlats = (get() as any).flats || getPrepopulatedFlats();
-                  const flatMap = new Map((currentFlats || []).map((f: any) => [f.id, f]));
-                  for (const f of data) {
-                    const prev = flatMap.get(f.id);
-                    flatMap.set(f.id, prev ? { ...prev, ...f } : f);
-                  }
-                  data = Array.from(flatMap.values());
-                }
-
-                if (Array.isArray(data) && (data.length > 0 || key === "complaints" || key === "notifications" || key === "collections" || key === "payments")) {
-                  updates[key] = data;
+                if (Array.isArray(data)) {
+                  successfulEndpoints++;
+                  set({ [key]: data } as any);
                   if (typeof window !== "undefined") {
                     try {
                       localStorage.setItem(`homeverse_${key}`, JSON.stringify(data));
@@ -1203,10 +1145,14 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           })
         );
 
-        if (Object.keys(updates).length > 0) {
-          set(updates as any);
+        if (successfulEndpoints === endpoints.length && getStoredDataOwner()) {
+          localStorage.setItem(SERVER_CACHE_OWNER_KEY, getStoredDataOwner());
+                    localStorage.setItem(SERVER_CACHE_VERSION_KEY, "6");
         }
-      } catch (err) {}
+      } catch (err) {
+      } finally {
+        set({ isDataHydrated: true });
+      }
     };
 
     fetchInitialState();
@@ -1222,9 +1168,6 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         { key: "complaints", path: "/api/complaints" },
         { key: "notifications", path: "/api/notifications" },
         { key: "serviceBookings", path: "/api/community-services/bookings" },
-        { key: "helpers", path: "/api/visitors/helpers" },
-        { key: "attendance", path: "/api/visitors/attendance" },
-        { key: "flatAttendance", path: "/api/visitors/helpers/flat-attendance" },
         { key: "payments", path: "/api/payments" },
         { key: "collections", path: "/api/payments/collections" },
         { key: "users", path: "/api/users" },
@@ -1260,24 +1203,22 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                 }
               }
               if (key === "communityEvents" && Array.isArray(data)) {
+                data = data.filter((event: any) => !isRemovedSampleEvent(event));
                 if (typeof window !== "undefined") {
                   try {
                     const stored = localStorage.getItem("homeverse_communityEvents");
                     if (stored) {
                       const localEvents = JSON.parse(stored);
                       if (Array.isArray(localEvents) && localEvents.length > 0) {
+                        const cleanedLocalEvents = localEvents.filter((event: any) => !isRemovedSampleEvent(event));
                         const dbIds = new Set(data.map((e: any) => e.id));
-                        const uniqueLocal = localEvents.filter((e: any) => !dbIds.has(e.id));
+                        const uniqueLocal = cleanedLocalEvents.filter((e: any) => !dbIds.has(e.id));
                         data = [...data, ...uniqueLocal];
                       }
                     }
                     localStorage.setItem("homeverse_communityEvents", JSON.stringify(data));
                   } catch (e) {}
                 }
-              }
-              if (key === "payments" && Array.isArray(data)) {
-                const baseSeeds = getPrepopulatedPayments();
-                data = mergeAndDedupePayments(data, baseSeeds);
               }
               if (key === "marketplaceItems" && Array.isArray(data)) {
                 data = mergeAndDedupeMarketplaceItems(data, (get() as any).marketplaceItems || []);
@@ -1298,7 +1239,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       if (Object.keys(batchUpdates).length > 0) {
         set(batchUpdates as any);
       }
-    }, 8000);
+    }, 30000);
 
     (globalThis as any).__homeverse_poll_interval = pollInterval;
     const socket = io("http://localhost:5000", {
@@ -1572,14 +1513,15 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
 
     socket.on("gatepass:update", (updated: any) => {
+      const normalized = normalizeGatePass(updated);
       const current = get().gatePasses || [];
-      const index = current.findIndex(g => g.id === updated.id);
+      const index = current.findIndex(g => g.id === normalized.id);
       if (index > -1) {
         const next = [...current];
-        next[index] = updated;
+        next[index] = normalized;
         set({ gatePasses: next });
       } else {
-        set({ gatePasses: [updated, ...current] });
+        set({ gatePasses: [normalized, ...current] });
       }
     });
 
@@ -1733,15 +1675,19 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
 
     socket.on("booking:update", (updated: any) => {
-      const current = get().serviceBookings || [];
+      const current = get().facilityBookings || [];
       const index = current.findIndex(b => b.id === updated.id);
       if (index > -1) {
         const next = [...current];
         next[index] = updated;
-        set({ serviceBookings: next });
+        set({ facilityBookings: next });
       } else {
-        set({ serviceBookings: [updated, ...current] });
+        set({ facilityBookings: [updated, ...current] });
       }
+    });
+
+    socket.on("booking:delete", ({ id }: any) => {
+      if (id) set({ facilityBookings: (get().facilityBookings || []).filter((booking) => booking.id !== id) });
     });
 
     socket.on("message:new", (newMsg: any) => {
@@ -1798,7 +1744,7 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           try {
             const parsed = JSON.parse(e.newValue);
             if (Array.isArray(parsed)) {
-              set({ communityEvents: parsed });
+              set({ communityEvents: parsed.filter((event: any) => !isRemovedSampleEvent(event)) });
             }
           } catch (err) {}
         }
@@ -2770,19 +2716,67 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
   },
 
+  loadFacilityBookings: async () => {
+    const res = await fetch("/api/facility-bookings", {
+      credentials: "include",
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error("Failed to load facility bookings");
+    set({ facilityBookings: await res.json() });
+  },
+
+  loadFacilityConfigurations: async () => {
+    const res = await fetch("/api/facility-configurations", {
+      credentials: "include",
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error("Failed to load facility configuration");
+    const configurations: FacilityConfiguration[] = await res.json();
+    set({ facilityConfigurations: configurations });
+    return configurations;
+  },
+
+  updateFacilityConfigurationStatus: async (id, status) => {
+    const res = await fetch(`/api/facility-configurations/${id}/status`, {
+      method: "PUT",
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ status })
+    });
+    if (!res.ok) throw new Error("Failed to update facility availability");
+    const updated: FacilityConfiguration = await res.json();
+    set((state) => ({
+      facilityConfigurations: state.facilityConfigurations.map((facility) => facility.id === id ? updated : facility)
+    }));
+  },
+
   bookFacility: async (booking) => {
     const res = await fetch("/api/facility-bookings", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(booking)
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ facility: booking.facility, date: booking.date, slots: booking.slots })
     });
-    return res.ok;
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.error || "Failed to book facility");
+    }
+    const bookings: FacilityBooking[] = await res.json();
+    set((state) => ({ facilityBookings: [...state.facilityBookings, ...bookings] }));
+    return true;
   },
 
   cancelFacilityBooking: async (id) => {
-    await fetch(`/api/facility-bookings/${id}`, {
-      method: "DELETE"
+    const res = await fetch(`/api/facility-bookings/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: getAuthHeaders()
     });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.error || "Failed to cancel booking");
+    }
+    set((state) => ({ facilityBookings: state.facilityBookings.filter((booking) => booking.id !== id) }));
   },
 
   listMarketplaceItem: async (item) => {
@@ -3883,10 +3877,18 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   addExpense: async (expense) => {
-    await fetch("/api/expenses", {
+    const res = await fetch("/api/expenses", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(expense)
+    });
+    if (!res.ok) throw new Error("Failed to save expense");
+    const savedExpense = await res.json();
+    set((state) => {
+      const nextExpenses = [savedExpense, ...(state.expenses || [])];
+      try { localStorage.setItem("homeverse_expenses", JSON.stringify(nextExpenses)); } catch {}
+      return { expenses: nextExpenses };
     });
   },
 

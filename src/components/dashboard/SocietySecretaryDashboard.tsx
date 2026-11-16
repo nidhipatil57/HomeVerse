@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Building2, Users, IndianRupee, MessageSquareWarning, Wrench, Shield,
@@ -24,14 +24,19 @@ const SocietyUtilityChart = dynamic(() => import("@/components/charts/SocietyUti
 
 export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
   const [activeTab, setActiveTab] = useState<"dashboard" | "resident">("dashboard");
+  const secretaryResidentView = useCommunityStore((state) => state.secretaryResidentView);
+  const setSecretaryResidentView = useCommunityStore((state) => state.setSecretaryResidentView);
   const [adminSubTab, setAdminSubTab] = useState<"approvals" | "residents" | "finance" | "operations" | "governance">("approvals");
 
-  // Local state for complaints and service bookings validation forms
+  useEffect(() => {
+    setActiveTab(secretaryResidentView ? "resident" : "dashboard");
+  }, [secretaryResidentView]);
+
+  // Local state for complaint review forms
   const [reviewPriorities, setReviewPriorities] = useState<Record<string, string>>({});
   const [reviewDepartments, setReviewDepartments] = useState<Record<string, string>>({});
   const [reviewAdminNotes, setReviewAdminNotes] = useState<Record<string, string>>({});
   const [reviewRejectReasons, setReviewRejectReasons] = useState<Record<string, string>>({});
-  const [bookingAdminNotes, setBookingAdminNotes] = useState<Record<string, string>>({});
 
   // Load state and actions from Central Store
   const {
@@ -50,7 +55,6 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
     expenses,
     flats,
     rentRecords,
-    serviceBookings,
 
     approveUser,
     rejectUser,
@@ -84,7 +88,6 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
       expenses: state.expenses || [],
       flats: state.flats || [],
       rentRecords: state.rentRecords || [],
-      serviceBookings: state.serviceBookings || [],
 
       approveUser: state.approveUser,
       rejectUser: state.rejectUser,
@@ -391,8 +394,8 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
 
   return (
     <div className="space-y-6">
-      {/* Header with Switcher */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-border/50 pb-5">
+      {/* Keep Secretary-only branding out of Resident View. */}
+      {activeTab === "dashboard" && <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-border/50 pb-5">
         <div>
           <div className="flex items-center gap-2">
             <Building2 className="w-6 h-6 text-primary" />
@@ -410,7 +413,10 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
           <Button
             size="sm"
             variant={activeTab === "dashboard" ? "default" : "ghost"}
-            onClick={() => setActiveTab("dashboard")}
+            onClick={() => {
+              setSecretaryResidentView(false);
+              setActiveTab("dashboard");
+            }}
             className="rounded-lg h-9 text-xs px-4"
           >
             <Building2 className="w-3.5 h-3.5 mr-1.5" />
@@ -419,14 +425,17 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
           <Button
             size="sm"
             variant={activeTab === "resident" ? "default" : "ghost"}
-            onClick={() => setActiveTab("resident")}
+            onClick={() => {
+              setSecretaryResidentView(true);
+              setActiveTab("resident");
+            }}
             className="rounded-lg h-9 text-xs px-4"
           >
             <Users className="w-3.5 h-3.5 mr-1.5" />
             Resident View
           </Button>
         </div>
-      </div>
+      </div>}
 
       <AnimatePresence mode="wait">
         {activeTab === "resident" ? (
@@ -1372,70 +1381,6 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
                                         </Button>
                                       )}
                                     </div>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Service Request validation queue */}
-                  <div className="space-y-6">
-                    <Card className="border-border/50 shadow-sm">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base font-semibold">Service Request Validation</CardTitle>
-                        <CardDescription className="text-xs">
-                          Validate and forward community services bookings to Manager
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-0 max-h-[500px] overflow-y-auto">
-                        <div className="divide-y divide-border/50 text-xs">
-                          {serviceBookings.filter(b => b.status === "Pending" || b.status === "Pending Secretary Review").length === 0 ? (
-                            <div className="p-8 text-center text-muted-foreground">
-                              No service bookings awaiting validation.
-                            </div>
-                          ) : (
-                            serviceBookings.filter(b => b.status === "Pending" || b.status === "Pending Secretary Review").map((b) => {
-                              const notesVal = bookingAdminNotes[b.id] || "";
-                              return (
-                                <div key={b.id} className="p-3 hover:bg-secondary/15 space-y-2.5">
-                                  <div>
-                                    <span className="font-semibold text-foreground">Flat {b.address} • {b.category}</span>
-                                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                                      Requested Date: {b.bookingDate} at {b.bookingTime}
-                                    </p>
-                                  </div>
-                                  <Input
-                                    placeholder="Verify details / add note..."
-                                    value={notesVal}
-                                    onChange={(e) => setBookingAdminNotes(prev => ({ ...prev, [b.id]: e.target.value }))}
-                                    className="h-8 rounded-lg text-xs"
-                                  />
-                                  <div className="flex justify-end gap-1.5 pt-1">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-[10px] text-red-500 hover:bg-red-500/5 rounded-md"
-                                      onClick={async () => {
-                                        await useCommunityStore.getState().updateBookingStatus(b.id, "Rejected by Secretary");
-                                        alert("Service booking rejected.");
-                                      }}
-                                    >
-                                      Reject
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      className="h-7 text-[10px] rounded-md gradient-primary text-white border-0"
-                                      onClick={async () => {
-                                        await useCommunityStore.getState().forwardBooking(b.id, notesVal);
-                                        alert("Service request forwarded to Manager.");
-                                      }}
-                                    >
-                                      Forward to Manager
-                                    </Button>
                                   </div>
                                 </div>
                               );

@@ -29,7 +29,6 @@ interface FacilityConfig {
   name: string;
   category: string;
   hours: string;
-  maxAdvanceDays: number;
   description: string;
   image: string;
 }
@@ -40,7 +39,6 @@ const FACILITIES: FacilityConfig[] = [
     name: "Badminton Court",
     category: "Sports",
     hours: "06:00 AM - 10:00 PM",
-    maxAdvanceDays: 7,
     description: "Indoor synthetic court with professional lighting and ventilation.",
     image: "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&auto=format&fit=crop&q=80"
   },
@@ -49,7 +47,6 @@ const FACILITIES: FacilityConfig[] = [
     name: "Gymnasium & Fitness Center",
     category: "Fitness",
     hours: "06:00 AM - 10:00 PM",
-    maxAdvanceDays: 3,
     description: "Equipped with cardio stations, free weights, and crossfit accessories.",
     image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&auto=format&fit=crop&q=80"
   },
@@ -58,7 +55,6 @@ const FACILITIES: FacilityConfig[] = [
     name: "Swimming Pool",
     category: "Aquatics",
     hours: "06:30 AM - 09:30 PM",
-    maxAdvanceDays: 5,
     description: "Temperature-regulated half-Olympic swimming pool with shallow kids section.",
     image: "https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?w=600&auto=format&fit=crop&q=80"
   },
@@ -67,7 +63,6 @@ const FACILITIES: FacilityConfig[] = [
     name: "Clubhouse Lounge",
     category: "Recreation",
     hours: "08:00 AM - 11:00 PM",
-    maxAdvanceDays: 14,
     description: "Spacious community lounge for meetings, board games, and quiet work.",
     image: "https://images.unsplash.com/photo-1517502884422-41eaead166d4?w=600&auto=format&fit=crop&q=80"
   },
@@ -76,7 +71,6 @@ const FACILITIES: FacilityConfig[] = [
     name: "Community Banquet & Party Hall",
     category: "Events",
     hours: "10:00 AM - 11:00 PM",
-    maxAdvanceDays: 30,
     description: "Air-conditioned celebration hall with banquet tables and sound system.",
     image: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=600&auto=format&fit=crop&q=80"
   }
@@ -100,11 +94,15 @@ const TIME_SLOTS = [
 export default function FacilityBookingPage() {
   const { user, initialize } = useAuth();
   const {
-    facilityBookings, bookFacility, cancelFacilityBooking,
+    facilityBookings, facilityConfigurations, loadFacilityBookings, loadFacilityConfigurations,
+    bookFacility, cancelFacilityBooking,
     initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
       facilityBookings: state.facilityBookings || [],
+      facilityConfigurations: state.facilityConfigurations || [],
+      loadFacilityBookings: state.loadFacilityBookings,
+      loadFacilityConfigurations: state.loadFacilityConfigurations,
       bookFacility: state.bookFacility,
       cancelFacilityBooking: state.cancelFacilityBooking,
       initializeDb: state.initializeDb,
@@ -121,20 +119,30 @@ export default function FacilityBookingPage() {
 
   const [selectedFacility, setSelectedFacility] = useState(FACILITIES[0].name);
   const [selectedDate, setSelectedDate] = useState(todayStr);
-  const [selectedSlot, setSelectedSlot] = useState("");
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [bookingMessage, setBookingMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     initialize();
     initializeDb();
+    void loadFacilityConfigurations().catch(() => {});
+    void loadFacilityBookings().catch(() => {});
+    const refreshTimer = window.setInterval(() => {
+      void loadFacilityBookings().catch(() => {});
+      void loadFacilityConfigurations().catch(() => {});
+    }, 10000);
     setMounted(true);
-  }, [initialize, initializeDb]);
+    return () => window.clearInterval(refreshTimer);
+  }, [initialize, initializeDb, loadFacilityBookings, loadFacilityConfigurations]);
 
   if (!mounted) return null;
 
   // Selected facility object
   const activeFacilityObj = FACILITIES.find(f => f.name === selectedFacility) || FACILITIES[0];
+  const activeFacilityConfig = facilityConfigurations.find((f) => f.name === selectedFacility);
+  const availableSlots = activeFacilityConfig?.timeSlots || TIME_SLOTS;
+  const facilityOperational = activeFacilityConfig?.status !== "Maintenance";
 
   // Map of occupied slots on selected date for selected facility
   const activeBookingsForDate = facilityBookings.filter(
@@ -155,14 +163,18 @@ export default function FacilityBookingPage() {
       }
       return;
     }
-    setSelectedSlot(slot);
+    setSelectedSlots((current) => current.includes(slot) ? current.filter((item) => item !== slot) : [...current, slot]);
     setBookingMessage(null);
   };
 
   const handleConfirmBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSlot) {
-      setBookingMessage({ type: "error", text: "Please select an available time slot." });
+    if (!selectedSlots.length) {
+      setBookingMessage({ type: "error", text: "Please select at least one available time slot." });
+      return;
+    }
+    if (!facilityOperational) {
+      setBookingMessage({ type: "error", text: "This facility is currently unavailable." });
       return;
     }
 
@@ -172,19 +184,16 @@ export default function FacilityBookingPage() {
     try {
       const success = await bookFacility({
         facility: selectedFacility,
-        userId: user?.id || "resident-default",
-        userName: user?.name || "Resident",
-        unit: user?.unit || "A-101",
         date: selectedDate,
-        slot: selectedSlot
+        slots: selectedSlots
       });
 
       if (success) {
         setBookingMessage({
           type: "success",
-          text: `Booking confirmed for ${selectedFacility} on ${selectedDate} (${selectedSlot}).`
+          text: `Booking confirmed for ${selectedFacility} on ${selectedDate} (${selectedSlots.join(", ")}).`
         });
-        setSelectedSlot("");
+        setSelectedSlots([]);
       } else {
         setBookingMessage({
           type: "error",
@@ -194,7 +203,7 @@ export default function FacilityBookingPage() {
     } catch (err) {
       setBookingMessage({
         type: "error",
-        text: "Failed to confirm reservation. Please try again."
+        text: err instanceof Error ? err.message : "Failed to confirm reservation. Please try again."
       });
     } finally {
       setIsSubmitting(false);
@@ -209,7 +218,7 @@ export default function FacilityBookingPage() {
         text: "Reservation cancelled. The slot has been released for other residents."
       });
     } catch (err) {
-      setBookingMessage({ type: "error", text: "Failed to cancel booking." });
+      setBookingMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to cancel booking." });
     }
   };
 
@@ -259,7 +268,7 @@ export default function FacilityBookingPage() {
               type="button"
               onClick={() => {
                 setSelectedFacility(facility.name);
-                setSelectedSlot("");
+                setSelectedSlots([]);
                 setBookingMessage(null);
               }}
               className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between ${
@@ -280,7 +289,10 @@ export default function FacilityBookingPage() {
               </div>
               <div>
                 <h4 className="font-bold text-xs text-foreground line-clamp-1">{facility.name}</h4>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{facility.hours}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{facilityConfigurations.find((item) => item.name === facility.name)?.hours || facility.hours}</p>
+                    {facilityConfigurations.find((item) => item.name === facility.name)?.status === "Maintenance" && (
+                      <p className="text-[9px] text-amber-600 mt-1">Currently unavailable</p>
+                    )}
               </div>
             </button>
           );
@@ -296,7 +308,7 @@ export default function FacilityBookingPage() {
                 <div>
                   <CardTitle className="text-base font-bold text-foreground">Available Slots · {selectedFacility}</CardTitle>
                   <CardDescription className="text-xs">
-                    Operating Hours: {activeFacilityObj.hours} · Maximum Advance: {activeFacilityObj.maxAdvanceDays} days
+                    Operating Hours: {activeFacilityConfig?.hours || activeFacilityObj.hours}
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -307,7 +319,7 @@ export default function FacilityBookingPage() {
                     value={selectedDate}
                     onChange={(e) => {
                       setSelectedDate(e.target.value);
-                      setSelectedSlot("");
+                      setSelectedSlots([]);
                       setBookingMessage(null);
                     }}
                     className="h-9 w-40 text-xs rounded-xl bg-secondary/30 border-border/60"
@@ -340,11 +352,11 @@ export default function FacilityBookingPage() {
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {TIME_SLOTS.map((slot) => {
+                  {availableSlots.map((slot) => {
                     const booking = activeBookingsForDate.find(b => b.slot === slot);
                     const isOccupied = Boolean(booking);
                     const isMine = booking?.userId === user?.id;
-                    const isSelected = selectedSlot === slot;
+                    const isSelected = selectedSlots.includes(slot);
 
                     let buttonClass = "border-border/60 hover:border-primary/50 hover:bg-primary/5 text-foreground";
                     let statusLabel = "Available";
@@ -364,7 +376,7 @@ export default function FacilityBookingPage() {
                       <button
                         key={slot}
                         type="button"
-                        disabled={isOccupied}
+                        disabled={isOccupied || !facilityOperational}
                         onClick={() => handleSlotSelect(slot)}
                         className={`p-3 rounded-xl border text-left text-xs transition-all flex flex-col justify-between h-18 ${buttonClass}`}
                       >
@@ -384,19 +396,19 @@ export default function FacilityBookingPage() {
               {/* Booking Submission Form */}
               <form onSubmit={handleConfirmBooking} className="pt-4 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="text-xs text-muted-foreground">
-                  {selectedSlot ? (
+                  {selectedSlots.length ? (
                     <span>
-                      Reserving: <strong className="text-foreground">{selectedFacility}</strong> on{" "}
-                      <strong className="text-foreground">{selectedDate}</strong> ({selectedSlot})
+                      Reserving {selectedSlots.length} slot(s): <strong className="text-foreground">{selectedFacility}</strong> on{" "}
+                      <strong className="text-foreground">{selectedDate}</strong> ({selectedSlots.join(", ")})
                     </span>
                   ) : (
-                    <span>Please click any available slot above to proceed.</span>
+                    <span>{facilityOperational ? "Select one or more available slots above to proceed." : "This facility is currently unavailable."}</span>
                   )}
                 </div>
 
                 <Button
                   type="submit"
-                  disabled={!selectedSlot || isSubmitting}
+                  disabled={!selectedSlots.length || !facilityOperational || isSubmitting}
                   className="w-full sm:w-auto h-10 px-6 rounded-xl font-bold text-xs gradient-primary text-white border-0 shadow-md"
                 >
                   <CalendarPlus className="w-4 h-4 mr-1.5" />

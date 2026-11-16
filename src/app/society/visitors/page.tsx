@@ -529,11 +529,11 @@ export default function VisitorsPage() {
                       <div className="flex items-center gap-3.5">
                         <Avatar className="w-12 h-12 rounded-2xl border-2 border-primary/20 shadow-sm">
                           <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
-                            {pass.name.slice(0, 2).toUpperCase()}
+                            {String(pass.name || (pass as any).visitorName || "Visitor").slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <h3 className="font-extrabold text-base text-foreground line-clamp-1">{pass.name}</h3>
+                          <h3 className="font-extrabold text-base text-foreground line-clamp-1">{pass.name || (pass as any).visitorName || "Visitor"}</h3>
                           <Badge className="bg-primary/10 text-primary border-primary/20 text-[11px] font-bold mt-0.5">
                             {pass.passType || "Gate Pass"}
                           </Badge>
@@ -575,7 +575,7 @@ export default function VisitorsPage() {
                       </Button>
 
                       <Button
-                        onClick={() => handleRevokePass(pass.id, pass.name)}
+                        onClick={() => handleRevokePass(pass.id, pass.name || (pass as any).visitorName || "Visitor")}
                         variant="outline"
                         className="h-10 px-3.5 border-destructive/30 hover:bg-destructive/10 text-destructive text-xs font-semibold rounded-xl"
                         title="Revoke Gate Pass"
@@ -603,7 +603,7 @@ export default function VisitorsPage() {
                   <div key={pass.id} className="p-4 flex items-center justify-between text-xs hover:bg-secondary/10">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-foreground">{pass.name}</span>
+                        <span className="font-bold text-foreground">{pass.name || (pass as any).visitorName || "Visitor"}</span>
                         <Badge variant="outline" className="text-[10px] px-2 py-0">
                           {pass.passType}
                         </Badge>

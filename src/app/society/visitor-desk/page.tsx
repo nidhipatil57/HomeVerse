@@ -111,10 +111,17 @@ export default function SecurityVisitorDeskPage() {
 
   if (!mounted) return null;
 
-  // Filter expected visitors, checked in visitors (most recent first)
+  const isDeliveryEntry = (visitor: Visitor) =>
+    visitor.isDelivery === true ||
+    String(visitor.visitorType || "").toLowerCase().includes("delivery") ||
+    String(visitor.purpose || "").toLowerCase().includes("delivery");
+
+  // The gate queue contains resident-approved passes and delivery entries only.
   const expectedQueue = visitors
     .filter(
-      (v) => v.portal === "society" && (v.status === "approved" || v.status === "expected" || v.status === "pending" || v.status === "at-gate")
+      (v) => v.portal === "society" &&
+        (v.status === "approved" || v.status === "expected") &&
+        (v.approvedBy !== "Walk-In" || isDeliveryEntry(v))
     )
     .sort((a, b) => {
       const timeB = new Date(b.expectedAt || b.date || 0).getTime() || 0;
@@ -124,7 +131,9 @@ export default function SecurityVisitorDeskPage() {
   
   const checkedInQueue = visitors
     .filter(
-      (v) => v.portal === "society" && (v.status === "checked-in" || v.status === "inside")
+      (v) => v.portal === "society" &&
+        (v.status === "checked-in" || v.status === "inside") &&
+        (isDeliveryEntry(v) || /pre-approved|pass code verified/i.test(v.approvedBy || ""))
     )
     .sort((a, b) => {
       const timeB = new Date(b.checkInTime || b.expectedAt || b.date || 0).getTime() || 0;
@@ -628,8 +637,8 @@ export default function SecurityVisitorDeskPage() {
         <Card className="lg:col-span-8 border-border/50 bg-card flex flex-col h-[400px] overflow-hidden">
           <CardHeader className="border-b border-border/20 pb-3 flex flex-row justify-between items-center">
             <div>
-              <CardTitle className="text-base font-bold flex items-center gap-2"><Clock className="w-5 h-5 text-indigo-500" /> Pre-Approved Expected Arrivals</CardTitle>
-              <CardDescription>Scheduled visitor tickets verified from resident passes</CardDescription>
+              <CardTitle className="text-base font-bold flex items-center gap-2"><Clock className="w-5 h-5 text-indigo-500" /> Pre-Approved Visitors & Deliveries</CardTitle>
+              <CardDescription>Resident-approved visitor passes and delivery arrivals</CardDescription>
             </div>
             <Input
               placeholder="Search by Flat, Name, OTP..."
@@ -641,7 +650,7 @@ export default function SecurityVisitorDeskPage() {
           <CardContent className="p-4 flex-1 overflow-y-auto space-y-3">
             {filteredExpected.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground text-xs">
-                No scheduled guests queued at the gate.
+                No pre-approved visitors or delivery arrivals are currently expected.
               </div>
             ) : (
               filteredExpected.map((v) => (
@@ -691,13 +700,13 @@ export default function SecurityVisitorDeskPage() {
         {/* Active inside list */}
         <Card className="border-border/50 bg-card flex flex-col h-[400px] overflow-hidden">
           <CardHeader className="border-b border-border/20 pb-3">
-            <CardTitle className="text-base font-bold flex items-center gap-2"><Activity className="w-5 h-5 text-emerald-500" /> Active Inside Complex ({checkedInQueue.length})</CardTitle>
-            <CardDescription>Guests currently inside the society premises. Verify checkout on departure.</CardDescription>
+            <CardTitle className="text-base font-bold flex items-center gap-2"><Activity className="w-5 h-5 text-emerald-500" /> Active Visitors & Deliveries ({checkedInQueue.length})</CardTitle>
+            <CardDescription>Pre-approved visitors and delivery partners currently inside the society premises.</CardDescription>
           </CardHeader>
           <CardContent className="p-4 flex-1 overflow-y-auto space-y-2.5">
             {checkedInQueue.length === 0 ? (
               <div className="text-center py-20 text-xs text-muted-foreground">
-                No active visitors inside society.
+                No pre-approved visitors or delivery partners are currently inside.
               </div>
             ) : (
               checkedInQueue.map((v) => (

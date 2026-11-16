@@ -72,9 +72,12 @@ interface SidebarProps {
   items: { label: string; href: string; icon: string }[];
   portalName: string;
   portalType: "society" | "hostel";
+  roleOverride?: string;
+  modeSwitchLabel?: string;
+  onModeSwitch?: () => void;
 }
 
-export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalName, portalType: initialPortalType }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalName, portalType: initialPortalType, roleOverride, modeSwitchLabel, onModeSwitch }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -88,19 +91,19 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
 
   // Dynamic portal details based on active user role
   const activePortalType = mounted && user ? user.portal : initialPortalType;
-  const activeUserRole = mounted && user ? user.role : "resident";
+  const activeUserRole = mounted && user ? (roleOverride || user.role) : "resident";
 
   let portalName = initialPortalName;
   if (mounted && user) {
-    if (user.role === "manager") {
+    if (activeUserRole === "manager") {
       portalName = "Manager Portal";
-    } else if (user.role === "security") {
+    } else if (activeUserRole === "security") {
       portalName = "Security Portal";
-    } else if (user.role === "warden") {
+    } else if (activeUserRole === "warden") {
       portalName = "Warden Portal";
-    } else if (user.role === "student") {
+    } else if (activeUserRole === "student") {
       portalName = "Student Portal";
-    } else if (user.role === "secretary") {
+    } else if (activeUserRole === "secretary") {
       portalName = "Secretary Portal";
     } else {
       portalName = user.portal === "society" ? "Society Portal" : "Hostel Portal";
@@ -141,7 +144,7 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
     const parts = [];
     if (user.unit) parts.push(user.unit);
     if (user.workerCategory) parts.push(user.workerCategory);
-    parts.push(user.role.charAt(0).toUpperCase() + user.role.slice(1));
+    parts.push(activeUserRole.charAt(0).toUpperCase() + activeUserRole.slice(1));
     displaySubtitle = parts.join(" · ");
   }
 
@@ -270,6 +273,20 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
           </nav>
         );
       })()}
+
+      {modeSwitchLabel && onModeSwitch && (
+        <div className="px-2.5 pb-2 shrink-0">
+          <Button
+            variant="outline"
+            className={cn("w-full rounded-xl h-9 text-xs font-semibold", collapsed && "px-0")}
+            onClick={onModeSwitch}
+            title={modeSwitchLabel}
+          >
+            <Shield className="w-4 h-4 shrink-0" />
+            {!collapsed && <span>{modeSwitchLabel}</span>}
+          </Button>
+        </div>
+      )}
 
       <Separator />
 

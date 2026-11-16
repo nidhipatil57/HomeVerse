@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { DollarSign, Plus, ArrowUpRight, FileText } from "lucide-react";
+import { DollarSign, Plus, ArrowUpRight, FileText, Download, Receipt } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,14 +9,18 @@ import { Input } from "@/components/ui/input";
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function SecretaryExpensesPage() {
   const { user, initialize } = useAuth();
   const {
-    expenses, addExpense, initializeDb
+    expenses, maintenanceBills, payments, collections, addExpense, initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
       expenses: state.expenses || [],
+      maintenanceBills: state.maintenanceBills || [],
+      payments: state.payments || [],
+      collections: state.collections || [],
       addExpense: state.addExpense,
       initializeDb: state.initializeDb,
     }))
@@ -39,24 +43,43 @@ export default function SecretaryExpensesPage() {
 
   if (!mounted) return null;
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!expVendor || Number(expAmount) <= 0) return;
-    addExpense({
-      category: expCategory,
-      vendor: expVendor,
-      amount: Number(expAmount),
-      date: expDate,
-      notes: expNotes,
-      invoiceUrl: "/invoices/stub.pdf"
-    });
-    setExpVendor("");
-    setExpAmount("");
-    setExpNotes("");
-    alert("Expense recorded and logged successfully!");
+    try {
+      await addExpense({
+        category: expCategory,
+        vendor: expVendor,
+        amount: Number(expAmount),
+        date: expDate,
+        notes: expNotes,
+        invoiceUrl: "/invoices/stub.pdf"
+      });
+      setExpVendor("");
+      setExpAmount("");
+      setExpNotes("");
+      alert("Expense recorded and logged successfully!");
+    } catch (error: any) {
+      alert(error?.message || "Could not save this expense.");
+    }
   };
 
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+  const downloadCsv = (filename: string, headers: string[], rows: any[][]) => {
+    const csvCell = (value: any) => {
+      const text = String(value ?? "").replace(/\r?\n/g, " ");
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6">
@@ -68,6 +91,13 @@ export default function SecretaryExpensesPage() {
         </p>
       </div>
 
+      <Tabs defaultValue="ledger" className="space-y-5">
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
+          <TabsTrigger value="ledger">Expense Ledger</TabsTrigger>
+          <TabsTrigger value="reports">Financial Reports</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ledger" className="space-y-5">
       <div className="grid lg:grid-cols-12 gap-6">
         {/* Left Column: Form */}
         <Card className="lg:col-span-5 border-border/50 h-fit">
@@ -154,6 +184,80 @@ export default function SecretaryExpensesPage() {
           </Card>
         </div>
       </div>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-5">
+          <div>
+            <h2 className="text-lg font-bold">Financial Reports</h2>
+            <p className="text-sm text-muted-foreground mt-1">Export current society ledger data as CSV files.</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-5">
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2"><ArrowUpRight className="w-4 h-4 text-rose-500" /> Outgoing Expenses</CardTitle>
+                <CardDescription>{expenses.length} expense records · ₹{totalExpenses.toLocaleString()} total</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" onClick={() => downloadCsv(
+                  "society-expenses.csv",
+                  ["Date", "Category", "Vendor", "Amount", "Notes"],
+                  expenses.map((item) => [item.date, item.category, item.vendor, item.amount, item.notes])
+                )}>
+                  <Download className="w-4 h-4 mr-2" /> Download expense report
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2"><Receipt className="w-4 h-4 text-primary" /> Maintenance Bills</CardTitle>
+                <CardDescription>{maintenanceBills.length} billing records</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" onClick={() => downloadCsv(
+                  "maintenance-bills.csv",
+                  ["Flat", "Resident", "Month", "Amount", "Due Date", "Status"],
+                  maintenanceBills.map((item: any) => [item.unit, item.residentName, item.month, item.amount, item.dueDate, item.status])
+                )}>
+                  <Download className="w-4 h-4 mr-2" /> Download billing report
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2"><Receipt className="w-4 h-4 text-emerald-600" /> Payment Transactions</CardTitle>
+                <CardDescription>{payments.length} payment records</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" onClick={() => downloadCsv(
+                  "payment-transactions.csv",
+                  ["Date", "Resident", "Flat", "Type", "Amount", "Status", "Method", "Reference"],
+                  payments.map((item: any) => [item.paidDate || item.createdAt, item.residentName, item.unit, item.paymentType, item.amount, item.status, item.paymentMethod, item.referenceId])
+                )}>
+                  <Download className="w-4 h-4 mr-2" /> Download payments report
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2"><FileText className="w-4 h-4 text-blue-600" /> Collections</CardTitle>
+                <CardDescription>{collections.length} collection records</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" onClick={() => downloadCsv(
+                  "society-collections.csv",
+                  ["Title", "Description", "Amount", "Due Date", "Status"],
+                  collections.map((item: any) => [item.title || item.name, item.description, item.amount, item.dueDate, item.status])
+                )}>
+                  <Download className="w-4 h-4 mr-2" /> Download collections report
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

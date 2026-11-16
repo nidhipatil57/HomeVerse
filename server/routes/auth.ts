@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import prisma from "../config/db.js";
 import { authenticateToken } from "../middleware/auth.js";
 import { broadcastUpdate } from "../socket/index.js";
+import { getPrepopulatedUsers } from "../seed-data.js";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "homeverse-secret-key-12345";
@@ -17,13 +18,70 @@ router.post("/login", async (req, res) => {
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+    const normalizedEmail = email.trim().toLowerCase();
+    const demoUser = getPrepopulatedUsers().find((candidate: any) => candidate.email?.trim().toLowerCase() === normalizedEmail);
+    let user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    // Keep the built-in demo credentials usable even if a persisted demo account
+    // has an outdated hash or has not yet been created in this database.
+    const demoPasswordMatches = Boolean(
+      demoUser?.password &&
+      String(password).trim().toLowerCase() === String(demoUser.password).trim().toLowerCase()
+    );
+    if (demoUser && demoPasswordMatches) {
+      const { password: _demoPassword, ...demoProfile } = demoUser;
+      const demoData = {
+        ...demoProfile,
+        status: demoUser.status || "approved",
+        password: bcrypt.hashSync(String(demoUser.password), 10)
+      };
+      user = user
+        ? await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              name: demoData.name,
+              email: normalizedEmail,
+              phone: demoData.phone,
+              role: demoData.role,
+              portal: demoData.portal,
+              unit: demoData.unit,
+              building: demoData.building,
+              societyName: demoData.societyName,
+              hostelName: demoData.hostelName,
+              collegeName: demoData.collegeName,
+              communityCode: demoData.communityCode,
+              ownerOrTenant: demoData.ownerOrTenant,
+              joinedAt: demoData.joinedAt,
+              status: demoData.status,
+              password: demoData.password,
+              designation: demoData.designation,
+              committeeId: demoData.committeeId,
+              employeeId: demoData.employeeId,
+              workingShift: demoData.workingShift,
+              gate: demoData.gate,
+              gender: demoData.gender,
+              course: demoData.course,
+              year: demoData.year,
+              branch: demoData.branch,
+              assignedWing: demoData.assignedWing,
+              workerCategory: demoData.workerCategory,
+              availability: demoData.availability,
+              rating: demoData.rating,
+              experience: demoData.experience,
+              specializations: demoData.specializations || []
+            }
+          })
+        : await prisma.user.create({ data: { ...demoData, specializations: demoData.specializations || [] } });
+    }
+
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     let isValidPassword = false;
-    if (user.password) {
+    if (demoPasswordMatches) {
+      isValidPassword = true;
+    } else if (user.password) {
       if (user.password.startsWith("$2")) {
         try {
           isValidPassword = bcrypt.compareSync(password, user.password);

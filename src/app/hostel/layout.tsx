@@ -43,6 +43,7 @@ export default function HostelLayout({
 }) {
   const { user, isAuthenticated, initialize, isLoading } = useAuth();
   const initializeDb = useCommunityStore(state => state.initializeDb);
+  const isDataHydrated = useCommunityStore(state => state.isDataHydrated);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -78,7 +79,7 @@ export default function HostelLayout({
   }, [mounted, user, isAuthenticated, isLoading, pathname, router]);
 
   // Show loading spinner during session checks
-  if (!mounted || isLoading || !isAuthenticated || !user || user.portal !== "hostel") {
+  if (!mounted || isLoading || !isAuthenticated || !user || user.portal !== "hostel" || !isDataHydrated) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-primary" />

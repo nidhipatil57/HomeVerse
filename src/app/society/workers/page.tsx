@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/lib/store/useAuth";
+import { SocietySecurityStaffSection } from "@/components/dashboard/SocietySecurityStaffSection";
 
 export default function WorkersDirectoryPage() {
   const { user, initialize } = useAuth();
@@ -100,6 +101,8 @@ export default function WorkersDirectoryPage() {
       u.status === "pending"
     );
   }, [users]);
+
+  const societySecurityStaffCount = users.filter((u) => u.role === "security" && u.portal === "society").length;
 
   if (!mounted) return null;
 
@@ -198,7 +201,7 @@ export default function WorkersDirectoryPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-[family-name:var(--font-heading)]">Worker Directory</h1>
+          <h1 className="text-3xl font-bold font-[family-name:var(--font-heading)]">{isSecretary ? "Helpers" : "Worker Directory"}</h1>
           <p className="text-muted-foreground mt-1">
             {isManager
               ? "Maintain verified workers, configure availability, set charges, and upload verification records."
@@ -213,7 +216,7 @@ export default function WorkersDirectoryPage() {
       </div>
 
       <Tabs defaultValue="roster" className="w-full">
-        <TabsList className="grid grid-cols-3 w-full md:w-[500px] h-12 bg-secondary/30 rounded-2xl p-1 mb-6">
+        <TabsList className="grid grid-cols-4 w-full md:w-[680px] h-12 bg-secondary/30 rounded-2xl p-1 mb-6">
           <TabsTrigger value="roster" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
             Active Directory ({approvedWorkers.length})
           </TabsTrigger>
@@ -222,6 +225,9 @@ export default function WorkersDirectoryPage() {
           </TabsTrigger>
           <TabsTrigger value="stats" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
             Roster Analytics
+          </TabsTrigger>
+          <TabsTrigger value="security" className="rounded-xl text-xs font-bold transition-all data-[state=active]:gradient-primary data-[state=active]:text-white">
+            Security Staff ({societySecurityStaffCount})
           </TabsTrigger>
         </TabsList>
 
@@ -433,6 +439,10 @@ export default function WorkersDirectoryPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="security" className="outline-none">
+          <SocietySecurityStaffSection />
         </TabsContent>
       </Tabs>
 

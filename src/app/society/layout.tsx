@@ -41,7 +41,6 @@ const getAllowedPaths = (role: string): string[] => {
         "/society/dashboard",
         "/society/ai-assistant",
         "/society/complaints",
-        "/society/services",
         "/society/workers",
         "/society/schedules",
         "/society/daily-operations",
@@ -55,7 +54,6 @@ const getAllowedPaths = (role: string): string[] => {
         "/society/maintenance",
         "/society/maintenance-bills-mgmt",
         "/society/payment-gateway",
-        "/society/events",
         "/society/announcements",
         "/society/notifications",
         "/society/settings"
@@ -81,7 +79,24 @@ const getAllowedPaths = (role: string): string[] => {
       ];
     case "secretary":
       return [
-        "/society"
+        "/society/dashboard",
+        "/society/ai-assistant",
+        "/society/residents",
+        "/society/buildings",
+        "/society/flats",
+        "/society/workers",
+        "/society/security-staff",
+        "/society/visitors",
+        "/society/complaints",
+        "/society/payments",
+        "/society/financial-reports",
+        "/society/expenses",
+        "/society/analytics",
+        "/society/announcements",
+        "/society/events-mgmt",
+        "/society/approvals",
+        "/society/notifications",
+        "/society/settings"
       ];
     case "worker":
       return [
@@ -107,6 +122,9 @@ export default function SocietyLayout({
 }) {
   const { user, isAuthenticated, initialize, isLoading } = useAuth();
   const initializeDb = useCommunityStore(state => state.initializeDb);
+  const isDataHydrated = useCommunityStore(state => state.isDataHydrated);
+  const secretaryResidentView = useCommunityStore(state => state.secretaryResidentView);
+  const setSecretaryResidentView = useCommunityStore(state => state.setSecretaryResidentView);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -134,15 +152,16 @@ export default function SocietyLayout({
     }
 
     // 3. Role Authorization check
-    const allowedPaths = getAllowedPaths(user.role);
+    const effectiveRole = user.role === "secretary" && secretaryResidentView ? "resident" : user.role;
+    const allowedPaths = getAllowedPaths(effectiveRole);
     const isAllowed = allowedPaths.some(path => pathname.startsWith(path));
     if (!isAllowed) {
       router.replace("/society/dashboard");
     }
-  }, [mounted, user, isAuthenticated, isLoading, pathname, router]);
+  }, [mounted, user, isAuthenticated, isLoading, pathname, router, secretaryResidentView]);
 
   // Show loading spinner during session checks
-  if (!mounted || isLoading || !isAuthenticated || !user || user.portal !== "society") {
+  if (!mounted || isLoading || !isAuthenticated || !user || user.portal !== "society" || !isDataHydrated) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-primary" />
@@ -151,24 +170,26 @@ export default function SocietyLayout({
   }
 
   // Prevent rendering if role and path mismatch
-  const allowedPaths = getAllowedPaths(user.role);
+  const isSecretaryResidentView = user.role === "secretary" && secretaryResidentView;
+  const effectiveRole = isSecretaryResidentView ? "resident" : user.role;
+  const allowedPaths = getAllowedPaths(effectiveRole);
   if (!allowedPaths.some(path => pathname.startsWith(path))) {
     return null;
   }
 
-  const items = user.role === "manager" 
-    ? MANAGER_SIDEBAR_ITEMS 
-    : user.role === "security" 
+  const items = effectiveRole === "manager"
+    ? MANAGER_SIDEBAR_ITEMS
+    : effectiveRole === "security"
       ? SECURITY_SIDEBAR_ITEMS 
-      : user.role === "secretary"
+      : effectiveRole === "secretary"
         ? SECRETARY_SIDEBAR_ITEMS
         : SOCIETY_SIDEBAR_ITEMS;
 
-  const portalName = user.role === "manager" 
-    ? "Manager Portal" 
-    : user.role === "security" 
+  const portalName = effectiveRole === "manager"
+    ? "Manager Portal"
+    : effectiveRole === "security"
       ? "Security Portal" 
-      : user.role === "secretary"
+      : effectiveRole === "secretary"
         ? "Secretary Portal"
         : "Society Portal";
 
@@ -178,6 +199,12 @@ export default function SocietyLayout({
         items={items}
         portalName={portalName}
         portalType="society"
+        roleOverride={isSecretaryResidentView ? "resident" : undefined}
+        modeSwitchLabel={isSecretaryResidentView ? "Secretary Portal" : undefined}
+        onModeSwitch={isSecretaryResidentView ? () => {
+          setSecretaryResidentView(false);
+          router.push("/society/dashboard");
+        } : undefined}
       />
       <main className="pl-[72px] md:pl-[280px] transition-all duration-300">
         <div className="max-w-[1600px] mx-auto p-6 lg:p-8">

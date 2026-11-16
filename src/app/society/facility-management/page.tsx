@@ -43,11 +43,15 @@ const INITIAL_FACILITIES: FacilityConfigItem[] = [
 export default function ManagerFacilityOperationsPage() {
   const { user, initialize } = useAuth();
   const {
-    facilityBookings, cancelFacilityBooking, initializeDb
+    facilityBookings, facilityConfigurations, loadFacilityBookings, loadFacilityConfigurations,
+    updateFacilityConfigurationStatus, initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
       facilityBookings: state.facilityBookings || [],
-      cancelFacilityBooking: state.cancelFacilityBooking,
+      facilityConfigurations: state.facilityConfigurations || [],
+      loadFacilityBookings: state.loadFacilityBookings,
+      loadFacilityConfigurations: state.loadFacilityConfigurations,
+      updateFacilityConfigurationStatus: state.updateFacilityConfigurationStatus,
       initializeDb: state.initializeDb,
     }))
   );
@@ -64,13 +68,30 @@ export default function ManagerFacilityOperationsPage() {
   useEffect(() => {
     initialize();
     initializeDb();
+    void loadFacilityConfigurations().then((configured) => {
+      setFacilities(INITIAL_FACILITIES.map((facility) => {
+        const saved = configured.find((item) => item.name === facility.name);
+        return saved ? { ...facility, ...saved } : facility;
+      }));
+    }).catch(() => {});
+    void loadFacilityBookings().catch(() => {});
+    const refreshTimer = window.setInterval(() => {
+      void loadFacilityBookings().catch(() => {});
+      void loadFacilityConfigurations().then((configured) => {
+        setFacilities(INITIAL_FACILITIES.map((facility) => {
+          const saved = configured.find((item) => item.name === facility.name);
+          return saved ? { ...facility, ...saved } : facility;
+        }));
+      }).catch(() => {});
+    }, 10000);
     setMounted(true);
-  }, [initialize, initializeDb]);
+    return () => window.clearInterval(refreshTimer);
+  }, [initialize, initializeDb, loadFacilityBookings, loadFacilityConfigurations]);
 
   if (!mounted) return null;
 
   // Filter bookings for the operational calendar view
-  const filteredBookings = facilityBookings.filter((b) => {
+  const occupiedBookings = facilityBookings.filter((b) => {
     const matchesDate = !filterDate || b.date === filterDate;
     const matchesFacility = filterFacility === "All" || b.facility === filterFacility;
     const matchesSearch =
@@ -80,15 +101,51 @@ export default function ManagerFacilityOperationsPage() {
     return matchesDate && matchesFacility && matchesSearch;
   });
 
-  const toggleFacilityStatus = (id: string) => {
-    setFacilities((prev) =>
-      prev.map((f) =>
-        f.id === id
-          ? { ...f, status: f.status === "Operational" ? "Maintenance" : "Operational" }
-          : f
-      )
-    );
+  const toggleFacilityStatus = async (id: string, name: string) => {
+    const facility = facilities.find((item) => item.id === id);
+    const config = facilityConfigurations.find((item) => item.name === name);
+    if (!facility || !config) return;
+    const status = facility.status === "Operational" ? "Maintenance" : "Operational";
+    try {
+      await updateFacilityConfigurationStatus(config.id, status);
+      setFacilities((prev) => prev.map((item) => item.id === id ? { ...item, status } : item));
+    } catch (error) {
+      console.error("Could not update facility availability:", error);
+    }
   };
+
+  const availableSlots = filterDate
+    ? facilities.filter((facility) =>
+        facility.status === "Operational" && (filterFacility === "All" || facility.name === filterFacility)
+      ).flatMap((facility) => {
+        const config = facilityConfigurations.find((item) => item.name === facility.name);
+        return (config?.timeSlots || []).filter((slot) => !facilityBookings.some((booking) =>
+          booking.facility === facility.name && booking.date === filterDate && booking.slot === slot && booking.status === "booked"
+        )).map((slot) => ({
+          id: `available-${facility.id}-${filterDate}-${slot}`,
+          facility: facility.name,
+          userId: "",
+          userName: "Available",
+          unit: "—",
+          date: filterDate,
+          slot,
+          status: "available" as const
+        }));
+      }).filter((booking) => {
+        const query = searchQuery.toLowerCase();
+        return !query || booking.facility.toLowerCase().includes(query) || booking.slot.toLowerCase().includes(query);
+      })
+    : [];
+  const slotStartMinutes = (slot: string) => {
+    const match = slot.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return 0;
+    let hour = Number(match[1]) % 12;
+    if (match[3].toUpperCase() === "PM") hour += 12;
+    return hour * 60 + Number(match[2]);
+  };
+  const filteredBookings = [...occupiedBookings, ...availableSlots].sort((a, b) =>
+    a.facility.localeCompare(b.facility) || slotStartMinutes(a.slot) - slotStartMinutes(b.slot)
+  );
 
   return (
     <div className="space-y-6">
@@ -191,7 +248,7 @@ export default function ManagerFacilityOperationsPage() {
                 <div>
                   <CardTitle className="text-base font-bold text-foreground">Operational Roster & Occupied Slots</CardTitle>
                   <CardDescription className="text-xs">
-                    Showing {filteredBookings.length} scheduled reservations
+                    Showing {filteredBookings.length} occupied and available slots
                   </CardDescription>
                 </div>
                 <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-bold">
@@ -237,6 +294,10 @@ export default function ManagerFacilityOperationsPage() {
                             <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
                               Confirmed (Auto)
                             </Badge>
+                          ) : b.status === "available" ? (
+                            <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[10px] font-bold">
+                              Available
+                            </Badge>
                           ) : (
                             <Badge className="bg-muted text-muted-foreground border text-[10px] font-bold">
                               Cancelled
@@ -248,14 +309,11 @@ export default function ManagerFacilityOperationsPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
-                                if (confirm(`Manager Action: Release slot for ${b.facility} (${b.slot})?`)) {
-                                  cancelFacilityBooking(b.id);
-                                }
-                              }}
-                              className="h-7 text-[11px] text-red-500 hover:bg-red-500/10 rounded-lg"
+                              disabled
+                              title="Managers have read-only booking visibility"
+                              className="h-7 text-[11px] text-muted-foreground rounded-lg"
                             >
-                              Release Slot
+                              View Only
                             </Button>
                           )}
                         </td>
@@ -314,7 +372,7 @@ export default function ManagerFacilityOperationsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => toggleFacilityStatus(fac.id)}
+                        onClick={() => void toggleFacilityStatus(fac.id, fac.name)}
                         className="h-8 text-xs rounded-xl border-border/60"
                       >
                         {fac.status === "Operational" ? "Set to Maintenance" : "Set Operational"}

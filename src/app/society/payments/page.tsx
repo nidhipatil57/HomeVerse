@@ -1119,7 +1119,7 @@ export default function PaymentsPage() {
                         {editingColl ? "Save Changes" : "Publish Program"}
                       </Button>
                       {editingColl && (
-                        <Button variant="outline" onClick={() => setEditingColl(null)} className="h-9 rounded-xl">
+                        <Button type="button" variant="outline" onClick={() => setEditingColl(null)} className="h-9 rounded-xl">
                           Cancel
                         </Button>
                       )}

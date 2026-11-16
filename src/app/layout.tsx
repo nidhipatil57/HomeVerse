@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { MutationRequestGuard } from "@/components/providers/MutationRequestGuard";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -62,6 +63,7 @@ export default function RootLayout({
           disableTransitionOnChange={false}
         >
           <TooltipProvider delay={200}>
+            <MutationRequestGuard />
             {children}
           </TooltipProvider>
         </ThemeProvider>
