@@ -6,18 +6,8 @@ import { useCommunityStore } from "@/lib/store/useCommunityStore";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
-// Dynamically import the role-specific dashboards to reduce compile time and bundle size
-const SocietyResidentDashboard = dynamic(
-  () => import("@/components/dashboard/SocietyResidentDashboard").then((m) => m.SocietyResidentDashboard),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-primary" />
-      </div>
-    )
-  }
-);
+import { SocietyResidentDashboard } from "@/components/dashboard/SocietyResidentDashboard";
+import { SocietySecretaryDashboard } from "@/components/dashboard/SocietySecretaryDashboard";
 
 const SocietyManagerDashboard = dynamic(
   () => import("@/components/dashboard/SocietyManagerDashboard").then((m) => m.SocietyManagerDashboard),
@@ -33,18 +23,6 @@ const SocietyManagerDashboard = dynamic(
 
 const SocietySecurityDashboard = dynamic(
   () => import("@/components/dashboard/SocietySecurityDashboard").then((m) => m.SocietySecurityDashboard),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-primary" />
-      </div>
-    )
-  }
-);
-
-const SocietySecretaryDashboard = dynamic(
-  () => import("@/components/dashboard/SocietySecretaryDashboard").then((m) => m.SocietySecretaryDashboard),
   {
     ssr: false,
     loading: () => (

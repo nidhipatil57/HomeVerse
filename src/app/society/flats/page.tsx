@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Building2, Plus, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,11 @@ import { useAuth } from "@/lib/store/useAuth";
 export default function SecretaryFlatsPage() {
   const { user, initialize } = useAuth();
   const {
-    flats, addFlat, initializeDb
+    flats, users, addFlat, initializeDb
   } = useCommunityStore(
     useShallow((state) => ({
       flats: state.flats || [],
+      users: state.users || [],
       addFlat: state.addFlat,
       initializeDb: state.initializeDb,
     }))
@@ -37,6 +38,43 @@ export default function SecretaryFlatsPage() {
     setMounted(true);
   }, [initialize, initializeDb]);
 
+  const sortedFlats = useMemo(() => {
+    return flats
+      .map(f => {
+        const flatDigits = (f.flatNumber || "").replace(/\D/g, "");
+        const flatWing = (f.wing || f.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || "";
+
+        const matchingResident = users.find(u => {
+          if (u.role !== "resident" && u.role !== "secretary") return false;
+          const uDigits = (u.unit || "").replace(/\D/g, "");
+          const uWing = (u.building || u.unit || "").match(/[ABC]/i)?.[0]?.toUpperCase() || "";
+          return uDigits === flatDigits && (!uWing || !flatWing || uWing === flatWing);
+        });
+
+        const isOccupied = Boolean(matchingResident) || f.status === "occupied";
+        const resName = matchingResident?.name || f.residentName || (isOccupied ? "Resident Assigned" : undefined);
+
+        return {
+          ...f,
+          status: isOccupied ? ("occupied" as const) : ("vacant" as const),
+          residentName: resName
+        };
+      })
+      .filter(f => 
+        f.flatNumber.includes(search) || 
+        f.building.toLowerCase().includes(search.toLowerCase()) ||
+        (f.residentName && f.residentName.toLowerCase().includes(search.toLowerCase()))
+      )
+      .sort((a, b) => {
+        const wingA = (a.wing || a.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || "A";
+        const wingB = (b.wing || b.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || "A";
+        if (wingA !== wingB) return wingA.localeCompare(wingB);
+        const numA = parseInt((a.flatNumber || "").replace(/\D/g, "") || "0", 10);
+        const numB = parseInt((b.flatNumber || "").replace(/\D/g, "") || "0", 10);
+        return numA - numB;
+      });
+  }, [flats, users, search]);
+
   if (!mounted) return null;
 
   const handleAddFlat = (e: React.FormEvent) => {
@@ -52,11 +90,6 @@ export default function SecretaryFlatsPage() {
     setFlatNo("");
     alert(`Flat ${wing}-${flatNo} added successfully!`);
   };
-
-  const filteredFlats = flats.filter(f => 
-    f.flatNumber.includes(search) || 
-    f.building.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="space-y-6">
@@ -87,7 +120,7 @@ export default function SecretaryFlatsPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border/30 max-h-[500px] overflow-y-auto">
-                {filteredFlats.map((f) => (
+                {sortedFlats.map((f: any) => (
                   <div key={f.id} className="p-4 flex items-center justify-between hover:bg-secondary/15 transition-colors text-xs">
                     <div>
                       <h4 className="font-bold">Flat {f.wing}-{f.flatNumber}</h4>
@@ -101,7 +134,7 @@ export default function SecretaryFlatsPage() {
                     </Badge>
                   </div>
                 ))}
-                {filteredFlats.length === 0 && (
+                {sortedFlats.length === 0 && (
                   <div className="text-center py-20 text-muted-foreground text-xs">
                     No matching flats found in registry.
                   </div>

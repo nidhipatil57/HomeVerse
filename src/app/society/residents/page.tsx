@@ -42,13 +42,22 @@ export default function SecretaryResidentsPage() {
   }, [initialize, initializeDb]);
 
   const filteredResidents = useMemo(() => {
-    return users.filter(u => 
-      u.role === "resident" && 
-      u.status !== "pending" &&
-      (u.name.toLowerCase().includes(residentSearch.toLowerCase()) || 
-       (u.unit && u.unit.includes(residentSearch)) ||
-       (u.building && u.building.toLowerCase().includes(residentSearch.toLowerCase())))
-    );
+    return users
+      .filter(u =>
+        (u.role === "resident" || (u.role === "secretary" && u.unit)) &&
+        u.status !== "pending" &&
+        (u.name.toLowerCase().includes(residentSearch.toLowerCase()) ||
+          (u.unit && u.unit.includes(residentSearch)) ||
+          (u.building && u.building.toLowerCase().includes(residentSearch.toLowerCase())))
+      )
+      .sort((a, b) => {
+        const wingA = (a.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || (a.unit || "").match(/^[ABC]/i)?.[0]?.toUpperCase() || "A";
+        const wingB = (b.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || (b.unit || "").match(/^[ABC]/i)?.[0]?.toUpperCase() || "A";
+        if (wingA !== wingB) return wingA.localeCompare(wingB);
+        const numA = parseInt((a.unit || "").replace(/\D/g, "") || "0", 10);
+        const numB = parseInt((b.unit || "").replace(/\D/g, "") || "0", 10);
+        return numA - numB;
+      });
   }, [users, residentSearch]);
 
   if (!mounted) return null;
@@ -73,14 +82,6 @@ export default function SecretaryResidentsPage() {
       status: "approved" as const
     };
     addRegisteredUser(newUser);
-
-    // Update flat database status
-    const matchFlat = flats.find(f => f.flatNumber === flat && f.building === building);
-    if (matchFlat) {
-      useCommunityStore.setState(state => ({
-        flats: state.flats.map(f => f.id === matchFlat.id ? { ...f, status: "occupied", residentId: newUser.id, residentName: name } : f)
-      }));
-    }
 
     setName("");
     setPhone("");
@@ -121,12 +122,15 @@ export default function SecretaryResidentsPage() {
                 {filteredResidents.map((r) => (
                   <div key={r.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-secondary/20 transition-colors">
                     <div>
-                      <h4 className="text-xs font-bold">{r.name}</h4>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        Unit: <strong>{r.building} • Flat {r.unit}</strong> | Mobile: {r.phone} | Joined: {r.joinedAt || "July 2026"}
-                      </p>
-                      <p className="text-[9px] text-muted-foreground mt-0.5">
-                        Status: <Badge variant="outline" className="text-[8px] py-0">{r.ownerOrTenant || "Tenant"}</Badge>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                          {((r.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || "A")}-{r.unit?.replace(/^[A-Za-z\s-]+/, '') || r.unit}
+                        </span>
+                        <h4 className="text-xs font-bold">{r.name}</h4>
+                        <Badge variant="outline" className="text-[9px] py-0">{r.ownerOrTenant || (r.role === "secretary" ? "Secretary" : "Owner")}</Badge>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Unit: <strong>{r.building} • Flat {r.unit}</strong> | Mobile: {r.phone} | Joined: {r.joinedAt || "Jan 2026"}
                       </p>
                     </div>
 
@@ -138,11 +142,10 @@ export default function SecretaryResidentsPage() {
                           activateDeactivateUser(r.id, r.status === "approved" ? "deactivated" : "approved");
                           alert(`Account status updated for ${r.name}`);
                         }}
-                        className={`h-8 text-[10px] rounded-lg flex items-center gap-1 ${
-                          r.status === "approved" 
-                            ? "border-amber-500/25 text-amber-500 hover:bg-amber-500/10" 
+                        className={`h-8 text-[10px] rounded-lg flex items-center gap-1 ${r.status === "approved"
+                            ? "border-amber-500/25 text-amber-500 hover:bg-amber-500/10"
                             : "border-green-500/25 text-green-500 hover:bg-green-500/10"
-                        }`}
+                          }`}
                       >
                         <Power className="w-3 h-3" />
                         {r.status === "approved" ? "Deactivate" : "Activate"}

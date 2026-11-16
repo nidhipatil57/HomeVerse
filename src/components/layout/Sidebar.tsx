@@ -159,7 +159,7 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
       className="fixed left-0 top-0 bottom-0 z-40 flex flex-col border-r border-border/50 bg-sidebar"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 h-13 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 h-12 shrink-0">
         <AnimatePresence mode="wait">
           {!collapsed && (
             <motion.div
@@ -206,8 +206,8 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
         return (
           <nav
             className={cn(
-              "flex-1 px-2.5 py-2 min-h-0 overflow-y-auto scrollbar-none",
-              isDenseList ? "flex flex-col justify-between" : "space-y-1"
+              "flex-1 px-2.5 py-1.5 min-h-0 flex flex-col justify-between overflow-hidden",
+              !isDenseList && "space-y-1 justify-start overflow-y-auto"
             )}
           >
             {items.map((item) => {
@@ -219,8 +219,8 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-3 rounded-xl text-[13px] font-medium transition-all duration-200 group relative",
-                    isDenseList ? "flex-1 min-h-[30px] max-h-[46px]" : "h-10",
+                    "flex items-center gap-2.5 px-3 rounded-xl text-[13px] font-medium transition-all duration-150 group relative",
+                    isDenseList ? "flex-1 min-h-0 max-h-[46px] my-px" : "h-10",
                     collapsed && "justify-center px-0",
                     isActive
                       ? "bg-primary/10 text-primary shadow-xs font-semibold"
@@ -274,7 +274,7 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
       <Separator />
 
       {/* Footer */}
-      <div className="p-2.5 shrink-0">
+      <div className="px-3 py-2 shrink-0">
         <div className={cn("flex items-center gap-2.5", collapsed && "justify-center")}>
           <Avatar className="w-8 h-8 shrink-0">
             <AvatarFallback className="text-[11px] font-bold gradient-primary text-white">

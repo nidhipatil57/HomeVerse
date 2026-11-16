@@ -1092,11 +1092,11 @@ export default function BuySellPage() {
           </div>
 
           <div className="space-y-3">
-            {(enquirySubTab === "received" ? receivedEnquiries : sentEnquiries).map((enq) => {
+            {(enquirySubTab === "received" ? receivedEnquiries : sentEnquiries).map((enq, idx) => {
               const matchedItem = marketplaceItems.find((i) => i.id === enq.itemId);
 
               return (
-                <Card key={enq.id} className="p-4 border-border/60 rounded-2xl bg-card shadow-sm space-y-3">
+                <Card key={enq.id ? `${enq.id}-${idx}` : `enq-${idx}`} className="p-4 border-border/60 rounded-2xl bg-card shadow-sm space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border/30 pb-2.5">
                     <div>
                       <div className="flex items-center gap-2">
@@ -1621,16 +1621,16 @@ export default function BuySellPage() {
                           <MessageSquare className="w-3.5 h-3.5 text-blue-600" /> Received Enquiries ({itemEnqs.length})
                         </h4>
                         <div className="space-y-2 max-h-40 overflow-y-auto divide-y divide-border/20">
-                          {itemEnqs.map((enq) => (
-                            <div key={enq.id} className="pt-2 text-[11px] space-y-1">
+                          {itemEnqs.map((enq, eIdx) => (
+                            <div key={enq.id ? `${enq.id}-${eIdx}` : `item-enq-${eIdx}`} className="pt-2 text-[11px] space-y-1">
                               <div className="flex justify-between font-bold">
                                 <span>{enq.buyerName} ({enq.buyerFlat || "Flat"})</span>
                                 <span className="text-[10px] text-muted-foreground">{formatItemDate(enq.createdAt)}</span>
                               </div>
                               <p className="text-muted-foreground italic">"{enq.message}"</p>
                               {enq.buyerPhone && (
-                                <a href={`tel:${enq.buyerPhone}`} className="text-blue-600 hover:underline inline-block">
-                                  📞 {enq.buyerPhone}
+                                <a href={`tel:${enq.buyerPhone}`} className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                                  <Phone className="w-3 h-3" /> {enq.buyerPhone}
                                 </a>
                               )}
                             </div>

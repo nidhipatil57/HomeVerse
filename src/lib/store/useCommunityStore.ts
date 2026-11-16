@@ -896,8 +896,8 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           localStorage.setItem(FRESH_PAYMENTS_KEY, "true");
         }
 
-        // Clear all previous dummy marketplace records once to start 100% fresh
-        const FRESH_MARKETPLACE_KEY = "homeverse_fresh_marketplace_clean_2026_v1";
+        // Clear all previous dummy marketplace records once to start 100% fresh and prevent duplicate key collisions
+        const FRESH_MARKETPLACE_KEY = "homeverse_fresh_marketplace_clean_2026_v2";
         if (localStorage.getItem(FRESH_MARKETPLACE_KEY) !== "true") {
           localStorage.removeItem("homeverse_marketplaceItems");
           localStorage.removeItem("homeverse_marketplaceEnquiries");
@@ -1168,6 +1168,26 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                     helperMap.set(h.id, prev ? { ...prev, ...h } : h);
                   }
                   data = Array.from(helperMap.values());
+                }
+
+                if (key === "users" && Array.isArray(data)) {
+                  const currentUsers = (get() as any).users || getPrepopulatedUsers();
+                  const userMap = new Map((currentUsers || []).map((u: any) => [u.id, u]));
+                  for (const u of data) {
+                    const prev = userMap.get(u.id);
+                    userMap.set(u.id, prev ? { ...prev, ...u } : u);
+                  }
+                  data = Array.from(userMap.values());
+                }
+
+                if (key === "flats" && Array.isArray(data)) {
+                  const currentFlats = (get() as any).flats || getPrepopulatedFlats();
+                  const flatMap = new Map((currentFlats || []).map((f: any) => [f.id, f]));
+                  for (const f of data) {
+                    const prev = flatMap.get(f.id);
+                    flatMap.set(f.id, prev ? { ...prev, ...f } : f);
+                  }
+                  data = Array.from(flatMap.values());
                 }
 
                 if (Array.isArray(data) && (data.length > 0 || key === "complaints" || key === "notifications" || key === "collections" || key === "payments")) {
@@ -1790,11 +1810,54 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   saveDb: () => {},
 
   addRegisteredUser: async (u) => {
-    await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(u)
+    // 1. Immediately update Zustand store & persist to localStorage
+    set((state) => {
+      const exists = state.users.some(user => user.id === u.id || (user.email && user.email.toLowerCase() === u.email.toLowerCase()));
+      const updatedUsers = exists ? state.users.map(user => user.id === u.id ? { ...user, ...u } : user) : [...state.users, u];
+
+      // Auto-occupy or register the flat for this resident
+      let updatedFlats = state.flats;
+      if (u.unit) {
+        const flatNum = (u.unit || "").replace(/^[A-Za-z\s-]+/, '').trim();
+        const wing = (u.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || "A";
+        const building = u.building || `${wing} Wing`;
+        const flatIdx = state.flats.findIndex(f => f.flatNumber === flatNum && (f.wing === wing || f.building === building));
+        if (flatIdx >= 0) {
+          updatedFlats = state.flats.map((f, i) => i === flatIdx ? { ...f, status: "occupied", residentId: u.id, residentName: u.name } : f);
+        } else {
+          updatedFlats = [
+            ...state.flats,
+            {
+              id: `FL-${wing}${flatNum}`,
+              building,
+              wing,
+              floor: parseInt(flatNum[0] || "1", 10),
+              flatNumber: flatNum,
+              status: "occupied",
+              residentId: u.id,
+              residentName: u.name
+            }
+          ];
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_users", JSON.stringify(updatedUsers));
+          localStorage.setItem("homeverse_flats", JSON.stringify(updatedFlats));
+        } catch (e) {}
+      }
+      return { users: updatedUsers, flats: updatedFlats };
     });
+
+    // 2. Background API persistence
+    try {
+      await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(u)
+      });
+    } catch (e) {}
   },
 
   addComplaint: async (c) => {
@@ -3764,24 +3827,59 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   activateDeactivateUser: async (userId, status) => {
-    const res = await fetch(`/api/users/${userId}/status`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status })
+    set((state) => {
+      const updatedUsers = state.users.map((u) => (u.id === userId ? { ...u, status } : u));
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_users", JSON.stringify(updatedUsers));
+        } catch (e) {}
+      }
+      return { users: updatedUsers };
     });
-    if (res.ok) {
-      set((state) => ({
-        users: state.users.map((u) => (u.id === userId ? { ...u, status } : u))
-      }));
-    }
+    try {
+      await fetch(`/api/users/${userId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+    } catch (e) {}
   },
 
   addFlat: async (flat) => {
-    await fetch("/api/flats", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(flat)
+    const flatNum = (flat.flatNumber || "").trim();
+    const wing = (flat.wing || flat.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || "A";
+    const building = flat.building || `${wing} Wing`;
+    const newFlat: FlatInfo = {
+      id: `FL-${wing}${flatNum}`,
+      building,
+      wing,
+      floor: Number(flat.floor) || 1,
+      flatNumber: flatNum,
+      status: flat.status || "vacant",
+      residentId: flat.residentId,
+      residentName: flat.residentName,
+    };
+
+    set((state) => {
+      const exists = state.flats.some(f => f.flatNumber === flatNum && (f.wing === wing || f.building === building));
+      const updatedFlats = exists
+        ? state.flats.map(f => (f.flatNumber === flatNum && (f.wing === wing || f.building === building)) ? { ...f, ...newFlat } : f)
+        : [...state.flats, newFlat];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_flats", JSON.stringify(updatedFlats));
+        } catch (e) {}
+      }
+      return { flats: updatedFlats };
     });
+
+    try {
+      await fetch("/api/flats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(flat)
+      });
+    } catch (e) {}
   },
 
   addExpense: async (expense) => {

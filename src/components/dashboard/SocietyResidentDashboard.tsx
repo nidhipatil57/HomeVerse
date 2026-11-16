@@ -5,7 +5,7 @@ import {
   MessageSquareWarning, IndianRupee, Calendar, Users, Package,
   Megaphone, Droplets, Zap, Heart, TrendingUp, TrendingDown,
   ArrowRight, Plus, UserCheck, CreditCard, CalendarPlus,
-  Bot, Building2, Trophy
+  Bot, Building2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -79,20 +79,6 @@ export function SocietyResidentDashboard({ resident }: { resident: any }) {
 
   // Filter local events
   const rsvpsCount = communityEvents.reduce((acc, ev) => acc + (ev.rsvps?.includes(resident?.id) ? 1 : 0), 0);
-  const last7Days = new Date();
-  last7Days.setDate(last7Days.getDate() - 7);
-  const newItemsThisWeek = lostFoundItems.filter(item => 
-    item.portal === "society" && 
-    item.status !== "Pending Verification" && 
-    item.status !== "Rejected" &&
-    new Date(item.createdAt).getTime() >= last7Days.getTime()
-  ).length;
-
-  const myActiveClaims = lostFoundItems.filter(item => 
-    item.portal === "society" &&
-    item.claims && 
-    item.claims.some(claim => claim.residentId === resident?.id && claim.status !== "Returned" && claim.status !== "Rejected")
-  ).length;
 
   const residentStats = [
     { label: "Pending Complaints", value: pendingComplaintsCount, change: -8, trend: "down" as const, icon: "MessageSquareWarning", color: "#f59e0b" },
@@ -127,35 +113,6 @@ export function SocietyResidentDashboard({ resident }: { resident: any }) {
             </Badge>
           </div>
         </div>
-      </motion.div>
-
-      {/* Lost & Found Hub Widget */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <Card className="border-border/50 bg-secondary/5">
-          <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-primary">
-                <Trophy className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-foreground">Lost & Found Hub</h4>
-                <div className="flex gap-4 text-xs text-muted-foreground mt-0.5">
-                  <span>New Items This Week: <strong className="text-foreground">{newItemsThisWeek}</strong></span>
-                  <span>My Active Claims: <strong className="text-foreground">{myActiveClaims}</strong></span>
-                </div>
-              </div>
-            </div>
-            <Link href="/society/lost-found" className="shrink-0">
-              <Button size="sm" className="rounded-xl gradient-primary text-white border-0 h-9 font-semibold text-xs px-4">
-                View Lost & Found
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
       </motion.div>
 
       {/* Quick Actions */}

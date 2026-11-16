@@ -169,8 +169,18 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
     const pendingResidentsCount = users.filter(u => u.role === "resident" && u.status === "pending").length;
     const pendingWorkersCount = users.filter(u => u.role === "worker" && u.status === "pending").length;
 
-    const occupiedFlats = flats.filter(f => f.status === "occupied").length;
-    const vacantFlats = flats.filter(f => f.status === "vacant").length;
+    const occupiedFlats = flats.filter(f => {
+      if (f.status === "occupied") return true;
+      const fNum = (f.flatNumber || "").replace(/\D/g, "");
+      const fWing = (f.wing || f.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || "";
+      return users.some(u => {
+        if (u.role !== "resident" && u.role !== "secretary") return false;
+        const uNum = (u.unit || "").replace(/\D/g, "");
+        const uWing = (u.building || u.unit || "").match(/[ABC]/i)?.[0]?.toUpperCase() || "";
+        return uNum === fNum && (!fWing || !uWing || fWing === uWing);
+      });
+    }).length;
+    const vacantFlats = Math.max(0, flats.length - occupiedFlats);
 
     const pendingPaymentsCount = maintenanceBills.filter(b => b.status === "pending" || b.status === "overdue").length;
     const monthlyCollection = maintenanceBills.filter(b => b.status === "paid").reduce((sum, b) => sum + b.amount, 0);
@@ -209,13 +219,22 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
 
   // --- Filtering Residents & Workers ---
   const filteredResidents = useMemo(() => {
-    return users.filter(u => 
-      u.role === "resident" && 
-      u.status !== "pending" &&
-      (u.name.toLowerCase().includes(residentSearch.toLowerCase()) || 
-       (u.unit && u.unit.includes(residentSearch)) ||
-       (u.building && u.building.toLowerCase().includes(residentSearch.toLowerCase())))
-    );
+    return users
+      .filter(u => 
+        (u.role === "resident" || (u.role === "secretary" && u.unit)) && 
+        u.status !== "pending" &&
+        (u.name.toLowerCase().includes(residentSearch.toLowerCase()) || 
+         (u.unit && u.unit.includes(residentSearch)) ||
+         (u.building && u.building.toLowerCase().includes(residentSearch.toLowerCase())))
+      )
+      .sort((a, b) => {
+        const wingA = (a.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || (a.unit || "").match(/^[ABC]/i)?.[0]?.toUpperCase() || "A";
+        const wingB = (b.building || "").match(/[ABC]/i)?.[0]?.toUpperCase() || (b.unit || "").match(/^[ABC]/i)?.[0]?.toUpperCase() || "A";
+        if (wingA !== wingB) return wingA.localeCompare(wingB);
+        const numA = parseInt((a.unit || "").replace(/\D/g, "") || "0", 10);
+        const numB = parseInt((b.unit || "").replace(/\D/g, "") || "0", 10);
+        return numA - numB;
+      });
   }, [users, residentSearch]);
 
   const filteredWorkers = useMemo(() => {
@@ -253,15 +272,6 @@ export function SocietySecretaryDashboard({ secretary }: { secretary: any }) {
       status: "approved" as const
     };
     useCommunityStore.getState().addRegisteredUser(newUser);
-
-    // Update flat database status
-    const matchFlat = flats.find(f => f.flatNumber === newResidentFlat && f.building === newResidentBuilding);
-    if (matchFlat) {
-      // Direct mutation since updateFlatStatus isn't fully structured
-      useCommunityStore.setState(state => ({
-        flats: state.flats.map(f => f.id === matchFlat.id ? { ...f, status: "occupied", residentId: `user-${Date.now()}`, residentName: newResidentName } : f)
-      }));
-    }
 
     setNewResidentName("");
     setNewResidentPhone("");
