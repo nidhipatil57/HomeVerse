@@ -27,7 +27,7 @@ export default function UtilityUsagePage() {
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">My Flat Consumption Analytics 📊</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">My Flat Consumption Analytics</h1>
         <p className="text-muted-foreground mt-1">Review water and electricity usage metrics and conservation advisory logs for Flat {user?.unit || "A-301"}</p>
       </motion.div>
 

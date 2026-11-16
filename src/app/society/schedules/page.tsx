@@ -133,7 +133,7 @@ export default function SchedulesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight font-[family-name:var(--font-heading)]">Operations Schedule 📅</h1>
+        <h1 className="text-3xl font-bold tracking-tight font-[family-name:var(--font-heading)]">Operations Schedule</h1>
         <p className="text-muted-foreground mt-1">
           Calendar agenda of today's technician visits, upcoming maintenance tasks, and critical emergency dispatches.
         </p>

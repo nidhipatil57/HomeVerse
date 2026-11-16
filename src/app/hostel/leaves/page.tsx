@@ -43,8 +43,6 @@ export default function WardenLeavesPage() {
     setMounted(true);
   }, [initialize, initializeDb]);
 
-  if (!mounted) return null;
-
   const isWarden = user?.role === "warden";
 
   // Filter leaves based on role
@@ -63,6 +61,8 @@ export default function WardenLeavesPage() {
 
   const pendingLeaves = filteredLeaves.filter((l) => l.status === "pending");
   const historyLeaves = filteredLeaves.filter((l) => l.status !== "pending");
+
+  if (!mounted) return null;
 
   const handleCreateLeave = (e: React.FormEvent) => {
     e.preventDefault();

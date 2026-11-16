@@ -93,9 +93,7 @@ export default function EmergencyRequestsPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Flame className="w-6 h-6 animate-bounce text-yellow-300" />
-            <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight font-[family-name:var(--font-heading)]">
-              Critical Emergency Dashboard 🚨
-            </h1>
+            <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight font-[family-name:var(--font-heading)]">Critical Emergency Dashboard</h1>
           </div>
           <p className="text-white/90 text-sm font-medium">
             Active fire, gas leaks, major power failures, lift issues, or severe leaks. Resolving these is priority #1.

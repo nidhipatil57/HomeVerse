@@ -405,9 +405,7 @@ export default function MockPaymentGatewayPage() {
                   </div>
 
                   <div>
-                    <h1 className="text-xl font-extrabold font-[family-name:var(--font-heading)] text-foreground leading-snug">
-                      {payload.title}
-                    </h1>
+                    <h1 className="text-xl font-extrabold font-[family-name:var(--font-heading)] text-foreground leading-snug">{payload.title}</h1>
                     {payload.subtitle && (
                       <p className="text-xs text-muted-foreground mt-1">{payload.subtitle}</p>
                     )}
@@ -487,9 +485,7 @@ export default function MockPaymentGatewayPage() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-bold font-[family-name:var(--font-heading)]">
-                      Choose Payment Method
-                    </h2>
+                    <h2 className="text-base font-bold font-[family-name:var(--font-heading)]">Choose Payment Method</h2>
                     <p className="text-[11px] text-muted-foreground">
                       Select any simulated method to authorize your HomeVerse transaction
                     </p>
@@ -783,9 +779,7 @@ export default function MockPaymentGatewayPage() {
               </div>
 
               <div>
-                <h2 className="text-xl font-extrabold font-[family-name:var(--font-heading)]">
-                  Processing ₹{payload.amount.toLocaleString()}
-                </h2>
+                <h2 className="text-xl font-extrabold font-[family-name:var(--font-heading)]">Processing ₹{payload.amount.toLocaleString()}</h2>
                 <p className="text-xs text-muted-foreground mt-1">
                   Please do not close or refresh while authorizing via {resolvedMethodLabel}
                 </p>
@@ -863,9 +857,7 @@ export default function MockPaymentGatewayPage() {
                 <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 text-[10px] uppercase tracking-wider mb-2">
                   Payment Verified & Synced
                 </Badge>
-                <h2 className="text-2xl font-extrabold font-[family-name:var(--font-heading)]">
-                  ₹{payload.amount.toLocaleString()} Paid Successfully!
-                </h2>
+                <h2 className="text-2xl font-extrabold font-[family-name:var(--font-heading)]">₹{payload.amount.toLocaleString()} Paid Successfully!</h2>
                 <p className="text-xs text-muted-foreground mt-1">
                   {payload.kind === "event-registration"
                     ? `Your event registration & digital pass for "${payload.title}" are confirmed.`

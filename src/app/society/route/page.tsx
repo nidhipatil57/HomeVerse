@@ -24,10 +24,8 @@ export default function WorkerRoutePage() {
       <div className="grid md:grid-cols-12 gap-6">
         <Card className="md:col-span-7 border-border/50">
           <CardHeader className="pb-3 border-b border-border/20">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Navigation className="w-5 h-5 text-blue-500" />
-              Walking Path Schedule
-            </CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-2"><Navigation className="w-5 h-5 text-blue-500" />
+              Walking Path Schedule</CardTitle>
           </CardHeader>
           <CardContent className="p-6 space-y-5">
             {routeSteps.map((step, idx) => (

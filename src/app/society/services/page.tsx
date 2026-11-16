@@ -199,9 +199,7 @@ export default function ManagerServicesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-            Service Requests Operations 💼
-          </h1>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Service Requests Operations</h1>
           <p className="text-muted-foreground mt-1">
             {isSecretary 
               ? "Review, approve, and escalate resident local help bookings to the Operations Manager." 

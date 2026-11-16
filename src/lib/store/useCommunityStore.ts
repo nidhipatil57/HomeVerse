@@ -90,18 +90,49 @@ export interface FacilityBooking {
   status: "booked" | "cancelled";
 }
 
+export interface MarketplaceEnquiry {
+  id: string;
+  itemId: string;
+  itemTitle?: string;
+  sellerId: string;
+  buyerId: string;
+  buyerName: string;
+  buyerFlat?: string;
+  buyerPhone?: string;
+  message: string;
+  status: "pending" | "replied";
+  createdAt: string;
+}
+
+export interface MarketplaceSavedItem {
+  id: string;
+  userId: string;
+  itemId: string;
+  createdAt: string;
+}
+
 export interface MarketplaceItem {
   id: string;
   title: string;
   description: string;
   price: string;
+  originalPrice?: string | null;
+  condition?: "New" | "Like New" | "Good" | "Fair" | string;
   sellerId: string;
   sellerName: string;
-  image?: string;
+  flatNumber?: string | null;
+  building?: string | null;
+  contactPreference?: "In-app" | "WhatsApp" | "Phone" | string;
+  contactPhone?: string | null;
   category: string;
-  status: "available" | "sold";
+  status: "active" | "sold" | "inactive" | "available";
   portal: PortalType;
   createdAt: string;
+  soldAt?: string | null;
+  images?: string[];
+  image?: string;
+  enquiries?: MarketplaceEnquiry[];
+  savedBy?: MarketplaceSavedItem[];
 }
 
 export interface Claim {
@@ -377,6 +408,8 @@ interface CommunityState {
   parcels: Parcel[];
   facilityBookings: FacilityBooking[];
   marketplaceItems: MarketplaceItem[];
+  marketplaceEnquiries: MarketplaceEnquiry[];
+  marketplaceSavedIds: string[];
   lostFoundItems: FoundItem[];
   lostReports: LostReport[];
   itemMatches: ItemMatch[];
@@ -489,9 +522,14 @@ interface CommunityState {
   bookFacility: (booking: Omit<FacilityBooking, "id" | "status">) => Promise<boolean>;
   cancelFacilityBooking: (id: string) => Promise<void>;
 
-  // Marketplace Transactions
-  listMarketplaceItem: (item: Omit<MarketplaceItem, "id" | "status" | "createdAt">) => Promise<void>;
+  // Marketplace Transactions (Buy & Sell)
+  listMarketplaceItem: (item: Partial<MarketplaceItem>) => Promise<MarketplaceItem>;
+  updateMarketplaceItem: (id: string, updates: Partial<MarketplaceItem>) => Promise<MarketplaceItem>;
   sellMarketplaceItem: (id: string) => Promise<void>;
+  deleteMarketplaceItem: (itemId: string) => Promise<void>;
+  enquireMarketplaceItem: (itemId: string, message: string, buyerMeta?: { buyerFlat?: string; buyerPhone?: string }) => Promise<MarketplaceEnquiry>;
+  toggleSaveMarketplaceItem: (itemId: string) => Promise<boolean>;
+  clearAllMarketplaceData: () => Promise<void>;
 
   // Lost & Found Transactions
   reportLostFoundItem: (item: Omit<FoundItem, "id" | "status" | "createdAt">) => Promise<void>;
@@ -590,7 +628,6 @@ interface CommunityState {
     selectedBuilding?: string;
     breakdown?: { label: string; amount: number }[];
   }) => Promise<void>;
-  deleteMarketplaceItem: (itemId: string) => Promise<void>;
   updateWorkerServices: (workerId: string, details: {
     specializations: string[];
     experience: string;
@@ -690,6 +727,19 @@ const mergeAndDedupePayments = (dbPayments: any[], existingOrSeed: any[]): any[]
   return finalList;
 };
 
+export const mergeAndDedupeMarketplaceItems = (incoming: any[], existingOrSeed: any[]): any[] => {
+  const map = new Map<string, any>();
+  for (const item of existingOrSeed || []) {
+    if (item?.id) map.set(item.id, item);
+  }
+  for (const item of incoming || []) {
+    if (item?.id) map.set(item.id, item);
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+  );
+};
+
 const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
   if (typeof window !== "undefined") {
     try {
@@ -720,6 +770,11 @@ const loadLocalOrSeed = <T>(key: string, seedFn: () => T): T => {
               localStorage.setItem("homeverse_flats", JSON.stringify(seeds));
               return seeds as unknown as T;
             }
+          }
+          if (key === "marketplaceItems") {
+            const deduped = mergeAndDedupeMarketplaceItems([], Array.isArray(parsed) ? parsed : []);
+            try { localStorage.setItem("homeverse_marketplaceItems", JSON.stringify(deduped)); } catch (e) {}
+            return deduped as unknown as T;
           }
           if (key === "collections") {
             return (Array.isArray(parsed) ? parsed : []) as unknown as T;
@@ -767,6 +822,8 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   parcels: loadLocalOrSeed("parcels", getPrepopulatedParcels),
   facilityBookings: [],
   marketplaceItems: loadLocalOrSeed("marketplaceItems", getPrepopulatedMarketplaceItems),
+  marketplaceEnquiries: loadLocalOrSeed("marketplaceEnquiries", () => []),
+  marketplaceSavedIds: loadLocalOrSeed("marketplaceSaved", () => []),
   lostFoundItems: loadLocalOrSeed("lostFoundItems", getPrepopulatedFoundItems),
   lostReports: loadLocalOrSeed("lostReports", getPrepopulatedLostReports),
   itemMatches: loadLocalOrSeed("itemMatches", getPrepopulatedItemMatches),
@@ -830,14 +887,23 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
           } catch (e) {}
         }
 
-        // Clear all previous dummy payments and bills once to start 100% fresh
-        const FRESH_PAYMENTS_KEY = "homeverse_fresh_payments_clean_2026_fresh_v2";
+        // Clear all previous cached payments and bills in browser localStorage to start fresh with October pending bills
+        const FRESH_PAYMENTS_KEY = "homeverse_fresh_payments_october_pending_clean_v4";
         if (localStorage.getItem(FRESH_PAYMENTS_KEY) !== "true") {
           localStorage.removeItem("homeverse_payments");
           localStorage.removeItem("homeverse_maintenanceBills");
           localStorage.removeItem("homeverse_collections");
           localStorage.setItem(FRESH_PAYMENTS_KEY, "true");
-          fetch("/api/payments/clear-all", { method: "POST" }).catch(() => {});
+        }
+
+        // Clear all previous dummy marketplace records once to start 100% fresh
+        const FRESH_MARKETPLACE_KEY = "homeverse_fresh_marketplace_clean_2026_v1";
+        if (localStorage.getItem(FRESH_MARKETPLACE_KEY) !== "true") {
+          localStorage.removeItem("homeverse_marketplaceItems");
+          localStorage.removeItem("homeverse_marketplaceEnquiries");
+          localStorage.removeItem("homeverse_marketplaceSaved");
+          localStorage.setItem(FRESH_MARKETPLACE_KEY, "true");
+          fetch("/api/marketplace/clear-all", { method: "POST" }).catch(() => {});
         }
 
         const storedPayments = localStorage.getItem("homeverse_payments");
@@ -889,6 +955,14 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         }
         localStorage.setItem("homeverse_flats", JSON.stringify(finalFlats));
         localUpdates.flats = finalFlats;
+
+        // Invalidate previous cached helpers/passes to ensure clean, isolated wing-specific helpers
+        const FRESH_HELPERS_KEY = "homeverse_fresh_helpers_clean_v8";
+        if (localStorage.getItem(FRESH_HELPERS_KEY) !== "true") {
+          localStorage.removeItem("homeverse_helpers");
+          localStorage.removeItem("homeverse_gatePasses");
+          localStorage.setItem(FRESH_HELPERS_KEY, "true");
+        }
 
         // Ensure fresh helpers and gate passes for each flat
         const storedHelpers = localStorage.getItem("homeverse_helpers");
@@ -1082,6 +1156,20 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
                   data = mergeAndDedupePayments(data, baseSeeds);
                 }
 
+                if (key === "marketplaceItems" && Array.isArray(data)) {
+                  data = mergeAndDedupeMarketplaceItems(data, (get() as any).marketplaceItems || []);
+                }
+
+                if (key === "helpers" && Array.isArray(data)) {
+                  const currentHelpers = (get() as any).helpers || getPrepopulatedHelpers();
+                  const helperMap = new Map((currentHelpers || []).map((h: any) => [h.id, h]));
+                  for (const h of data) {
+                    const prev = helperMap.get(h.id);
+                    helperMap.set(h.id, prev ? { ...prev, ...h } : h);
+                  }
+                  data = Array.from(helperMap.values());
+                }
+
                 if (Array.isArray(data) && (data.length > 0 || key === "complaints" || key === "notifications" || key === "collections" || key === "payments")) {
                   updates[key] = data;
                   if (typeof window !== "undefined") {
@@ -1170,6 +1258,9 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
               if (key === "payments" && Array.isArray(data)) {
                 const baseSeeds = getPrepopulatedPayments();
                 data = mergeAndDedupePayments(data, baseSeeds);
+              }
+              if (key === "marketplaceItems" && Array.isArray(data)) {
+                data = mergeAndDedupeMarketplaceItems(data, (get() as any).marketplaceItems || []);
               }
               const currentStr = JSON.stringify((get() as any)[key]);
               const nextStr = JSON.stringify(data);
@@ -1497,14 +1588,55 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
     });
 
     socket.on("marketplace:update", (updated: any) => {
+      if (!updated || !updated.id) return;
       const current = get().marketplaceItems || [];
-      const index = current.findIndex(m => m.id === updated.id);
-      if (index > -1) {
-        const next = [...current];
-        next[index] = updated;
-        set({ marketplaceItems: next });
-      } else {
-        set({ marketplaceItems: [updated, ...current] });
+      const next = mergeAndDedupeMarketplaceItems([updated], current);
+      set({ marketplaceItems: next });
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_marketplaceItems", JSON.stringify(next)); } catch (e) {}
+      }
+    });
+
+    socket.on("marketplace:delete", ({ id }: any) => {
+      const current = get().marketplaceItems || [];
+      const next = current.filter(m => m.id !== id);
+      set({ marketplaceItems: next });
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_marketplaceItems", JSON.stringify(next)); } catch (e) {}
+      }
+    });
+
+    socket.on("marketplace:clear", () => {
+      set({ marketplaceItems: [], marketplaceEnquiries: [], marketplaceSavedIds: [] });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.removeItem("homeverse_marketplaceItems");
+          localStorage.removeItem("homeverse_marketplaceEnquiries");
+          localStorage.removeItem("homeverse_marketplaceSaved");
+        } catch (e) {}
+      }
+    });
+
+    socket.on("marketplace:enquiry", ({ enquiry, itemId }: any) => {
+      if (!enquiry) return;
+      const currentEnqs = get().marketplaceEnquiries || [];
+      const nextEnqs = [enquiry, ...currentEnqs.filter(e => e.id !== enquiry.id)];
+      const currentItems = get().marketplaceItems || [];
+      const nextItems = currentItems.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            enquiries: [enquiry, ...(item.enquiries || []).filter(e => e.id !== enquiry.id)]
+          };
+        }
+        return item;
+      });
+      set({ marketplaceEnquiries: nextEnqs, marketplaceItems: nextItems });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_marketplaceEnquiries", JSON.stringify(nextEnqs));
+          localStorage.setItem("homeverse_marketplaceItems", JSON.stringify(nextItems));
+        } catch (e) {}
       }
     });
 
@@ -2591,25 +2723,252 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   listMarketplaceItem: async (item) => {
-    await fetch("/api/marketplace", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(item)
+    const id = item.id || `BUY-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+    const newItem: MarketplaceItem = {
+      id,
+      title: item.title || "Item",
+      description: item.description || "",
+      price: String(item.price || "0"),
+      originalPrice: item.originalPrice ? String(item.originalPrice) : null,
+      condition: item.condition || "Good",
+      sellerId: item.sellerId || "resident-user",
+      sellerName: item.sellerName || "Resident",
+      flatNumber: item.flatNumber || "",
+      building: item.building || "A Wing",
+      contactPreference: item.contactPreference || "In-app",
+      contactPhone: item.contactPhone || "",
+      category: item.category || "Other",
+      status: "active",
+      portal: item.portal || "society",
+      createdAt: item.createdAt || new Date().toISOString(),
+      images: item.images && item.images.length > 0 ? item.images : (item.image ? [item.image] : []),
+      image: item.image || (item.images && item.images[0]) || "",
+      enquiries: [],
+      savedBy: []
+    };
+
+    set((state) => {
+      const next = mergeAndDedupeMarketplaceItems([newItem], state.marketplaceItems || []);
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_marketplaceItems", JSON.stringify(next)); } catch (e) {}
+      }
+      return { marketplaceItems: next };
     });
+
+    try {
+      const res = await fetch("/api/marketplace", {
+        method: "POST",
+        credentials: "include",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(newItem)
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        set((state) => {
+          const filtered = (state.marketplaceItems || []).filter(i => i.id !== id && i.id !== saved.id);
+          const next = mergeAndDedupeMarketplaceItems([saved], filtered);
+          if (typeof window !== "undefined") {
+            try { localStorage.setItem("homeverse_marketplaceItems", JSON.stringify(next)); } catch (e) {}
+          }
+          return { marketplaceItems: next };
+        });
+        return saved;
+      }
+    } catch (e) {
+      console.warn("Backend marketplace post failed, saved locally:", e);
+    }
+    return newItem;
+  },
+
+  updateMarketplaceItem: async (id, updates) => {
+    let updatedItem: MarketplaceItem | null = null;
+    set((state) => {
+      const next = state.marketplaceItems.map((item) => {
+        if (item.id === id) {
+          updatedItem = {
+            ...item,
+            ...updates,
+            images: updates.images || item.images,
+            image: (updates.images && updates.images[0]) || updates.image || item.image
+          };
+          return updatedItem;
+        }
+        return item;
+      });
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_marketplaceItems", JSON.stringify(next)); } catch (e) {}
+      }
+      return { marketplaceItems: next };
+    });
+
+    try {
+      const res = await fetch(`/api/marketplace/${id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        const serverData = await res.json();
+        set((state) => {
+          const next = state.marketplaceItems.map(i => i.id === id ? { ...i, ...serverData } : i);
+          if (typeof window !== "undefined") {
+            try { localStorage.setItem("homeverse_marketplaceItems", JSON.stringify(next)); } catch (e) {}
+          }
+          return { marketplaceItems: next };
+        });
+        return serverData;
+      }
+    } catch (e) {
+      console.warn("Backend marketplace update failed, updated locally:", e);
+    }
+    return updatedItem || ({} as MarketplaceItem);
   },
 
   sellMarketplaceItem: async (id) => {
-    await fetch(`/api/marketplace/${id}/status`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "sold" })
+    const soldAt = new Date().toISOString();
+    set((state) => {
+      const next = state.marketplaceItems.map((item) =>
+        item.id === id ? { ...item, status: "sold" as const, soldAt } : item
+      );
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_marketplaceItems", JSON.stringify(next)); } catch (e) {}
+      }
+      return { marketplaceItems: next };
     });
+
+    try {
+      await fetch(`/api/marketplace/${id}/status`, {
+        method: "PUT",
+        credentials: "include",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ status: "sold" })
+      });
+    } catch (e) {
+      console.warn("Backend status update failed, updated locally:", e);
+    }
   },
 
   deleteMarketplaceItem: async (itemId) => {
-    await fetch(`/api/marketplace/${itemId}`, {
-      method: "DELETE"
+    set((state) => {
+      const next = state.marketplaceItems.filter((item) => item.id !== itemId);
+      const nextEnqs = state.marketplaceEnquiries.filter((enq) => enq.itemId !== itemId);
+      const nextSaved = state.marketplaceSavedIds.filter((id) => id !== itemId);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_marketplaceItems", JSON.stringify(next));
+          localStorage.setItem("homeverse_marketplaceEnquiries", JSON.stringify(nextEnqs));
+          localStorage.setItem("homeverse_marketplaceSaved", JSON.stringify(nextSaved));
+        } catch (e) {}
+      }
+      return { marketplaceItems: next, marketplaceEnquiries: nextEnqs, marketplaceSavedIds: nextSaved };
     });
+
+    try {
+      await fetch(`/api/marketplace/${itemId}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: getAuthHeaders()
+      });
+    } catch (e) {
+      console.warn("Backend delete failed, removed locally:", e);
+    }
+  },
+
+  enquireMarketplaceItem: async (itemId, message, buyerMeta) => {
+    const item = get().marketplaceItems.find((i) => i.id === itemId);
+    const enqId = `ENQ-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const newEnquiry: MarketplaceEnquiry = {
+      id: enqId,
+      itemId,
+      itemTitle: item?.title || "Item",
+      sellerId: item?.sellerId || "",
+      buyerId: "resident-buyer",
+      buyerName: "Resident",
+      buyerFlat: buyerMeta?.buyerFlat || "",
+      buyerPhone: buyerMeta?.buyerPhone || "",
+      message: message.trim(),
+      status: "pending",
+      createdAt: new Date().toISOString()
+    };
+
+    set((state) => {
+      const nextEnqs = [newEnquiry, ...state.marketplaceEnquiries];
+      const nextItems = state.marketplaceItems.map((i) => {
+        if (i.id === itemId) {
+          return { ...i, enquiries: [newEnquiry, ...(i.enquiries || [])] };
+        }
+        return i;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("homeverse_marketplaceEnquiries", JSON.stringify(nextEnqs));
+          localStorage.setItem("homeverse_marketplaceItems", JSON.stringify(nextItems));
+        } catch (e) {}
+      }
+      return { marketplaceEnquiries: nextEnqs, marketplaceItems: nextItems };
+    });
+
+    try {
+      const res = await fetch(`/api/marketplace/${itemId}/enquire`, {
+        method: "POST",
+        credentials: "include",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ message, ...buyerMeta })
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        return saved;
+      }
+    } catch (e) {
+      console.warn("Backend enquiry failed, saved locally:", e);
+    }
+    return newEnquiry;
+  },
+
+  toggleSaveMarketplaceItem: async (itemId) => {
+    let nowSaved = false;
+    set((state) => {
+      const current = state.marketplaceSavedIds || [];
+      nowSaved = !current.includes(itemId);
+      const nextSaved = nowSaved ? [...current, itemId] : current.filter((id) => id !== itemId);
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("homeverse_marketplaceSaved", JSON.stringify(nextSaved)); } catch (e) {}
+      }
+      return { marketplaceSavedIds: nextSaved };
+    });
+
+    try {
+      await fetch(`/api/marketplace/${itemId}/save`, {
+        method: "POST",
+        credentials: "include",
+        headers: getAuthHeaders()
+      });
+    } catch (e) {}
+    return nowSaved;
+  },
+
+  clearAllMarketplaceData: async () => {
+    set({
+      marketplaceItems: [],
+      marketplaceEnquiries: [],
+      marketplaceSavedIds: []
+    });
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("homeverse_marketplaceItems");
+        localStorage.removeItem("homeverse_marketplaceEnquiries");
+        localStorage.removeItem("homeverse_marketplaceSaved");
+      } catch (e) {}
+    }
+    try {
+      await fetch("/api/marketplace/clear-all", {
+        method: "POST",
+        credentials: "include",
+        headers: getAuthHeaders()
+      });
+    } catch (e) {}
   },
 
   reportLostFoundItem: async (item) => {
@@ -3527,8 +3886,8 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       const newNotifs = newBills.map((b) => ({
         id: `NTF-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
         userId: b.residentId,
-        title: "Maintenance Bill Generated 🧾",
-        message: `📢 ${billDetails.month} maintenance bill (₹${billDetails.amount.toLocaleString()}) has been dispatched. Due date: ${b.dueDate}`,
+        title: "Maintenance Bill Generated",
+        message: `${billDetails.month} maintenance bill (₹${billDetails.amount.toLocaleString()}) has been dispatched. Due date: ${b.dueDate}`,
         type: "warning" as const,
         read: false,
         timestamp: new Date().toISOString(),
@@ -3621,16 +3980,29 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         }));
       }
 
+      const collectionNotifs = generatedPayments.map((p) => ({
+        id: `NTF-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+        userId: p.residentId,
+        title: `Special Occasion Assessment: ${details.title}`,
+        message: `${details.title} charge of ₹${Number(details.amount).toLocaleString()} has been announced by the Secretary. Due date: ${details.dueDate}`,
+        type: "warning" as const,
+        read: false,
+        timestamp: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      }));
+
       const nextPayments = mergeAndDedupePayments(generatedPayments, state.payments);
+      const nextNotifs = [...collectionNotifs, ...(state.notifications || [])];
 
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("homeverse_collections", JSON.stringify(nextCollections));
           localStorage.setItem("homeverse_payments", JSON.stringify(nextPayments));
+          localStorage.setItem("homeverse_notifications", JSON.stringify(nextNotifs));
         } catch (e) {}
       }
 
-      return { collections: nextCollections, payments: nextPayments };
+      return { collections: nextCollections, payments: nextPayments, notifications: nextNotifs };
     });
 
     return created;

@@ -44,9 +44,7 @@ export default function SecretaryApprovalsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Approvals Queue 📋
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Approvals Queue</h1>
         <p className="text-muted-foreground mt-1">
           Review, approve, or reject new resident registrations and worker gate entry credentials
         </p>
@@ -56,9 +54,7 @@ export default function SecretaryApprovalsPage() {
         {/* Resident Approvals */}
         <Card className="border-border/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold flex items-center gap-1.5">
-              <Users className="w-4.5 h-4.5 text-primary" /> Resident Approval Requests ({residentPending.length})
-            </CardTitle>
+            <CardTitle className="text-base font-semibold flex items-center gap-1.5"><Users className="w-4.5 h-4.5 text-primary" /> Resident Approval Requests ({residentPending.length})</CardTitle>
             <CardDescription className="text-xs">Verify credentials before granting complex access</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -108,9 +104,7 @@ export default function SecretaryApprovalsPage() {
         {/* Worker Approvals */}
         <Card className="border-border/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold flex items-center gap-1.5">
-              <Wrench className="w-4.5 h-4.5 text-primary" /> Worker Registration Approvals ({workerPending.length})
-            </CardTitle>
+            <CardTitle className="text-base font-semibold flex items-center gap-1.5"><Wrench className="w-4.5 h-4.5 text-primary" /> Worker Registration Approvals ({workerPending.length})</CardTitle>
             <CardDescription className="text-xs">Staff and local trade contractors awaiting gate authorization</CardDescription>
           </CardHeader>
           <CardContent className="p-0">

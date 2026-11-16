@@ -348,205 +348,11 @@ export const getPrepopulatedParcels = (): Parcel[] => [
   }
 ];
 
-export const getPrepopulatedMarketplaceItems = (): MarketplaceItem[] => [
-  {
-    id: "MKT-001",
-    title: "Mountain Cycle (18-Speed)",
-    description: "Excellent riding condition, disc brakes. Used for 1 year around campus.",
-    price: "₹3,500",
-    sellerId: "user-student-3",
-    sellerName: "Rohan Das",
-    category: "Cycles",
-    status: "available",
-    portal: "hostel",
-    createdAt: "2026-07-01T12:00:00"
-  },
-  {
-    id: "MKT-002",
-    title: "Academic Notes - CS Algorithms",
-    description: "Complete handwritten notes covering all core sorting, graph algorithms, and DP proofs.",
-    price: "₹250",
-    sellerId: "user-student-1",
-    sellerName: "Aarav Mehta",
-    category: "Notes",
-    status: "available",
-    portal: "hostel",
-    createdAt: "2026-07-02T09:00:00"
-  },
-  {
-    id: "MKT-003",
-    title: "Microwave Oven (Solitaire 20L)",
-    description: "Compact microwave, excellent heating. Used for only 6 months. Relocating, so selling.",
-    price: "₹2,500",
-    sellerId: "user-resident-2",
-    sellerName: "Nidhi Kumar",
-    category: "Electronics",
-    status: "available",
-    portal: "society",
-    createdAt: "2026-06-30T10:00:00"
-  },
-  {
-    id: "MKT-004",
-    title: "Wooden Study Table",
-    description: "Spacious wooden study table with a drawer and small shelf. Great for students.",
-    price: "₹1,200",
-    sellerId: "user-resident-1",
-    sellerName: "Sara Shah",
-    category: "Furniture",
-    status: "available",
-    portal: "society",
-    createdAt: "2026-07-04T15:00:00"
-  },
-  {
-    id: "MKT-005",
-    title: "Acoustic Guitar - Kadence Frontier",
-    description: "Sunburst color acoustic guitar, barely used. Comes with bag and picks.",
-    price: "₹3,800",
-    sellerId: "user-resident-4",
-    sellerName: "Kishore Kumar",
-    category: "Others",
-    status: "available",
-    portal: "society",
-    createdAt: "2026-07-03T11:00:00"
-  }
-];
+export const getPrepopulatedMarketplaceItems = (): MarketplaceItem[] => [];
 
-export const getPrepopulatedFoundItems = (): FoundItem[] => [
-  {
-    id: "LF-001",
-    reporterId: "user-student-2",
-    reporterName: "Priya Sharma",
-    communityCode: "VESIT26",
-    category: "Other",
-    description: "Casio Scientific Calculator fx-991EX found in library study room 3.",
-    images: ["/images/found-calculator.jpg"],
-    foundLocation: "Library study room 3",
-    dateFound: "2026-07-04",
-    timeFound: "16:30",
-    additionalNotes: "Model fx-991EX, has some scratches.",
-    status: "Pending Verification",
-    portal: "hostel",
-    createdAt: "2026-07-04T16:30:00Z",
-    claims: []
-  },
-  {
-    id: "LF-002",
-    reporterId: "user-resident-2",
-    reporterName: "Nidhi Kumar",
-    communityCode: "SUN123",
-    category: "Keys",
-    description: "Bunch of keys found on the floor near A Wing lift entrance. Has 3 keys attached.",
-    images: ["/images/found-keys.jpg"],
-    foundLocation: "Near A Wing lift entrance",
-    dateFound: "2026-07-05",
-    timeFound: "09:00",
-    additionalNotes: "Keyring has a small leather strap.",
-    status: "Available",
-    portal: "society",
-    createdAt: "2026-07-05T09:00:00Z",
-    claims: []
-  },
-  {
-    id: "LF-003",
-    reporterId: "user-security-1",
-    reporterName: "Raj Singh",
-    communityCode: "SUN123",
-    category: "Wallet",
-    description: "Brown leather wallet found in Clubhouse lobby. Contains some cash and transportation card.",
-    images: ["/images/found-wallet.jpg"],
-    foundLocation: "Clubhouse lobby",
-    dateFound: "2026-07-02",
-    timeFound: "18:00",
-    additionalNotes: "Handed over to security desk immediately.",
-    status: "Returned",
-    portal: "society",
-    createdAt: "2026-07-02T18:00:00Z",
-    claims: [
-      {
-        id: "CLM-001",
-        itemId: "LF-003",
-        residentId: "user-resident-1",
-        residentName: "Sara Shah",
-        claimReason: "I lost my brown wallet in the clubhouse yesterday. It has my transportation card.",
-        itemDetails: "Casio transportation card, two banknotes, brown faux leather.",
-        proofImage: "",
-        contactNumber: "+91 98765 43210",
-        status: "Returned",
-        approvalDate: "2026-07-03T10:00:00.000Z",
-        collectionDate: "2026-07-03T10:30:00.000Z",
-        collectionTime: "10:30 AM",
-        collectedBy: "Sara Shah",
-        verifiedBySecurity: "Raj Singh",
-        createdAt: "2026-07-02T19:00:00Z"
-      }
-    ]
-  },
-  {
-    id: "LF-004",
-    reporterId: "user-resident-1",
-    reporterName: "Sara Shah",
-    communityCode: "SUN123",
-    category: "Water Bottle",
-    description: "Milton steel water bottle found at the clubhouse table.",
-    images: ["/images/found-bottle.jpg"],
-    foundLocation: "Clubhouse table",
-    dateFound: "2026-07-06",
-    timeFound: "11:00",
-    additionalNotes: "Blue color, steel cap.",
-    status: "Claim Pending Verification",
-    portal: "society",
-    createdAt: "2026-07-06T11:00:00Z",
-    claims: [
-      {
-        id: "CLM-002",
-        itemId: "LF-004",
-        residentId: "user-resident-2",
-        residentName: "Nidhi Kumar",
-        claimReason: "My Milton blue bottle was left at the clubhouse table during the committee meeting.",
-        itemDetails: "Blue color, scratched bottom, has a yellow sticker.",
-        proofImage: "",
-        contactNumber: "+91 87654 32110",
-        status: "Claim Pending Verification",
-        createdAt: "2026-07-06T12:00:00Z"
-      }
-    ]
-  },
-  {
-    id: "LF-005",
-    reporterId: "user-resident-2",
-    reporterName: "Nidhi Kumar",
-    communityCode: "SUN123",
-    category: "Earbuds",
-    description: "White Bluetooth Earbuds found near gym treadmill.",
-    images: ["/images/found-earbuds.jpg"],
-    foundLocation: "Gym treadmill",
-    dateFound: "2026-07-07",
-    timeFound: "10:00",
-    additionalNotes: "Left case open.",
-    status: "Ready for Pickup",
-    portal: "society",
-    createdAt: "2026-07-07T10:00:00Z",
-    claims: [
-      {
-        id: "CLM-003",
-        itemId: "LF-005",
-        residentId: "user-resident-1",
-        residentName: "Sara Shah",
-        claimReason: "I forgot my white earbuds at the gym treadmill.",
-        itemDetails: "White case, has a small black mark on the side.",
-        proofImage: "",
-        contactNumber: "+91 98765 43210",
-        status: "Ready for Pickup",
-        approvalDate: "2026-07-07T12:00:00.000Z",
-        createdAt: "2026-07-07T11:00:00Z"
-      }
-    ]
-  }
-];
+export const getPrepopulatedFoundItems = (): FoundItem[] => [];
 
-export const getPrepopulatedClaims = (): Claim[] => [
-  // Defined inline above under claims of FoundItem for local offline store sync
-];
+export const getPrepopulatedClaims = (): Claim[] => [];
 
 export const getPrepopulatedMaintenanceBills = (): MaintenanceBill[] => [];
 
@@ -2290,8 +2096,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "08:00 AM",
     "expectedExit": "12:00 PM",
     "assignedFlats": [
-      "101",
-      "A-101",
+            "A-101",
       "A Wing 101"
     ],
     "assignedResidents": [
@@ -2321,8 +2126,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:30 AM",
     "expectedExit": "11:30 AM",
     "assignedFlats": [
-      "102",
-      "A-102",
+            "A-102",
       "A Wing 102"
     ],
     "assignedResidents": [
@@ -2353,8 +2157,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:00 AM",
     "expectedExit": "10:00 AM",
     "assignedFlats": [
-      "102",
-      "A-102",
+            "A-102",
       "A Wing 102"
     ],
     "assignedResidents": [
@@ -2384,8 +2187,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "09:00 AM",
     "expectedExit": "01:00 PM",
     "assignedFlats": [
-      "201",
-      "A-201",
+            "A-201",
       "A Wing 201"
     ],
     "assignedResidents": [
@@ -2416,8 +2218,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:00 AM",
     "expectedExit": "01:00 PM",
     "assignedFlats": [
-      "202",
-      "A-202",
+            "A-202",
       "A Wing 202"
     ],
     "assignedResidents": [
@@ -2447,8 +2248,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:00 AM",
     "expectedExit": "12:00 PM",
     "assignedFlats": [
-      "202",
-      "A-202",
+            "A-202",
       "A Wing 202"
     ],
     "assignedResidents": [
@@ -2478,8 +2278,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "08:30 AM",
     "expectedExit": "12:30 PM",
     "assignedFlats": [
-      "301",
-      "A-301",
+            "A-301",
       "A Wing 301"
     ],
     "assignedResidents": [
@@ -2509,8 +2308,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:00 AM",
     "expectedExit": "11:00 AM",
     "assignedFlats": [
-      "302",
-      "A-302",
+            "A-302",
       "A Wing 302"
     ],
     "assignedResidents": [
@@ -2541,8 +2339,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "06:30 PM",
     "expectedExit": "09:30 PM",
     "assignedFlats": [
-      "302",
-      "A-302",
+            "A-302",
       "A Wing 302"
     ],
     "assignedResidents": [
@@ -2572,8 +2369,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "08:00 AM",
     "expectedExit": "12:00 PM",
     "assignedFlats": [
-      "101",
-      "B-101",
+            "B-101",
       "B Wing 101"
     ],
     "assignedResidents": [
@@ -2603,8 +2399,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:30 AM",
     "expectedExit": "11:30 AM",
     "assignedFlats": [
-      "102",
-      "B-102",
+            "B-102",
       "B Wing 102"
     ],
     "assignedResidents": [
@@ -2634,8 +2429,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:00 AM",
     "expectedExit": "10:30 AM",
     "assignedFlats": [
-      "102",
-      "B-102",
+            "B-102",
       "B Wing 102"
     ],
     "assignedResidents": [
@@ -2665,8 +2459,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "09:00 AM",
     "expectedExit": "01:00 PM",
     "assignedFlats": [
-      "201",
-      "B-201",
+            "B-201",
       "B Wing 201"
     ],
     "assignedResidents": [
@@ -2696,8 +2489,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "08:00 AM",
     "expectedExit": "12:00 PM",
     "assignedFlats": [
-      "202",
-      "B-202",
+            "B-202",
       "B Wing 202"
     ],
     "assignedResidents": [
@@ -2728,8 +2520,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "06:00 PM",
     "expectedExit": "09:00 PM",
     "assignedFlats": [
-      "202",
-      "B-202",
+            "B-202",
       "B Wing 202"
     ],
     "assignedResidents": [
@@ -2759,8 +2550,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "08:30 AM",
     "expectedExit": "12:30 PM",
     "assignedFlats": [
-      "301",
-      "B-301",
+            "B-301",
       "B Wing 301"
     ],
     "assignedResidents": [
@@ -2790,8 +2580,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:30 AM",
     "expectedExit": "11:30 AM",
     "assignedFlats": [
-      "302",
-      "B-302",
+            "B-302",
       "B Wing 302"
     ],
     "assignedResidents": [
@@ -2821,8 +2610,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:00 AM",
     "expectedExit": "11:00 AM",
     "assignedFlats": [
-      "302",
-      "B-302",
+            "B-302",
       "B Wing 302"
     ],
     "assignedResidents": [
@@ -2852,8 +2640,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "08:00 AM",
     "expectedExit": "12:00 PM",
     "assignedFlats": [
-      "101",
-      "C-101",
+            "C-101",
       "C Wing 101"
     ],
     "assignedResidents": [
@@ -2884,8 +2671,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:00 AM",
     "expectedExit": "10:30 AM",
     "assignedFlats": [
-      "101",
-      "C-101",
+            "C-101",
       "C Wing 101"
     ],
     "assignedResidents": [
@@ -2915,8 +2701,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "09:00 AM",
     "expectedExit": "01:00 PM",
     "assignedFlats": [
-      "102",
-      "C-102",
+            "C-102",
       "C Wing 102"
     ],
     "assignedResidents": [
@@ -2946,8 +2731,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:30 AM",
     "expectedExit": "11:30 AM",
     "assignedFlats": [
-      "201",
-      "C-201",
+            "C-201",
       "C Wing 201"
     ],
     "assignedResidents": [
@@ -2977,8 +2761,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "06:30 PM",
     "expectedExit": "09:30 PM",
     "assignedFlats": [
-      "201",
-      "C-201",
+            "C-201",
       "C Wing 201"
     ],
     "assignedResidents": [
@@ -3008,8 +2791,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "08:00 AM",
     "expectedExit": "12:00 PM",
     "assignedFlats": [
-      "202",
-      "C-202",
+            "C-202",
       "C Wing 202"
     ],
     "assignedResidents": [
@@ -3039,8 +2821,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:00 AM",
     "expectedExit": "11:00 AM",
     "assignedFlats": [
-      "301",
-      "C-301",
+            "C-301",
       "C Wing 301"
     ],
     "assignedResidents": [
@@ -3071,8 +2852,7 @@ export const getPrepopulatedHelpers = (): Helper[] => [
     "expectedArrival": "07:30 AM",
     "expectedExit": "11:00 AM",
     "assignedFlats": [
-      "301",
-      "C-301",
+            "C-301",
       "C Wing 301"
     ],
     "assignedResidents": [
@@ -3098,8 +2878,7 @@ export const getPrepopulatedHelperAttendance = (): HelperAttendance[] => [
     "checkInTime": "2026-11-10T10:14:58.701Z",
     "entryGate": "Main Security Gate",
     "assignedFlats": [
-      "202",
-      "A-202"
+            "A-202"
     ],
     "status": "checked-in"
   },
@@ -3113,8 +2892,7 @@ export const getPrepopulatedHelperAttendance = (): HelperAttendance[] => [
     "checkOutTime": "2026-11-10T12:14:58.701Z",
     "entryGate": "Main Security Gate",
     "assignedFlats": [
-      "202",
-      "A-202"
+            "A-202"
     ],
     "status": "checked-out"
   },
@@ -3127,8 +2905,7 @@ export const getPrepopulatedHelperAttendance = (): HelperAttendance[] => [
     "checkInTime": "2026-11-10T11:14:58.701Z",
     "entryGate": "Gate 1",
     "assignedFlats": [
-      "101",
-      "A-101"
+            "A-101"
     ],
     "status": "checked-in"
   },
@@ -3142,8 +2919,7 @@ export const getPrepopulatedHelperAttendance = (): HelperAttendance[] => [
     "checkOutTime": "2026-11-10T11:14:58.701Z",
     "entryGate": "Main Security Gate",
     "assignedFlats": [
-      "102",
-      "A-102"
+            "A-102"
     ],
     "status": "checked-out"
   },
@@ -3156,8 +2932,7 @@ export const getPrepopulatedHelperAttendance = (): HelperAttendance[] => [
     "checkInTime": "2026-11-10T12:14:58.701Z",
     "entryGate": "Gate 2",
     "assignedFlats": [
-      "101",
-      "B-101"
+            "B-101"
     ],
     "status": "checked-in"
   },
@@ -3170,8 +2945,7 @@ export const getPrepopulatedHelperAttendance = (): HelperAttendance[] => [
     "checkInTime": "2026-11-10T10:44:58.701Z",
     "entryGate": "Main Security Gate",
     "assignedFlats": [
-      "101",
-      "C-101"
+            "C-101"
     ],
     "status": "checked-in"
   }

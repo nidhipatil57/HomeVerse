@@ -23,6 +23,7 @@ import {
   downloadPassBlob,
   sharePassImageToApps,
 } from "@/lib/visitorPassGenerator";
+import { isDomesticHelper, isHelperAssignedToResident } from "@/lib/helperUtils";
 
 const helperCategories = [
   "Maid", "Cook", "Driver", "Cleaner", "Nanny", "Elder Care", "Laundry", "Housekeeping"
@@ -97,33 +98,13 @@ export default function DailyCheckInsPage() {
     }
   }, [registerOpen]);
 
-  // Strictly domestic helper filter (Maids, Cooks, Housekeeping)
-  const isDomesticHelper = (cat?: string) => {
-    const c = (cat || "").toLowerCase();
-    return c.includes("maid") || c.includes("cook") || c.includes("housekeep") || c.includes("cleaning");
-  };
-
-  // Derive assigned helpers: ONLY registered domestic helpers (maids, cooks) linked to this resident's flat
+  // Derive assigned helpers: strictly domestic helpers (maids, cooks) assigned to this resident's flat
   const myHelpers = useMemo(() => {
-    if (!user) return [];
-    const cleanUserUnit = (user.unit || "").replace(/^[A-Za-z\s-]+/, '').trim();
-    
-    return helpers.filter(h => {
-      // Must be a domestic helper (Maid, Cook, etc.), not a personal guest or general visitor
-      if (!isDomesticHelper(h.category)) return false;
-
-      if (h.residentIds?.includes(user.id)) return true;
-      if (h.assignedResidents?.some(r => r && r.toLowerCase().includes((user.name || "").toLowerCase()))) return true;
-      if (h.assignedFlats && h.assignedFlats.some(f => {
-        if (!f) return false;
-        const cleanFlat = f.replace(/^[A-Za-z\s-]+/, '').trim();
-        return cleanFlat === cleanUserUnit || f === user.unit;
-      })) return true;
-      return false;
-    });
+    if (!user || !user.id) return [];
+    return helpers.filter((h) => isHelperAssignedToResident(h, user));
   }, [helpers, user]);
 
-  if (!mounted || !user) return null;
+  if (!mounted || !user || !user.id) return null;
 
   // Open Gate Pass Preview
   const handleOpenPassModal = (helper: Helper) => {
@@ -313,7 +294,8 @@ export default function DailyCheckInsPage() {
   const parseTime = (timeStr: string) => {
     try {
       const [time, modifier] = timeStr.split(" ");
-      let [hours, mins] = time.split(":").map(Number);
+      const [rawHours, mins] = time.split(":").map(Number);
+      let hours = rawHours;
       if (modifier === "PM" && hours < 12) hours += 12;
       if (modifier === "AM" && hours === 12) hours = 0;
       return { hours, mins };
@@ -334,9 +316,7 @@ export default function DailyCheckInsPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-            <ClipboardCheck className="w-8 h-8 text-primary" /> Daily Check-Ins
-          </h1>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2"><ClipboardCheck className="w-8 h-8 text-primary" /> Daily Check-Ins</h1>
           <p className="text-muted-foreground mt-1">
             Real-time entry tracker, live gate passes, and logs for your recurring household helpers (maids, cooks, drivers).
           </p>
@@ -924,9 +904,7 @@ export default function DailyCheckInsPage() {
       >
         <DialogContent className="sm:max-w-md rounded-3xl p-6 bg-card border-primary/20 max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-[family-name:var(--font-heading)] text-center text-lg font-bold">
-              Domestic Helper Gate Pass
-            </DialogTitle>
+            <DialogTitle className="font-[family-name:var(--font-heading)] text-center text-lg font-bold">Domestic Helper Gate Pass</DialogTitle>
             <DialogDescription className="text-center text-xs text-muted-foreground mt-0.5">
               Official QR gate pass for security verification and entry.
             </DialogDescription>

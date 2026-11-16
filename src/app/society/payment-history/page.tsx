@@ -85,9 +85,7 @@ export default function PaymentHistoryPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Payment History 🧾
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Payment History</h1>
         <p className="text-muted-foreground mt-1">
           Review and audit past paid invoices, receipts, and society contributions
         </p>
@@ -96,9 +94,7 @@ export default function PaymentHistoryPage() {
       {/* Paid Invoices List */}
       <Card className="border-border/50">
         <CardHeader>
-          <CardTitle className="text-base font-bold flex items-center gap-1.5">
-            <Clock className="w-4.5 h-4.5 text-primary" /> Paid Invoices Archive
-          </CardTitle>
+          <CardTitle className="text-base font-bold flex items-center gap-1.5"><Clock className="w-4.5 h-4.5 text-primary" /> Paid Invoices Archive</CardTitle>
           <CardDescription>Receipts and paid cycles log</CardDescription>
         </CardHeader>
         <CardContent className="p-0">

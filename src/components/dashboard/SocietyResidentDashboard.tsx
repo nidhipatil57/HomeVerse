@@ -38,7 +38,7 @@ const quickActions = [
 ];
 
 export function SocietyResidentDashboard({ resident }: { resident: any }) {
-  const { complaints, visitors, parcels, maintenanceBills, communityEvents, announcements, lostFoundItems, raiseEmergencyAlert } = useCommunityStore(
+  const { complaints, visitors, parcels, maintenanceBills, communityEvents, announcements, lostFoundItems } = useCommunityStore(
     useShallow((state) => ({
       complaints: state.complaints,
       visitors: state.visitors,
@@ -47,7 +47,6 @@ export function SocietyResidentDashboard({ resident }: { resident: any }) {
       communityEvents: state.communityEvents,
       announcements: state.announcements || [],
       lostFoundItems: state.lostFoundItems || [],
-      raiseEmergencyAlert: state.raiseEmergencyAlert
     }))
   );
 
@@ -115,7 +114,7 @@ export function SocietyResidentDashboard({ resident }: { resident: any }) {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">
-              Good Morning, {resident?.name || "Nidhi"} 👋
+              Good Morning, {resident?.name || "Nidhi"}
             </h1>
             <p className="text-muted-foreground mt-1">
               Here&apos;s what&apos;s happening at {resident?.societyName || "Harmony Heights"} today • Flat {resident?.unit || "A-301"}.
@@ -129,51 +128,6 @@ export function SocietyResidentDashboard({ resident }: { resident: any }) {
           </div>
         </div>
       </motion.div>
-
-      {/* Emergency Trigger SOS & Parcel release */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <Card className="md:col-span-8 border-red-500/20 bg-red-500/5 relative overflow-hidden flex flex-col justify-center">
-          <div className="absolute right-0 top-0 w-32 h-32 bg-red-500/10 rounded-full blur-2xl pointer-events-none" />
-          <CardContent className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <span className="text-[10px] text-red-500 font-extrabold uppercase tracking-widest block">🚨 SECURITY SOS</span>
-              <h2 className="text-base font-bold text-foreground">Need Immediate Security or Medical Assistance?</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Triggering SOS will instantly notify the Main Gate guard post with your flat location.</p>
-            </div>
-            <Button
-              onClick={() => {
-                raiseEmergencyAlert({
-                  residentId: resident.id,
-                  residentName: resident.name,
-                  unit: resident.unit,
-                  building: resident.building || "Tower A",
-                  phone: resident.phone || "+91 99999 88888",
-                  emergencyType: "Medical",
-                  priority: "critical"
-                });
-                alert("Emergency SOS Alert has been broadcast to security guards at Gate 1!");
-              }}
-              className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-10 px-4 text-xs font-semibold shrink-0"
-            >
-              Trigger Emergency SOS
-            </Button>
-          </CardContent>
-        </Card>
-
-        {myParcels.length > 0 && (
-          <Card className="md:col-span-4 border-amber-500/20 bg-amber-500/5 flex flex-col justify-center">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0 text-amber-500">
-                <Package className="w-5 h-5 animate-bounce" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-foreground">Parcel Awaiting Gate Pickup!</h4>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Show Gate OTP: <span className="font-bold text-amber-600 font-mono text-xs">{myParcels[0].otp}</span> to release.</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
 
       {/* Lost & Found Hub Widget */}
       <motion.div

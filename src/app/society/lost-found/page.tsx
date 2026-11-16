@@ -436,9 +436,7 @@ export default function LostFoundPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-            Community Lost & Found 🔍
-          </h1>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Community Lost & Found</h1>
           <p className="text-muted-foreground mt-1">
             Browse verified found items held by Security, submit claims, or notify Security of your lost property.
           </p>
@@ -891,10 +889,8 @@ export default function LostFoundPage() {
       <Dialog open={showClaimModal} onOpenChange={setShowClaimModal}>
         <DialogContent className="sm:max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto bg-card text-foreground border border-border">
           <DialogHeader>
-            <DialogTitle className="font-[family-name:var(--font-heading)] flex items-center gap-2 text-base">
-              <Shield className="w-5 h-5 text-indigo-500" />
-              Ownership verification form
-            </DialogTitle>
+            <DialogTitle className="font-[family-name:var(--font-heading)] flex items-center gap-2 text-base"><Shield className="w-5 h-5 text-indigo-500" />
+              Ownership verification form</DialogTitle>
             <DialogDescription className="text-xs">
               Answer the questions below to submit ownership proof. This information will only be shared with Security.
             </DialogDescription>

@@ -61,7 +61,7 @@ export default function SecurityHelpersEntryPage() {
 
   // Current day and date
   const now = new Date();
-  const todayStr = useMemo(() => now.toLocaleDateString("en-CA"), []);
+  const todayStr = now.toLocaleDateString("en-CA");
   const todayDayName = dayNames[now.getDay()];
   const todayDayShort = dayShortNames[now.getDay()];
 
@@ -168,9 +168,7 @@ export default function SecurityHelpersEntryPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border/40">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold font-[family-name:var(--font-heading)] flex items-center gap-2.5">
-            <Shield className="w-7 h-7 text-blue-500" /> Domestic Help Attendance Console
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold font-[family-name:var(--font-heading)] flex items-center gap-2.5"><Shield className="w-7 h-7 text-blue-500" /> Domestic Help Attendance Console</h1>
           <p className="text-xs md:text-sm text-muted-foreground mt-1">
             Dedicated Security portal for registered domestic staff (maids, cooks, housekeeping). Automatically synchronized from Resident Gate Passes.
           </p>
@@ -308,9 +306,7 @@ export default function SecurityHelpersEntryPage() {
               <CardHeader className="pb-3 border-b border-border/50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-base font-bold">
-                      Today's Scheduled Helpers ({todayDayName})
-                    </CardTitle>
+                    <CardTitle className="text-base font-bold">Today's Scheduled Helpers ({todayDayName})</CardTitle>
                     <CardDescription className="text-xs">
                       1-click check-in and check-out with automatic timestamps. Instant notification sent to resident flat.
                     </CardDescription>
@@ -452,10 +448,8 @@ export default function SecurityHelpersEntryPage() {
           <div className="lg:col-span-4 space-y-4">
             <Card className="border-border/60 bg-card rounded-2xl shadow-sm flex flex-col h-[520px] overflow-hidden">
               <CardHeader className="pb-3 border-b border-border/50">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Currently Inside ({currentlyInsideList.length})
-                </CardTitle>
+                <CardTitle className="text-sm font-bold flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Currently Inside ({currentlyInsideList.length})</CardTitle>
                 <CardDescription className="text-[11px]">
                   Domestic staff actively present inside residential flats
                 </CardDescription>

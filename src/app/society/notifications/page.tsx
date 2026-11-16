@@ -45,9 +45,7 @@ export default function SocietyNotificationsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-            Notifications Inbox 🔔
-          </h1>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">Notifications Inbox</h1>
           <p className="text-muted-foreground mt-1">
             Read alerts, transaction updates, and safety broadcasts sent to your flat
           </p>
@@ -69,9 +67,7 @@ export default function SocietyNotificationsPage() {
       {/* Inbox List */}
       <Card className="border-border/50">
         <CardHeader className="pb-3 border-b">
-          <CardTitle className="text-base font-semibold flex items-center gap-1.5">
-            <MailOpen className="w-4.5 h-4.5 text-primary" /> My Notifications Inbox
-          </CardTitle>
+          <CardTitle className="text-base font-semibold flex items-center gap-1.5"><MailOpen className="w-4.5 h-4.5 text-primary" /> My Notifications Inbox</CardTitle>
           <CardDescription>Direct announcements and alert messages</CardDescription>
         </CardHeader>
         <CardContent className="p-0">

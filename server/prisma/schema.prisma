@@ -261,20 +261,60 @@ model FacilityBooking {
 }
 
 model MarketplaceItem {
-  id          String   @id
-  title       String
-  description String
-  price       String
-  sellerId    String
-  sellerName  String
-  category    String
-  status      String
-  portal      String
-  createdAt   DateTime @default(now())
-  images      String[]
+  id                String                 @id
+  title             String
+  description       String
+  price             String
+  originalPrice     String?
+  condition         String?                @default("Good")
+  sellerId          String
+  sellerName        String
+  flatNumber        String?
+  building          String?
+  contactPreference String?                @default("In-app")
+  contactPhone      String?
+  category          String
+  status            String                 @default("active")
+  portal            String
+  createdAt         DateTime               @default(now())
+  soldAt            DateTime?
+  images            String[]
+  enquiries         MarketplaceEnquiry[]
+  savedBy           MarketplaceSavedItem[]
 
   @@index([sellerId])
   @@index([portal])
+  @@index([status])
+}
+
+model MarketplaceEnquiry {
+  id          String          @id
+  itemId      String
+  item        MarketplaceItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemTitle   String?
+  sellerId    String
+  buyerId     String
+  buyerName   String
+  buyerFlat   String?
+  buyerPhone  String?
+  message     String
+  status      String          @default("pending")
+  createdAt   DateTime        @default(now())
+
+  @@index([itemId])
+  @@index([sellerId])
+  @@index([buyerId])
+}
+
+model MarketplaceSavedItem {
+  id        String          @id
+  userId    String
+  itemId    String
+  item      MarketplaceItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+
+  @@unique([userId, itemId])
+  @@index([userId])
 }
 
 model FoundItem {

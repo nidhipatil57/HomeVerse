@@ -29,9 +29,7 @@ export default function SecretaryFinancialReportsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Financial Reports Console 📊
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Financial Reports Console</h1>
         <p className="text-muted-foreground mt-1">
           Export annual audit logs, download capital expense summaries, and generate tax audit balance sheets
         </p>
@@ -41,9 +39,7 @@ export default function SecretaryFinancialReportsPage() {
         {/* Left: Export Action Console */}
         <Card className="lg:col-span-5 border-border/50 h-fit">
           <CardHeader>
-            <CardTitle className="text-base font-bold flex items-center gap-1.5">
-              <ClipboardList className="w-5 h-5 text-primary" /> Run Custom Exporters
-            </CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-1.5"><ClipboardList className="w-5 h-5 text-primary" /> Run Custom Exporters</CardTitle>
             <CardDescription>Compile real-time logs for audits</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -80,9 +76,7 @@ export default function SecretaryFinancialReportsPage() {
         {/* Right: Archived Documents */}
         <Card className="lg:col-span-7 border-border/50">
           <CardHeader>
-            <CardTitle className="text-base font-bold flex items-center gap-1.5">
-              <FileText className="w-5 h-5 text-primary" /> Archived Financial Statements
-            </CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-1.5"><FileText className="w-5 h-5 text-primary" /> Archived Financial Statements</CardTitle>
             <CardDescription>Statements approved by Committee Board</CardDescription>
           </CardHeader>
           <CardContent className="p-0">

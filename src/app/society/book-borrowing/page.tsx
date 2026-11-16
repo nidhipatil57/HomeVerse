@@ -64,9 +64,7 @@ export default function BookBorrowingPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Book Borrowing 📚
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Book Borrowing</h1>
         <p className="text-muted-foreground mt-1">
           Search the society community library, request books, and manage your borrowed book logs
         </p>
@@ -137,9 +135,7 @@ export default function BookBorrowingPage() {
         {/* Right: Borrowed Items */}
         <Card className="lg:col-span-4 border-border/50 h-fit">
           <CardContent className="p-5">
-            <h3 className="font-bold text-sm text-foreground flex items-center gap-1.5 border-b pb-3 mb-4">
-              <Bookmark className="w-4 h-4 text-primary" /> My Borrowed Books ({borrowedBooks.length})
-            </h3>
+            <h3 className="font-bold text-sm text-foreground flex items-center gap-1.5 border-b pb-3 mb-4"><Bookmark className="w-4 h-4 text-primary" /> My Borrowed Books ({borrowedBooks.length})</h3>
 
             <div className="space-y-3">
               {borrowedBooks.map((b) => (

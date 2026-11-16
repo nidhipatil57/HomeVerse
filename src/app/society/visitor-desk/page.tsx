@@ -415,9 +415,7 @@ export default function SecurityVisitorDeskPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-            <Shield className="w-8 h-8 text-red-500" /> Security Gateguard Portal
-          </h1>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2"><Shield className="w-8 h-8 text-red-500" /> Security Gateguard Portal</h1>
           <p className="text-muted-foreground mt-1">
             Gate guard station for verifying codes, checking walk-ins, and managing visitor parking slots.
           </p>
@@ -517,7 +515,7 @@ export default function SecurityVisitorDeskPage() {
             />
             <DialogContent className="sm:max-w-md rounded-2xl p-6">
               <DialogHeader>
-                <DialogTitle className="font-[family-name:var(--font-heading)] text-red-600 flex items-center gap-1.5">🚨 Log Emergency Vehicle Entry</DialogTitle>
+                <DialogTitle className="font-[family-name:var(--font-heading)] text-red-600 flex items-center gap-1.5">Log Emergency Vehicle Entry</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleEmergencySubmit} className="space-y-4 mt-2">
                 <div>

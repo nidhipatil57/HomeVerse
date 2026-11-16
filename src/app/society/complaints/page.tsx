@@ -734,12 +734,10 @@ export default function ComplaintsPage() {
           <div className="flex items-center gap-2">
             <span className="text-3xl">🛡️</span>
             <div>
-              <h1 className="text-2xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-                HomeVerse Complaints Control Center
+              <h1 className="text-2xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">HomeVerse Complaints Control Center
                 <Badge className="bg-primary/20 text-primary border-primary/30 uppercase text-[10px] tracking-wider">
                   Role: {user?.role}
-                </Badge>
-              </h1>
+                </Badge></h1>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Enterprise ticket management, real-time database sync, and AI diagnostics.
               </p>
@@ -760,9 +758,7 @@ export default function ComplaintsPage() {
             />
             <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto rounded-2xl bg-card border border-border shadow-xl">
               <DialogHeader>
-                <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold flex items-center gap-2 text-foreground">
-                  🏢 Gated Complex Community Complaint Board
-                </DialogTitle>
+                <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold flex items-center gap-2 text-foreground">Gated Complex Community Complaint Board</DialogTitle>
                 <CardDescription className="text-xs">
                   Review active complex-wide maintenance schedules to help coordinate requests and prevent duplicates.
                 </CardDescription>
@@ -862,9 +858,7 @@ export default function ComplaintsPage() {
               />
               <DialogContent className="sm:max-w-xl rounded-2xl bg-card border border-border shadow-xl">
                 <DialogHeader>
-                  <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold">
-                    {isSecurity ? "🚨 Log Gated Security Incident" : "📋 Submit Maintenance Ticket"}
-                  </DialogTitle>
+                  <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold">{isSecurity ? " Log Gated Security Incident" : " Submit Maintenance Ticket"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleRaiseComplaint} className="space-y-4 mt-3 text-xs">
                   <div className="grid grid-cols-2 gap-4">
@@ -1402,9 +1396,7 @@ export default function ComplaintsPage() {
                             <Badge className="bg-red-600 text-white text-[10px] animate-pulse">EMERGENCY LEVEL</Badge>
                           )}
                         </div>
-                        <h2 className="text-lg font-bold font-[family-name:var(--font-heading)] text-foreground mt-1.5">
-                          {selected.title}
-                        </h2>
+                        <h2 className="text-lg font-bold font-[family-name:var(--font-heading)] text-foreground mt-1.5">{selected.title}</h2>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
                           Raised by <strong>{selected.raisedByName}</strong> · Flat {selected.unit}, {selected.building} (Wing {selected.wing || "A"}) · Logged {new Date(selected.createdAt).toLocaleString()}
                         </p>

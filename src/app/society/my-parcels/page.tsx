@@ -40,9 +40,7 @@ export default function MyParcelsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          My Parcels 📦
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">My Parcels</h1>
         <p className="text-muted-foreground mt-1">
           Track packages and courier deliveries received at the gatekeeper post and view release OTPs
         </p>
@@ -105,9 +103,7 @@ export default function MyParcelsPage() {
         {/* Right Column: Historical Logs */}
         <Card className="lg:col-span-4 border-border/50 h-fit">
           <CardHeader>
-            <CardTitle className="text-base font-bold flex items-center gap-1.5">
-              <Clock className="w-4.5 h-4.5 text-primary" /> Delivery History
-            </CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-1.5"><Clock className="w-4.5 h-4.5 text-primary" /> Delivery History</CardTitle>
             <CardDescription className="text-xs">Archive logs of picked-up packages</CardDescription>
           </CardHeader>
           <CardContent className="p-0">

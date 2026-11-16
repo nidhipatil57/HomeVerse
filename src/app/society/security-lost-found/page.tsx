@@ -414,9 +414,7 @@ export default function SecurityLostFoundPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-            Lost & Found Officer Console 🛡️
-          </h1>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Lost & Found Officer Console</h1>
           <p className="text-muted-foreground mt-1">
             Manage found items, cross-reference private alerts, and process claims.
           </p>
@@ -446,10 +444,8 @@ export default function SecurityLostFoundPage() {
         <TabsContent value="pending" className="space-y-4">
           <Card className="border-border/50">
             <CardHeader className="pb-3 border-b">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Clock className="w-5 h-5 text-amber-500" />
-                Awaiting Verification Queue
-              </CardTitle>
+              <CardTitle className="text-base font-bold flex items-center gap-2"><Clock className="w-5 h-5 text-amber-500" />
+                Awaiting Verification Queue</CardTitle>
               <CardDescription>Items reported by residents that have not been physically logged or verified at the Security Desk.</CardDescription>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
@@ -515,10 +511,8 @@ export default function SecurityLostFoundPage() {
             <div className="lg:col-span-2 space-y-4">
               <Card className="border-border/50">
                 <CardHeader className="pb-3 border-b">
-                  <CardTitle className="text-base font-bold flex items-center gap-2">
-                    <ClipboardList className="w-5 h-5 text-indigo-500" />
-                    Published / Held at Security Desk
-                  </CardTitle>
+                  <CardTitle className="text-base font-bold flex items-center gap-2"><ClipboardList className="w-5 h-5 text-indigo-500" />
+                    Published / Held at Security Desk</CardTitle>
                   <CardDescription>Verified items currently held in storage at the gate desk. Residents can see these.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 space-y-4">
@@ -560,10 +554,8 @@ export default function SecurityLostFoundPage() {
             <div className="space-y-4">
               <Card className="border-border/50 bg-secondary/10">
                 <CardHeader className="pb-3 border-b">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 text-purple-600" />
-                    Private Lost Alerts ({privateLostAlerts.length})
-                  </CardTitle>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-purple-600" />
+                    Private Lost Alerts ({privateLostAlerts.length})</CardTitle>
                   <CardDescription className="text-[11px]">Private notifications reported by residents. Security can suggest matching items.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-3 space-y-3">
@@ -603,10 +595,8 @@ export default function SecurityLostFoundPage() {
         <TabsContent value="claims" className="space-y-4">
           <Card className="border-border/50">
             <CardHeader className="pb-3 border-b">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <User className="w-5 h-5 text-indigo-500" />
-                Resident Ownership Claims
-              </CardTitle>
+              <CardTitle className="text-base font-bold flex items-center gap-2"><User className="w-5 h-5 text-indigo-500" />
+                Resident Ownership Claims</CardTitle>
               <CardDescription>Residents claiming possession of published items. Verify details and approve for desk pickup.</CardDescription>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
@@ -725,10 +715,8 @@ export default function SecurityLostFoundPage() {
         <TabsContent value="history" className="space-y-4">
           <Card className="border-border/50">
             <CardHeader className="pb-3 border-b">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                Handover Audit Logs
-              </CardTitle>
+              <CardTitle className="text-base font-bold flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                Handover Audit Logs</CardTitle>
               <CardDescription>Archived records of successfully returned or resolved items.</CardDescription>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
@@ -864,9 +852,7 @@ export default function SecurityLostFoundPage() {
       <Dialog open={showClaimHandoverDialog} onOpenChange={setShowClaimHandoverDialog}>
         <DialogContent className="sm:max-w-md rounded-2xl bg-card text-foreground border border-border">
           <DialogHeader>
-            <DialogTitle className="font-[family-name:var(--font-heading)] flex items-center gap-1.5 text-base">
-              <Shield className="w-5 h-5 text-indigo-500" /> Secure OTP Handover
-            </DialogTitle>
+            <DialogTitle className="font-[family-name:var(--font-heading)] flex items-center gap-1.5 text-base"><Shield className="w-5 h-5 text-indigo-500" /> Secure OTP Handover</DialogTitle>
             <DialogDescription className="text-xs">
               Verify the claimant is physically present. Enter the 6-digit Collection OTP generated on their portal to finalize return.
             </DialogDescription>

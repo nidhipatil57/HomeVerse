@@ -38,6 +38,22 @@ router.post("/announcements", authenticateToken, async (req: any, res) => {
       }
     });
     broadcastUpdate("announcement:update", newItem);
+
+    try {
+      const residents = await prisma.user.findMany({
+        where: { role: "resident" },
+        select: { id: true }
+      });
+      for (const r of residents) {
+        await sendInAppNotification(
+          r.id,
+          `Announcement: ${title}`,
+          content.substring(0, 100) + (content.length > 100 ? "..." : ""),
+          "info"
+        );
+      }
+    } catch (e) {}
+
     res.status(201).json(newItem);
   } catch (error) {
     res.status(500).json({ error: "Failed to create announcement" });
@@ -356,7 +372,7 @@ router.post("/maintenance/generate", optionalAuth, async (req: any, res) => {
 
         // 2. Also create a ResidentPayment record to track this transaction
         const paymentId = `PAY-BILL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
-        await prisma.residentPayment.create({
+        const payment = await prisma.residentPayment.create({
           data: {
             id: paymentId,
             residentId: r.id,
@@ -381,6 +397,7 @@ router.post("/maintenance/generate", optionalAuth, async (req: any, res) => {
 
         generatedBills.push(bill);
         broadcastUpdate("maintenance:update", bill);
+        broadcastUpdate("payment:update", payment);
       }
 
       return res.status(201).json({ success: true, count: generatedBills.length });
@@ -408,7 +425,7 @@ router.post("/maintenance/generate", optionalAuth, async (req: any, res) => {
 
     // Also create a ResidentPayment record for this single bill
     const paymentId = `PAY-BILL-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
-    await prisma.residentPayment.create({
+    const singlePayment = await prisma.residentPayment.create({
       data: {
         id: paymentId,
         residentId,
@@ -430,6 +447,7 @@ router.post("/maintenance/generate", optionalAuth, async (req: any, res) => {
     await sendInAppNotification(residentId, "Maintenance Bill Generated 🧾", `📢 ${month} maintenance bill has been generated. Due date: ${dueDate}`, "warning");
 
     broadcastUpdate("maintenance:update", bill);
+    broadcastUpdate("payment:update", singlePayment);
     res.status(201).json(bill);
   } catch (error) {
     console.error("Failed to generate maintenance bills:", error);
@@ -728,7 +746,7 @@ router.post("/payments/collections", optionalAuth, async (req: any, res) => {
       try {
         await sendInAppNotification(
           r.id,
-          "New Special Collection Announced 📣",
+          "New Special Collection Announced",
           `${title} (₹${parsedAmount.toLocaleString()}) announced by Secretary. Due by ${dueDate}.`,
           "info"
         );
@@ -2272,60 +2290,346 @@ router.put("/incidents/:id/resolve", authenticateToken, async (req: any, res) =>
 });
 
 // ==========================================
-// 🛠️ Marketplace Items
+// 🛠️ Marketplace Items (Buy & Sell)
 // ==========================================
 router.get("/marketplace", authenticateToken, async (req: any, res) => {
   try {
+    const { status, category, search, myOnly } = req.query;
+    const where: any = { portal: req.user.portal || "society" };
+    
+    if (myOnly === "true") {
+      where.sellerId = req.user.id;
+    } else if (status && status !== "all") {
+      where.status = status;
+    }
+    
+    if (category && category !== "All" && category !== "All Items") {
+      where.category = category;
+    }
+
+    if (search && String(search).trim()) {
+      const q = String(search).trim();
+      where.OR = [
+        { title: { contains: q, mode: "insensitive" } },
+        { description: { contains: q, mode: "insensitive" } },
+        { sellerName: { contains: q, mode: "insensitive" } },
+        { category: { contains: q, mode: "insensitive" } }
+      ];
+    }
+
     const list = await prisma.marketplaceItem.findMany({
-      where: { portal: req.user.portal },
+      where,
+      include: {
+        enquiries: {
+          orderBy: { createdAt: "desc" }
+        },
+        savedBy: true
+      },
       orderBy: { createdAt: "desc" }
     });
     res.json(list);
   } catch (error) {
+    console.error("Failed to fetch marketplace items:", error);
     res.status(500).json({ error: "Failed to fetch marketplace" });
   }
 });
 
 router.post("/marketplace", authenticateToken, async (req: any, res) => {
-  const { title, description, price, category, images } = req.body;
+  const {
+    title,
+    description,
+    price,
+    originalPrice,
+    condition,
+    category,
+    images,
+    contactPreference,
+    contactPhone,
+    flatNumber,
+    building
+  } = req.body;
+
   if (!title || !description || !price || !category) {
     return res.status(400).json({ error: "Title, description, price, and category are required" });
   }
+
   try {
-    const id = `MKT-${Math.floor(100 + Math.random() * 900)}`;
+    const id = (req.body.id && String(req.body.id).trim()) || `BUY-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+    const resolvedFlat = flatNumber || req.user.unit || "";
+    const resolvedBuilding = building || req.user.building || "A Wing";
+    const resolvedPhone = contactPhone || req.user.phone || "";
+
     const newItem = await prisma.marketplaceItem.create({
       data: {
         id,
-        title,
-        description,
-        price,
+        title: title.trim(),
+        description: description.trim(),
+        price: String(price).trim(),
+        originalPrice: originalPrice ? String(originalPrice).trim() : null,
+        condition: condition || "Good",
         sellerId: req.user.id,
-        sellerName: req.user.name || "User",
+        sellerName: req.user.name || "Resident",
+        flatNumber: resolvedFlat,
+        building: resolvedBuilding,
+        contactPreference: contactPreference || "In-app",
+        contactPhone: resolvedPhone,
         category,
-        status: "available",
-        portal: req.user.portal,
-        images: images || []
+        status: "active",
+        portal: req.user.portal || "society",
+        images: Array.isArray(images) ? images : []
+      },
+      include: {
+        enquiries: true,
+        savedBy: true
       }
     });
+
     broadcastUpdate("marketplace:update", newItem);
     res.status(201).json(newItem);
   } catch (error) {
+    console.error("Failed to post marketplace item:", error);
     res.status(500).json({ error: "Failed to post marketplace item" });
+  }
+});
+
+router.put("/marketplace/:id", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const {
+    title,
+    description,
+    price,
+    originalPrice,
+    condition,
+    category,
+    images,
+    contactPreference,
+    contactPhone,
+    status
+  } = req.body;
+
+  try {
+    const existing = await prisma.marketplaceItem.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Marketplace item not found" });
+    }
+
+    if (existing.sellerId !== req.user.id && req.user.role !== "secretary" && req.user.role !== "admin") {
+      return res.status(403).json({ error: "You are not authorized to edit this listing" });
+    }
+
+    const data: any = {};
+    if (title !== undefined) data.title = title.trim();
+    if (description !== undefined) data.description = description.trim();
+    if (price !== undefined) data.price = String(price).trim();
+    if (originalPrice !== undefined) data.originalPrice = originalPrice ? String(originalPrice).trim() : null;
+    if (condition !== undefined) data.condition = condition;
+    if (category !== undefined) data.category = category;
+    if (images !== undefined) data.images = Array.isArray(images) ? images : [];
+    if (contactPreference !== undefined) data.contactPreference = contactPreference;
+    if (contactPhone !== undefined) data.contactPhone = contactPhone;
+    if (status !== undefined) {
+      data.status = status;
+      if (status === "sold" && !existing.soldAt) {
+        data.soldAt = new Date();
+      }
+    }
+
+    const updated = await prisma.marketplaceItem.update({
+      where: { id },
+      data,
+      include: {
+        enquiries: true,
+        savedBy: true
+      }
+    });
+
+    broadcastUpdate("marketplace:update", updated);
+    res.json(updated);
+  } catch (error) {
+    console.error("Failed to update marketplace item:", error);
+    res.status(500).json({ error: "Failed to update marketplace item" });
   }
 });
 
 router.put("/marketplace/:id/status", authenticateToken, async (req: any, res) => {
   const { id } = req.params;
   const { status } = req.body;
+
   try {
+    const existing = await prisma.marketplaceItem.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Marketplace item not found" });
+    }
+
+    if (existing.sellerId !== req.user.id && req.user.role !== "secretary" && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Unauthorized to change status of this listing" });
+    }
+
     const updated = await prisma.marketplaceItem.update({
       where: { id },
-      data: { status }
+      data: {
+        status,
+        soldAt: status === "sold" ? new Date() : existing.soldAt
+      },
+      include: {
+        enquiries: true,
+        savedBy: true
+      }
     });
+
     broadcastUpdate("marketplace:update", updated);
     res.json(updated);
   } catch (error) {
+    console.error("Failed to update status:", error);
     res.status(500).json({ error: "Failed to update marketplace status" });
+  }
+});
+
+router.post("/marketplace/:id/enquire", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const { message, buyerFlat, buyerPhone } = req.body;
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ error: "Message is required to contact the seller" });
+  }
+
+  try {
+    const item = await prisma.marketplaceItem.findUnique({ where: { id } });
+    if (!item) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+
+    if (item.sellerId === req.user.id) {
+      return res.status(400).json({ error: "You cannot enquire on your own listing" });
+    }
+
+    const enqId = `ENQ-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+    const enquiry = await prisma.marketplaceEnquiry.create({
+      data: {
+        id: enqId,
+        itemId: item.id,
+        itemTitle: item.title,
+        sellerId: item.sellerId,
+        buyerId: req.user.id,
+        buyerName: req.user.name || "Resident",
+        buyerFlat: buyerFlat || req.user.unit || "",
+        buyerPhone: buyerPhone || req.user.phone || "",
+        message: message.trim(),
+        status: "pending"
+      }
+    });
+
+    try {
+      await sendInAppNotification(
+        item.sellerId,
+        "New Marketplace Enquiry 🛍️",
+        `📢 ${req.user.name || "A neighbor"} (Flat ${req.user.unit || ""}) enquired on "${item.title}": "${message.trim().slice(0, 80)}"`,
+        "info"
+      );
+    } catch (notifErr) {
+      console.warn("Notification error:", notifErr);
+    }
+
+    broadcastUpdate("marketplace:enquiry", { enquiry, itemId: item.id });
+    res.status(201).json(enquiry);
+  } catch (error) {
+    console.error("Failed to submit enquiry:", error);
+    res.status(500).json({ error: "Failed to submit enquiry" });
+  }
+});
+
+router.get("/marketplace/enquiries", authenticateToken, async (req: any, res) => {
+  try {
+    const received = await prisma.marketplaceEnquiry.findMany({
+      where: { sellerId: req.user.id },
+      include: { item: true },
+      orderBy: { createdAt: "desc" }
+    });
+    const sent = await prisma.marketplaceEnquiry.findMany({
+      where: { buyerId: req.user.id },
+      include: { item: true },
+      orderBy: { createdAt: "desc" }
+    });
+    res.json({ received, sent });
+  } catch (error) {
+    console.error("Failed to fetch enquiries:", error);
+    res.status(500).json({ error: "Failed to fetch enquiries" });
+  }
+});
+
+router.post("/marketplace/:id/save", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  try {
+    const existing = await prisma.marketplaceSavedItem.findUnique({
+      where: {
+        userId_itemId: {
+          userId: req.user.id,
+          itemId: id
+        }
+      }
+    });
+
+    if (existing) {
+      await prisma.marketplaceSavedItem.delete({
+        where: { id: existing.id }
+      });
+      return res.json({ saved: false });
+    } else {
+      await prisma.marketplaceSavedItem.create({
+        data: {
+          id: `SAV-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`,
+          userId: req.user.id,
+          itemId: id
+        }
+      });
+      return res.json({ saved: true });
+    }
+  } catch (error) {
+    console.error("Failed to toggle save item:", error);
+    res.status(500).json({ error: "Failed to toggle save item" });
+  }
+});
+
+router.get("/marketplace/saved", authenticateToken, async (req: any, res) => {
+  try {
+    const saved = await prisma.marketplaceSavedItem.findMany({
+      where: { userId: req.user.id },
+      include: { item: true },
+      orderBy: { createdAt: "desc" }
+    });
+    res.json(saved.map(s => s.item));
+  } catch (error) {
+    console.error("Failed to fetch saved items:", error);
+    res.status(500).json({ error: "Failed to fetch saved items" });
+  }
+});
+
+router.delete("/marketplace/:id", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  try {
+    const existing = await prisma.marketplaceItem.findUnique({ where: { id } });
+    if (existing && existing.sellerId !== req.user.id && req.user.role !== "secretary" && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Unauthorized to delete this listing" });
+    }
+    await prisma.marketplaceItem.delete({ where: { id } });
+    broadcastUpdate("marketplace:delete", { id });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Failed to delete marketplace item:", error);
+    res.status(500).json({ error: "Failed to delete marketplace item" });
+  }
+});
+
+router.post("/marketplace/clear-all", optionalAuth, async (req: any, res) => {
+  try {
+    await prisma.marketplaceEnquiry.deleteMany({});
+    await prisma.marketplaceSavedItem.deleteMany({});
+    await prisma.marketplaceItem.deleteMany({});
+    broadcastUpdate("marketplace:clear", {});
+    res.json({ success: true, message: "Marketplace cleared successfully" });
+  } catch (error) {
+    console.error("Failed to clear marketplace:", error);
+    res.json({ success: true, offline: true });
   }
 });
 
@@ -3939,13 +4243,15 @@ router.post("/flats", authenticateToken, async (req: any, res) => {
 // Facility Bookings
 router.get("/facility-bookings", authenticateToken, async (req: any, res) => {
   try {
-    const list = await prisma.facilityBooking.findMany();
+    const list = await prisma.facilityBooking.findMany({
+      include: { user: true }
+    });
     const mapped = list.map(b => ({
       id: b.id,
       facility: b.facilityName,
       userId: b.residentId,
-      userName: b.residentName,
-      unit: "A-204", // default fallback flat
+      userName: b.residentName || b.user?.name || "Resident",
+      unit: b.user?.unit || "A-101",
       date: b.date,
       slot: b.timeSlot,
       status: b.status as any
@@ -3962,6 +4268,20 @@ router.post("/facility-bookings", authenticateToken, async (req: any, res) => {
     return res.status(400).json({ error: "Facility, date, and slot are required" });
   }
   try {
+    // Check for existing active booking on same facility, date and slot
+    const existing = await prisma.facilityBooking.findFirst({
+      where: {
+        facilityName: facility,
+        date,
+        timeSlot: slot,
+        status: "booked"
+      }
+    });
+
+    if (existing) {
+      return res.status(409).json({ error: "This slot is already booked. Please choose another time slot." });
+    }
+
     const id = `FBK-${Math.floor(100 + Math.random() * 900)}-${Date.now()}`;
     const newBooking = await prisma.facilityBooking.create({
       data: {
@@ -3982,7 +4302,7 @@ router.post("/facility-bookings", authenticateToken, async (req: any, res) => {
       facility: newBooking.facilityName,
       userId: newBooking.residentId,
       userName: newBooking.residentName,
-      unit: req.user.unit || "A-204",
+      unit: req.user.unit || "A-101",
       date: newBooking.date,
       slot: newBooking.timeSlot,
       status: "booked" as const
@@ -4003,17 +4323,6 @@ router.delete("/facility-bookings/:id", authenticateToken, async (req: any, res)
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Failed to cancel booking" });
-  }
-});
-
-router.delete("/marketplace/:id", authenticateToken, async (req: any, res) => {
-  const { id } = req.params;
-  try {
-    await prisma.marketplaceItem.delete({ where: { id } });
-    broadcastUpdate("marketplace:delete", { id });
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to delete marketplace item" });
   }
 });
 

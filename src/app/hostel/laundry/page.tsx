@@ -365,7 +365,7 @@ export default function LaundryPage() {
                       const isBooked = record && record.status === "booked";
                       const isMine = isBooked && record?.bookedBy === user?.id;
 
-                      let variantStr = "outline";
+                      const variantStr = "outline";
                       let colorClass = "text-muted-foreground hover:bg-secondary";
                       let label = "Available";
 

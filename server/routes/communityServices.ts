@@ -484,6 +484,23 @@ router.post("/messages", authenticateToken, async (req: any, res) => {
   }
 });
 
+router.delete("/messages/:userId", authenticateToken, async (req: any, res) => {
+  const { userId } = req.params;
+  try {
+    await prisma.chatMessage.deleteMany({
+      where: {
+        OR: [
+          { senderId: req.user.id, receiverId: userId },
+          { senderId: userId, receiverId: req.user.id }
+        ]
+      }
+    });
+    res.json({ success: true, message: "Chat thread deleted successfully" });
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to delete chat: " + error.message });
+  }
+});
+
 // ==========================================
 // 🛠️ Secretary Moderation & Verification
 // ==========================================

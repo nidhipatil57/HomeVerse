@@ -289,68 +289,7 @@ const getPrepopulatedParcels = () => [
     }
 ];
 exports.getPrepopulatedParcels = getPrepopulatedParcels;
-const getPrepopulatedMarketplaceItems = () => [
-    {
-        id: "MKT-001",
-        title: "Mountain Cycle (18-Speed)",
-        description: "Excellent riding condition, disc brakes. Used for 1 year around campus.",
-        price: "₹3,500",
-        sellerId: "user-student-3",
-        sellerName: "Rohan Das",
-        category: "Cycles",
-        status: "available",
-        portal: "hostel",
-        createdAt: "2026-07-01T12:00:00"
-    },
-    {
-        id: "MKT-002",
-        title: "Academic Notes - CS Algorithms",
-        description: "Complete handwritten notes covering all core sorting, graph algorithms, and DP proofs.",
-        price: "₹250",
-        sellerId: "user-student-1",
-        sellerName: "Aarav Mehta",
-        category: "Notes",
-        status: "available",
-        portal: "hostel",
-        createdAt: "2026-07-02T09:00:00"
-    },
-    {
-        id: "MKT-003",
-        title: "Microwave Oven (Solitaire 20L)",
-        description: "Compact microwave, excellent heating. Used for only 6 months. Relocating, so selling.",
-        price: "₹2,500",
-        sellerId: "user-resident-2",
-        sellerName: "Nidhi Kumar",
-        category: "Electronics",
-        status: "available",
-        portal: "society",
-        createdAt: "2026-06-30T10:00:00"
-    },
-    {
-        id: "MKT-004",
-        title: "Wooden Study Table",
-        description: "Spacious wooden study table with a drawer and small shelf. Great for students.",
-        price: "₹1,200",
-        sellerId: "user-resident-1",
-        sellerName: "Sara Shah",
-        category: "Furniture",
-        status: "available",
-        portal: "society",
-        createdAt: "2026-07-04T15:00:00"
-    },
-    {
-        id: "MKT-005",
-        title: "Acoustic Guitar - Kadence Frontier",
-        description: "Sunburst color acoustic guitar, barely used. Comes with bag and picks.",
-        price: "₹3,800",
-        sellerId: "user-resident-4",
-        sellerName: "Kishore Kumar",
-        category: "Others",
-        status: "available",
-        portal: "society",
-        createdAt: "2026-07-03T11:00:00"
-    }
-];
+const getPrepopulatedMarketplaceItems = () => [];
 exports.getPrepopulatedMarketplaceItems = getPrepopulatedMarketplaceItems;
 const getPrepopulatedFoundItems = () => [
     {
@@ -532,56 +471,114 @@ const getPrepopulatedItemMatches = () => [
 exports.getPrepopulatedItemMatches = getPrepopulatedItemMatches;
 const getPrepopulatedMaintenanceBills = () => [
     {
-        id: "BILL-001",
-        residentId: "user-resident-2",
-        residentName: "Nidhi Kumar",
-        unit: "A-301",
-        month: "July 2026",
-        amount: 4500,
-        dueDate: "2026-07-10",
-        status: "pending"
-    },
-    {
-        id: "BILL-002",
+        id: "BILL-OCT-2026-AWing-204",
         residentId: "user-resident-1",
         residentName: "Sara Shah",
-        unit: "A-204",
-        month: "July 2026",
+        unit: "204",
+        month: "October 2026",
         amount: 4500,
-        dueDate: "2026-07-10",
-        status: "paid",
-        paidOn: "2026-07-03"
+        dueDate: "2026-10-15",
+        status: "pending",
+        description: "October 2026 Society Maintenance"
     },
     {
-        id: "BILL-003",
+        id: "BILL-OCT-2026-AWing-102",
+        residentId: "user-resident-10",
+        residentName: "Gaurav Sen",
+        unit: "102",
+        month: "October 2026",
+        amount: 4500,
+        dueDate: "2026-10-15",
+        status: "pending",
+        description: "October 2026 Society Maintenance"
+    },
+    {
+        id: "BILL-OCT-2026-AWing-301",
+        residentId: "user-resident-2",
+        residentName: "Nidhi Kumar",
+        unit: "301",
+        month: "October 2026",
+        amount: 4500,
+        dueDate: "2026-10-15",
+        status: "pending",
+        description: "October 2026 Society Maintenance"
+    },
+    {
+        id: "BILL-OCT-2026-AWing-201",
         residentId: "user-resident-3",
         residentName: "Sunita Rao",
-        unit: "A-201",
-        month: "June 2026",
+        unit: "201",
+        month: "October 2026",
         amount: 4500,
-        dueDate: "2026-06-10",
-        status: "overdue"
+        dueDate: "2026-10-15",
+        status: "pending",
+        description: "October 2026 Society Maintenance"
     },
     {
-        id: "BILL-004",
+        id: "BILL-OCT-2026-BWing-101",
         residentId: "user-resident-4",
         residentName: "Kishore Kumar",
-        unit: "B-101",
-        month: "July 2026",
-        amount: 4000,
-        dueDate: "2026-07-10",
-        status: "pending"
+        unit: "101",
+        month: "October 2026",
+        amount: 4500,
+        dueDate: "2026-10-15",
+        status: "pending",
+        description: "October 2026 Society Maintenance"
     },
     {
-        id: "BILL-005",
+        id: "BILL-OCT-2026-CWing-404",
         residentId: "user-resident-5",
-        residentName: "Amit Shah",
-        unit: "101",
-        month: "July 2026",
-        amount: 4200,
-        dueDate: "2026-07-10",
-        status: "paid",
-        paidOn: "2026-07-02"
+        residentName: "Amit Joshi",
+        unit: "404",
+        month: "October 2026",
+        amount: 4500,
+        dueDate: "2026-10-15",
+        status: "pending",
+        description: "October 2026 Society Maintenance"
+    },
+    {
+        id: "BILL-OCT-2026-AWing-302",
+        residentId: "user-resident-6",
+        residentName: "Rahul Mehta",
+        unit: "302",
+        month: "October 2026",
+        amount: 4500,
+        dueDate: "2026-10-15",
+        status: "pending",
+        description: "October 2026 Society Maintenance"
+    },
+    {
+        id: "BILL-OCT-2026-BWing-105",
+        residentId: "user-resident-7",
+        residentName: "Anjali Patil",
+        unit: "105",
+        month: "October 2026",
+        amount: 4500,
+        dueDate: "2026-10-15",
+        status: "pending",
+        description: "October 2026 Society Maintenance"
+    },
+    {
+        id: "BILL-OCT-2026-BWing-503",
+        residentId: "user-resident-8",
+        residentName: "Rohan Kulkarni",
+        unit: "503",
+        month: "October 2026",
+        amount: 4500,
+        dueDate: "2026-10-15",
+        status: "pending",
+        description: "October 2026 Society Maintenance"
+    },
+    {
+        id: "BILL-OCT-2026-CWing-201",
+        residentId: "user-resident-9",
+        residentName: "Priya Desai",
+        unit: "201",
+        month: "October 2026",
+        amount: 4500,
+        dueDate: "2026-10-15",
+        status: "pending",
+        description: "October 2026 Society Maintenance"
     }
 ];
 exports.getPrepopulatedMaintenanceBills = getPrepopulatedMaintenanceBills;

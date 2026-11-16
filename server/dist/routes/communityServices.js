@@ -447,6 +447,23 @@ router.post("/messages", auth_js_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: "Failed to send message: " + error.message });
     }
 });
+router.delete("/messages/:userId", auth_js_1.authenticateToken, async (req, res) => {
+    const { userId } = req.params;
+    try {
+        await db_js_1.default.chatMessage.deleteMany({
+            where: {
+                OR: [
+                    { senderId: req.user.id, receiverId: userId },
+                    { senderId: userId, receiverId: req.user.id }
+                ]
+            }
+        });
+        res.json({ success: true, message: "Chat thread deleted successfully" });
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to delete chat: " + error.message });
+    }
+});
 // ==========================================
 // 🛠️ Secretary Moderation & Verification
 // ==========================================

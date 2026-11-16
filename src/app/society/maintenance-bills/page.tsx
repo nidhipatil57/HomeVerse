@@ -64,9 +64,7 @@ export default function MaintenanceBillsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Maintenance Bills 💳
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Maintenance Bills</h1>
         <p className="text-muted-foreground mt-1">
           View and pay your pending society maintenance invoices and breakdown charges
         </p>

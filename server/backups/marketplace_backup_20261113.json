@@ -1,0 +1,63 @@
+[
+  {
+    "id": "MKT-001",
+    "title": "Mountain Cycle (18-Speed)",
+    "description": "Excellent riding condition, disc brakes. Used for 1 year around campus.",
+    "price": "₹3,500",
+    "sellerId": "user-student-3",
+    "sellerName": "Rohan Das",
+    "category": "Cycles",
+    "status": "available",
+    "portal": "hostel",
+    "createdAt": "2026-07-01T12:00:00"
+  },
+  {
+    "id": "MKT-002",
+    "title": "Academic Notes - CS Algorithms",
+    "description": "Complete handwritten notes covering all core sorting, graph algorithms, and DP proofs.",
+    "price": "₹250",
+    "sellerId": "user-student-1",
+    "sellerName": "Aarav Mehta",
+    "category": "Notes",
+    "status": "available",
+    "portal": "hostel",
+    "createdAt": "2026-07-02T09:00:00"
+  },
+  {
+    "id": "MKT-003",
+    "title": "Microwave Oven (Solitaire 20L)",
+    "description": "Compact microwave, excellent heating. Used for only 6 months. Relocating, so selling.",
+    "price": "₹2,500",
+    "sellerId": "user-resident-2",
+    "sellerName": "Nidhi Kumar",
+    "category": "Electronics",
+    "status": "available",
+    "portal": "society",
+    "createdAt": "2026-06-30T10:00:00"
+  },
+  {
+    "id": "MKT-004",
+    "title": "Wooden Study Table",
+    "description": "Spacious wooden study table with a drawer and small shelf. Great for students.",
+    "price": "₹1,200",
+    "sellerId": "user-resident-1",
+    "sellerName": "Sara Shah",
+    "category": "Furniture",
+    "status": "available",
+    "portal": "society",
+    "createdAt": "2026-07-04T15:00:00"
+  },
+  {
+    "id": "MKT-005",
+    "title": "Acoustic Guitar - Kadence Frontier",
+    "description": "Sunburst color acoustic guitar, barely used. Comes with bag and picks.",
+    "price": "₹3,800",
+    "sellerId": "user-resident-4",
+    "sellerName": "Kishore Kumar",
+    "category": "Others",
+    "status": "available",
+    "portal": "society",
+    "createdAt": "2026-07-03T11:00:00"
+  }
+]
+

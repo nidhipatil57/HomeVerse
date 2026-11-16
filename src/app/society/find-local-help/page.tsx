@@ -433,9 +433,7 @@ export default function CommunityServicesPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border/40">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold font-[family-name:var(--font-heading)] flex items-center gap-2.5">
-            <Wrench className="w-7 h-7 text-primary" /> Community Services Directory
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold font-[family-name:var(--font-heading)] flex items-center gap-2.5"><Wrench className="w-7 h-7 text-primary" /> Community Services Directory</h1>
           <p className="text-xs md:text-sm text-muted-foreground mt-1">
             Empanelled domestic helpers, repair technicians, and local services maintained by Society Management.
           </p>
@@ -463,32 +461,7 @@ export default function CommunityServicesPage() {
         </div>
       </div>
 
-      {/* Workflow Information Banner */}
-      <Card className="border-border/50 bg-secondary/15 rounded-2xl shadow-sm">
-        <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheck className="w-5 h-5 text-primary shrink-0" />
-            <div>
-              <span className="font-extrabold text-foreground block">
-                Standard Service Request Protocol
-              </span>
-              <span className="text-muted-foreground text-[11px]">
-                External technicians undergo mandatory verification. All service bookings follow the official pipeline:
-              </span>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-1.5 font-semibold text-[11px] bg-card p-2 rounded-xl border border-border/60 self-start md:self-auto">
-            <span className="text-primary font-bold">1. Resident Request</span>
-            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-foreground">2. Secretary Endorsement</span>
-            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-foreground">3. Manager Dispatch</span>
-            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-emerald-600 font-bold">4. Fulfilled</span>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* 4 Official Service Categories Switcher & Search */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
@@ -699,9 +672,7 @@ export default function CommunityServicesPage() {
       <Dialog open={!!bookingWorker} onOpenChange={(open) => !open && setBookingWorker(null)}>
         <DialogContent className="sm:max-w-md rounded-2xl p-6 bg-card border-border/60 max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-primary" /> Request Service Booking
-            </DialogTitle>
+            <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold flex items-center gap-2"><Calendar className="w-5 h-5 text-primary" /> Request Service Booking</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               Follows official workflow: Resident &rarr; Secretary endorsement &rarr; Manager dispatch.
             </DialogDescription>
@@ -804,9 +775,7 @@ export default function CommunityServicesPage() {
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent className="sm:max-w-md rounded-2xl p-6 bg-card border-border/60 max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold flex items-center gap-2">
-              <Plus className="w-5 h-5 text-primary" /> Add Provider to Directory
-            </DialogTitle>
+            <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold flex items-center gap-2"><Plus className="w-5 h-5 text-primary" /> Add Provider to Directory</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               Maintained by Society Manager. External providers do not require user logins.
             </DialogDescription>

@@ -71,8 +71,6 @@ export default function AnalyticsPage() {
     };
   }, [flats, maintenanceBills, complaints]);
 
-  if (!mounted) return null;
-
   const isSecretary = user?.role === "secretary";
   const isManager = user?.role === "manager";
 
@@ -98,12 +96,14 @@ export default function AnalyticsPage() {
     }));
   }, [complaints]);
 
+  if (!mounted) return null;
+
   // --- MANAGER VIEW ---
   if (isManager) {
     return (
       <div className="space-y-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">Operations Analytics Console 📊</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">Operations Analytics Console</h1>
           <p className="text-muted-foreground mt-1">Review operational metrics, average resolution speed, and technician performance scorecards</p>
         </motion.div>
 
@@ -203,7 +203,7 @@ export default function AnalyticsPage() {
     return (
       <div className="space-y-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">Society Analytics Console 📊</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">Society Analytics Console</h1>
           <p className="text-muted-foreground mt-1">AI-powered reports into society operations, water/energy volume index, and resolution metrics</p>
         </motion.div>
 
@@ -291,7 +291,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">My Flat Consumption Analytics 📊</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">My Flat Consumption Analytics</h1>
         <p className="text-muted-foreground mt-1">Review water and electricity usage metrics and conservation advisory logs for Flat {user?.unit || "A-301"}</p>
       </motion.div>
 

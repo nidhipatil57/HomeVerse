@@ -46,6 +46,10 @@ import {
   Search,
   Car,
   Camera,
+  CalendarDays,
+  CreditCard,
+  Tag,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -61,6 +65,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   UtensilsCrossed, WashingMachine, ClipboardCheck, Package, GraduationCap,
   Briefcase, MapPin, Wrench, Star, AlertTriangle, Shield, FileCheck, Bed, FileText, UserCheck,
   Search, Car, Camera, Calendar, BookOpen, CalendarPlus, Key, Clock, Zap,
+  CalendarDays, CreditCard, Tag, DollarSign,
 };
 
 interface SidebarProps {
@@ -154,7 +159,7 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
       className="fixed left-0 top-0 bottom-0 z-40 flex flex-col border-r border-border/50 bg-sidebar"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 h-16">
+      <div className="flex items-center justify-between px-3 py-2.5 h-13 shrink-0">
         <AnimatePresence mode="wait">
           {!collapsed && (
             <motion.div
@@ -162,16 +167,16 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="flex items-center gap-2.5"
+              className="flex items-center gap-2"
             >
-              <div className={`w-8 h-8 rounded-lg ${gradientClass} flex items-center justify-center shadow-md`}>
-                <PortalIcon className="w-4 h-4 text-white" />
+              <div className={`w-7 h-7 rounded-lg ${gradientClass} flex items-center justify-center shadow-md`}>
+                <PortalIcon className="w-3.5 h-3.5 text-white" />
               </div>
               <div>
-                <span className="text-sm font-bold font-[family-name:var(--font-heading)]">
+                <span className="text-xs font-bold font-[family-name:var(--font-heading)]">
                   Home<span className="text-gradient">Verse</span>
                 </span>
-                <p className="text-[10px] text-muted-foreground leading-none mt-0.5">
+                <p className="text-[9px] text-muted-foreground leading-none mt-0.5">
                   {portalName}
                 </p>
               </div>
@@ -182,13 +187,13 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-lg w-8 h-8 shrink-0"
+          className="rounded-lg w-7 h-7 shrink-0"
           onClick={() => setCollapsed(!collapsed)}
         >
           {collapsed ? (
-            <PanelLeft className="w-4 h-4" />
+            <PanelLeft className="w-3.5 h-3.5" />
           ) : (
-            <PanelLeftClose className="w-4 h-4" />
+            <PanelLeftClose className="w-3.5 h-3.5" />
           )}
         </Button>
       </div>
@@ -196,108 +201,108 @@ export const Sidebar = memo(function Sidebar({ items, portalName: initialPortalN
       <Separator />
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-        {items.map((item) => {
-          const Icon = iconMap[item.icon] || LayoutDashboard;
-          const isActive = pathname === item.href;
+      {(() => {
+        const isDenseList = items.length >= 14;
+        return (
+          <nav
+            className={cn(
+              "flex-1 px-2.5 py-2 min-h-0 overflow-y-auto scrollbar-none",
+              isDenseList ? "flex flex-col justify-between" : "space-y-1"
+            )}
+          >
+            {items.map((item) => {
+              const Icon = iconMap[item.icon] || LayoutDashboard;
+              const isActive = pathname === item.href;
 
-          const linkContent = (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative",
-                isActive
-                  ? "bg-primary/10 text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"
-              )}
-            >
-              {isActive && (
-                <motion.div
-                  layoutId="activeTab"
-                  className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary"
-                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                />
-              )}
-              <Icon className={cn("w-4.5 h-4.5 shrink-0", isActive && "text-primary")} />
-              <AnimatePresence mode="wait">
-                {!collapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: "auto" }}
-                    exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="truncate"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-              {!collapsed && isActive && (
-                <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-50" />
-              )}
-            </Link>
-          );
+              const linkContent = (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 rounded-xl text-[13px] font-medium transition-all duration-200 group relative",
+                    isDenseList ? "flex-1 min-h-[30px] max-h-[46px]" : "h-10",
+                    collapsed && "justify-center px-0",
+                    isActive
+                      ? "bg-primary/10 text-primary shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
+                  )}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeTab"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3.5px] h-5 rounded-r-full bg-primary"
+                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  )}
+                  <Icon className={cn("w-4 h-4 shrink-0 transition-colors", isActive && "text-primary")} />
+                  <AnimatePresence mode="wait">
+                    {!collapsed && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="truncate text-[13px]"
+                      >
+                        {item.label}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                  {!collapsed && isActive && (
+                    <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-50 shrink-0" />
+                  )}
+                </Link>
+              );
 
-          if (collapsed) {
-            return (
-              <Tooltip key={item.href}>
-                <TooltipTrigger render={linkContent} />
-                <TooltipContent side="right" className="font-medium">
-                  {item.label}
-                </TooltipContent>
-              </Tooltip>
-            );
-          }
+              if (collapsed) {
+                return (
+                  <Tooltip key={item.href}>
+                    <TooltipTrigger render={linkContent} />
+                    <TooltipContent side="right" className="font-medium">
+                      {item.label}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
 
-          return linkContent;
-        })}
-      </nav>
+              return linkContent;
+            })}
+          </nav>
+        );
+      })()}
 
       <Separator />
 
       {/* Footer */}
-      <div className="p-3 space-y-2">
-        <div className="flex items-center justify-center">
-          <ThemeToggle />
-        </div>
-
-        <div
-          className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-xl",
-            collapsed && "justify-center"
-          )}
-        >
+      <div className="p-2.5 shrink-0">
+        <div className={cn("flex items-center gap-2.5", collapsed && "justify-center")}>
           <Avatar className="w-8 h-8 shrink-0">
-            <AvatarFallback className="text-xs font-semibold gradient-primary text-white">
+            <AvatarFallback className="text-[11px] font-bold gradient-primary text-white">
               {initials}
             </AvatarFallback>
           </Avatar>
-          <AnimatePresence mode="wait">
-            {!collapsed && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex-1 min-w-0"
-              >
-                <p className="text-sm font-medium truncate">{displayName}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {displaySubtitle}
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
           {!collapsed && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-lg w-8 h-8 shrink-0"
-              onClick={handleLogout}
-            >
-              <LogOut className="w-3.5 h-3.5 text-muted-foreground" />
-            </Button>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold truncate leading-tight">{displayName}</p>
+              <p className="text-[10px] text-muted-foreground truncate leading-tight">
+                {displaySubtitle}
+              </p>
+            </div>
           )}
+          <div className="flex items-center gap-1 shrink-0">
+            <ThemeToggle />
+            {!collapsed && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-lg w-7 h-7 shrink-0 text-muted-foreground hover:text-destructive"
+                onClick={handleLogout}
+                title="Sign Out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </motion.aside>

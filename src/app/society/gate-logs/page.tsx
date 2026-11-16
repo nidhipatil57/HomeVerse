@@ -77,9 +77,7 @@ export default function SecurityGateLogsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Gate Pass Logs 🔑
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Gate Pass Logs</h1>
         <p className="text-muted-foreground mt-1">
           Issue temporary contractor gate passes, verify active badges, and view access validation records
         </p>
@@ -89,9 +87,7 @@ export default function SecurityGateLogsPage() {
         {/* Left Column: Form */}
         <Card className="lg:col-span-5 border-border/50 h-fit">
           <CardHeader>
-            <CardTitle className="text-base font-bold flex items-center gap-1.5">
-              <Plus className="w-4 h-4 text-primary" /> Issue Contractor Gate Pass
-            </CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-1.5"><Plus className="w-4 h-4 text-primary" /> Issue Contractor Gate Pass</CardTitle>
             <CardDescription>Generate credentials for long-term daily workers</CardDescription>
           </CardHeader>
           <CardContent>
@@ -146,9 +142,7 @@ export default function SecurityGateLogsPage() {
           <CardHeader className="border-b border-border/20 pb-3">
             <div className="flex flex-col sm:flex-row justify-between gap-3">
               <div>
-                <CardTitle className="text-base font-bold flex items-center gap-1.5">
-                  <Clock className="w-4.5 h-4.5 text-primary" /> Active Gated Contractor Passes
-                </CardTitle>
+                <CardTitle className="text-base font-bold flex items-center gap-1.5"><Clock className="w-4.5 h-4.5 text-primary" /> Active Gated Contractor Passes</CardTitle>
                 <CardDescription className="text-xs">Verify contractor credentials & limits</CardDescription>
               </div>
               <div className="relative w-full sm:w-44 shrink-0">

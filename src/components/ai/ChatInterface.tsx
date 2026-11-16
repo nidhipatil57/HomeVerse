@@ -46,46 +46,108 @@ const suggestionsByRole: Record<string, string[]> = {
   ]
 };
 
+function formatInline(str: string, isUser: boolean): React.ReactNode[] {
+  const parts = str.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={i} className={`font-semibold ${isUser ? "text-white" : "text-foreground"}`}>
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+function renderFormattedMessage(rawText: string, isUser: boolean) {
+  // Strip emojis cleanly
+  const cleanText = rawText.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{FE00}-\u{FE0F}]/gu, '').trim();
+
+  const lines = cleanText.split('\n');
+  const elements: React.ReactNode[] = [];
+  let bulletItems: React.ReactNode[] = [];
+
+  const flushBullets = () => {
+    if (bulletItems.length > 0) {
+      elements.push(
+        <ul key={`ul-${elements.length}`} className="my-1.5 pl-4 list-disc space-y-1 text-xs sm:text-sm">
+          {bulletItems}
+        </ul>
+      );
+      bulletItems = [];
+    }
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushBullets();
+      return;
+    }
+
+    if (trimmed.startsWith('•') || trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      const content = trimmed.replace(/^[•\-\*]\s*/, '');
+      bulletItems.push(
+        <li key={`li-${index}`} className="leading-relaxed">
+          {formatInline(content, isUser)}
+        </li>
+      );
+      return;
+    }
+
+    flushBullets();
+    elements.push(
+      <p key={`p-${index}`} className="my-1 leading-relaxed text-xs sm:text-sm">
+        {formatInline(trimmed, isUser)}
+      </p>
+    );
+  });
+
+  flushBullets();
+  return <div className="space-y-1">{elements}</div>;
+}
+
 function getAIResponseByRole(message: string, portalType: "society" | "hostel"): string {
   const lower = message.toLowerCase();
 
   // Plumber check
   if (lower.includes("plumber") || lower.includes("leak") || lower.includes("tap") || lower.includes("pipe")) {
-    return "I found an experienced plumber available in Sunshine Complex today!\n\n**Amit Kumar (Plumber)**\n⭐ 4.7 (18 reviews) · 4 years exp\nVisit Charge: ₹120\n🟢 Available Now\n\nYou can book Amit directly using the interactive recommendation card below:\n\n[RECOMMENDED_WORKER:user-worker-2]";
+    return "I found an experienced plumber available in Sunshine Complex today.\n\n**Amit Kumar (Plumber)**\nRating: 4.7 (18 reviews) · 4 years exp\nVisit Charge: ₹120\nStatus: Available Now\n\nYou can book Amit directly using the interactive recommendation card below:\n\n[RECOMMENDED_WORKER:user-worker-2]";
   }
 
   // Electrician check
   if (lower.includes("electrician") || lower.includes("wire") || lower.includes("spark") || lower.includes("fan") || lower.includes("mcb") || lower.includes("switch")) {
-    return "I found a highly-rated electrician available on shift today:\n\n**Ramesh Kumar (Electrician)**\n⭐ 4.8 (24 reviews) · 5 years exp\nVisit Charge: ₹150\n🟢 Available Now\n\nYou can schedule an appointment immediately:\n\n[RECOMMENDED_WORKER:user-worker-1]";
+    return "I found a highly-rated electrician available on shift today:\n\n**Ramesh Kumar (Electrician)**\nRating: 4.8 (24 reviews) · 5 years exp\nVisit Charge: ₹150\nStatus: Available Now\n\nYou can schedule an appointment immediately:\n\n[RECOMMENDED_WORKER:user-worker-1]";
   }
 
   // Maid check
   if (lower.includes("maid") || lower.includes("clean") || lower.includes("housekeep") || lower.includes("utensil")) {
-    return "Here is a trusted, verified maid highly recommended by residents in your society:\n\n**Meena Sharma (Maid)**\n⭐ 4.8 (42 reviews) · 6 years exp\nVisit Charge: ₹80\n🟢 Available Now\n\nBook Meena directly from this card:\n\n[RECOMMENDED_WORKER:user-worker-3]";
+    return "Here is a trusted, verified maid recommended by residents in your society:\n\n**Meena Sharma (Maid)**\nRating: 4.8 (42 reviews) · 6 years exp\nVisit Charge: ₹80\nStatus: Available Now\n\nBook Meena directly from this card:\n\n[RECOMMENDED_WORKER:user-worker-3]";
   }
 
   // Carpenter check
   if (lower.includes("carpenter") || lower.includes("furniture") || lower.includes("wood") || lower.includes("door") || lower.includes("lock")) {
-    return "I located a verified carpenter rostered in your gate logs today:\n\n**Sanjay Dutt (Carpenter)**\n⭐ 4.5 (12 reviews) · 7 years exp\nVisit Charge: ₹200\n🟢 Available Now\n\nBook Sanjay for any custom woodwork or lock repairs:\n\n[RECOMMENDED_WORKER:user-worker-4]";
+    return "I located a verified carpenter rostered in your gate logs today:\n\n**Sanjay Dutt (Carpenter)**\nRating: 4.5 (12 reviews) · 7 years exp\nVisit Charge: ₹200\nStatus: Available Now\n\nBook Sanjay for custom woodwork or lock repairs:\n\n[RECOMMENDED_WORKER:user-worker-4]";
   }
 
   // Gardener check
   if (lower.includes("gardener") || lower.includes("lawn") || lower.includes("plant") || lower.includes("garden") || lower.includes("weed")) {
-    return "Here is a professional gardener active in Sunshine Complex today:\n\n**Ram Lal (Gardener)**\n⭐ 4.7 (30 reviews) · 10 years exp\nVisit Charge: ₹100\n🟢 Available Now\n\nBook Ram Lal for lawn pruning and planting:\n\n[RECOMMENDED_WORKER:user-worker-6]";
+    return "Here is a professional gardener active in Sunshine Complex today:\n\n**Ram Lal (Gardener)**\nRating: 4.7 (30 reviews) · 10 years exp\nVisit Charge: ₹100\nStatus: Available Now\n\nBook Ram Lal for lawn pruning and planting:\n\n[RECOMMENDED_WORKER:user-worker-6]";
   }
 
   // Fallbacks
   if (lower.includes("maintenance") || lower.includes("bill")) {
-    return "Your maintenance bill for July 2026 is **₹4,500**. Breakdown:\n\n• Base Charges: ₹2,500\n• Sinking Fund: ₹500\n• Parking space: ₹800\n• Water Tariff: ₹400\n• Common Electricity: ₹300\n\n📅 **Due Date**: July 10, 2026. Settle online from the Maintenance page.";
+    return "Your maintenance bill for October 2026 is **₹4,500**:\n\n• Base Charges: ₹2,500\n• Sinking Fund: ₹500\n• Parking space: ₹800\n• Water Tariff: ₹400\n• Common Electricity: ₹300\n\nDue Date: October 15, 2026. Settle online anytime from the Payments section.";
   }
   if (lower.includes("meeting")) {
-    return "The next **Annual General Meeting (AGM)** is scheduled for:\n\n📅 **July 15, 2026** at **6:00 PM**\n📍 **Clubhouse Lounge, Ground Floor**\n\nAgenda items: Financial Audit, Garden renovation, and Gym upgrades.";
+    return "The next Annual General Meeting (AGM) is scheduled for:\n\nDate: October 25, 2026 at 6:00 PM\nLocation: Clubhouse Lounge, Ground Floor\n\nAgenda items: Financial Audit, Garden renovation, and Gym upgrades.";
   }
   if (lower.includes("parcel") || lower.includes("package")) {
-    return "📦 **Parcel Delivery Alert**:\n\n1 parcel from **Amazon** is awaiting gate pickup at Gate 1 Locker.\nOTP for release: **4821**.";
+    return "Parcel Delivery Alert:\n\n1 parcel from Amazon is awaiting gate pickup at Gate 1 Locker.\nOTP for release: 4821.";
   }
 
-  return "I am your community assistant! I can help you find available plumbers, electricians, maids, gardeners, or carpenters, as well as check your bills and parcels. Try asking: 'I need a plumber tomorrow.'";
+  return "I am your community assistant. I can help you find available plumbers, electricians, maids, gardeners, or carpenters, as well as check your bills and announcements. How can I assist you today?";
 }
 
 export function AIChat({ portalType }: AIChatProps) {
@@ -140,16 +202,16 @@ export function AIChat({ portalType }: AIChatProps) {
     let welcomeText = "";
     if (portalType === "society") {
       if (userRole === "secretary") {
-        welcomeText = "Greetings, Secretary. 💼 I am your **AI Administrative Assistant**. Ask me to generate billing reports, summarize pending complaints, or audit budget lists.";
+        welcomeText = "Greetings, Secretary. I am your **AI Administrative Assistant**. Ask me to generate billing reports, summarize pending complaints, or audit budget lists.";
       } else if (userRole === "security") {
-        welcomeText = "Gated Entry Assistant Online. 🚨 I can verify visitor OTPs, retrieve incident registries, or outline emergency procedures.";
+        welcomeText = "Gated Entry Assistant Online. I can verify visitor OTPs, retrieve incident registries, or outline emergency procedures.";
       } else if (userRole === "manager") {
-        welcomeText = "Operations Assistant Online. 🛠️ Let me help you coordinate workers, track escalations, schedule appointments, or audit directory rosters.";
+        welcomeText = "Operations Assistant Online. Let me help you coordinate workers, track escalations, schedule appointments, or audit directory rosters.";
       } else {
-        welcomeText = "Hi! 👋 I'm your **AI Community Assistant**. Ask me to search and book plumbers, electricians, maids, or ask about bills and parcels.";
+        welcomeText = "Hello, I am your **AI Community Assistant**. You can ask me to search and book plumbers, electricians, maids, or ask about bills and community updates.";
       }
     } else {
-      welcomeText = "Hey! 👋 I'm your **AI Hostel Assistant**. Ask me about today's mess menu, laundry slots, or packages.";
+      welcomeText = "Hello, I am your **AI Hostel Assistant**. You can ask me about today's mess menu, laundry slots, or maintenance.";
     }
 
     setMessages([
@@ -217,7 +279,7 @@ export function AIChat({ portalType }: AIChatProps) {
         {
           id: Date.now().toString(),
           role: "assistant",
-          content: `✅ I have successfully scheduled a booking request with **${bookingWorker.name}** for **${bookingDate} at ${bookingTime}**. They have been notified!`,
+          content: `I have successfully scheduled a booking request with **${bookingWorker.name}** for **${bookingDate} at ${bookingTime}**. They have been notified!`,
           timestamp: new Date().toISOString()
         }
       ]);
@@ -284,12 +346,12 @@ export function AIChat({ portalType }: AIChatProps) {
                     </Avatar>
                     
                     <div className="max-w-[75%] space-y-3">
-                      <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                      <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                         isUser
                           ? "gradient-primary text-white rounded-br-none"
                           : "bg-secondary/40 text-foreground border border-border/20 rounded-bl-none shadow-sm"
                       }`}>
-                        {text}
+                        {renderFormattedMessage(text, isUser)}
                       </div>
 
                       {/* Interactive Worker Card */}

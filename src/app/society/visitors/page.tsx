@@ -24,6 +24,7 @@ import {
   downloadPassBlob,
   sharePassImageToApps,
 } from "@/lib/visitorPassGenerator";
+import { isHelperAssignedToResident, getResidentHelperPass } from "@/lib/helperUtils";
 
 const deliveryPartners = [
   { name: "Amazon", color: "bg-amber-500/10 text-amber-600 border-amber-500/20" },
@@ -42,6 +43,7 @@ export default function VisitorsPage() {
   const {
     visitors,
     gatePasses,
+    helpers,
     submitVisitorRequest,
     cancelVisitorRequest,
     approveVisitorRequest,
@@ -53,6 +55,7 @@ export default function VisitorsPage() {
     useShallow((state) => ({
       visitors: state.visitors || [],
       gatePasses: state.gatePasses || [],
+      helpers: state.helpers || [],
       submitVisitorRequest: state.submitVisitorRequest,
       cancelVisitorRequest: state.cancelVisitorRequest,
       approveVisitorRequest: state.approveVisitorRequest,
@@ -333,15 +336,52 @@ export default function VisitorsPage() {
     return filteredVisitors.filter((v) => v.status === "approved" || v.status === "expected" || v.status === "checked-in" || v.status === "inside");
   }, [filteredVisitors]);
 
-  // Gate Passes filtered
+  // Gate Passes filtered:
+  // For Residents: strictly display ONLY the gate passes of their registered daily check-in workers.
+  // For Security/Secretary: display all society gate passes (visitors, contractors, domestic workers).
   const filteredGatePasses = useMemo(() => {
-    return gatePasses
-      .filter((gp) => {
-        if (!isSecurityOrSec && user?.unit) {
-          return gp.unit === user.unit;
-        }
-        return true;
-      })
+    // 1. Domestic helpers assigned to this resident in Daily Check-In
+    const myHelpers = helpers.filter((h) => {
+      if (!isSecurityOrSec) {
+        return isHelperAssignedToResident(h, user);
+      }
+      return true;
+    });
+
+    const residentHelperPasses = myHelpers.map((h) =>
+      getResidentHelperPass(h, user, gatePasses)
+    );
+
+    if (!isSecurityOrSec) {
+      // Residents ONLY see their active daily check-in domestic workers' gate passes
+      return residentHelperPasses
+        .filter((gp) => {
+          if (!searchQuery) return true;
+          const q = searchQuery.toLowerCase();
+          return (
+            (gp.name || "").toLowerCase().includes(q) ||
+            (gp.phone && gp.phone.includes(q)) ||
+            (gp.unit || "").toLowerCase().includes(q) ||
+            (gp.otp && gp.otp.includes(q)) ||
+            (gp.passType && gp.passType.toLowerCase().includes(q))
+          );
+        })
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    }
+
+    // Security & Secretary: Combined comprehensive gate pass log
+    const seen = new Set<string>();
+    const combined: typeof gatePasses = [];
+
+    for (const p of [...gatePasses, ...residentHelperPasses]) {
+      const key = (p.id || p.name).toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        combined.push(p as any);
+      }
+    }
+
+    return combined
       .filter((gp) => {
         if (!searchQuery) return true;
         const q = searchQuery.toLowerCase();
@@ -354,7 +394,7 @@ export default function VisitorsPage() {
         );
       })
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-  }, [gatePasses, user, isSecurityOrSec, searchQuery]);
+  }, [gatePasses, helpers, user, isSecurityOrSec, searchQuery]);
 
   const activeGatePassesList = useMemo(() => {
     return filteredGatePasses.filter((p) => p.status === "active");
@@ -371,9 +411,7 @@ export default function VisitorsPage() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border/40">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold font-[family-name:var(--font-heading)] flex items-center gap-2.5">
-            <Shield className="w-7 h-7 text-primary" /> Visitor & Gate Passes
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold font-[family-name:var(--font-heading)] flex items-center gap-2.5"><Shield className="w-7 h-7 text-primary" /> Visitor & Gate Passes</h1>
           <p className="text-xs md:text-sm text-muted-foreground mt-1">
             Issue simple Gate Passes and pre-approve deliveries and visitors.
           </p>
@@ -596,9 +634,7 @@ export default function VisitorsPage() {
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-amber-600 animate-pulse" />
                   <div>
-                    <CardTitle className="text-sm font-bold text-amber-950 dark:text-amber-200">
-                      Walk-in Guests Waiting at Main Gate ({pendingWalkIns.length})
-                    </CardTitle>
+                    <CardTitle className="text-sm font-bold text-amber-950 dark:text-amber-200">Walk-in Guests Waiting at Main Gate ({pendingWalkIns.length})</CardTitle>
                     <CardDescription className="text-xs text-amber-800/80 dark:text-amber-300/80">
                       Security has logged unexpected visitors requesting entry to your flat.
                     </CardDescription>
@@ -772,9 +808,7 @@ export default function VisitorsPage() {
       <Dialog open={showGatePassModal} onOpenChange={setShowGatePassModal}>
         <DialogContent className="sm:max-w-md rounded-3xl p-7 bg-card border-border/60 shadow-xl">
           <DialogHeader className="space-y-1.5 pb-2">
-            <DialogTitle className="font-[family-name:var(--font-heading)] text-xl font-bold flex items-center gap-2.5">
-              <KeyRound className="w-5 h-5 text-primary" /> Issue Gate Pass
-            </DialogTitle>
+            <DialogTitle className="font-[family-name:var(--font-heading)] text-xl font-bold flex items-center gap-2.5"><KeyRound className="w-5 h-5 text-primary" /> Issue Gate Pass</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               Enter person's name and who they are to generate their digital gate pass card.
             </DialogDescription>
@@ -872,9 +906,7 @@ export default function VisitorsPage() {
       <Dialog open={showPreApproveModal} onOpenChange={setShowPreApproveModal}>
         <DialogContent className="sm:max-w-md rounded-3xl p-6 bg-card border-border/60 max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" /> Pre-Approve Delivery / Guest
-            </DialogTitle>
+            <DialogTitle className="font-[family-name:var(--font-heading)] text-lg font-bold flex items-center gap-2"><Shield className="w-5 h-5 text-primary" /> Pre-Approve Delivery / Guest</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               Pre-approved entries grant instant verification at Security with QR and OTP.
             </DialogDescription>
@@ -999,9 +1031,7 @@ export default function VisitorsPage() {
       >
         <DialogContent className="sm:max-w-md rounded-3xl p-6 bg-card border-primary/20 max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-[family-name:var(--font-heading)] text-center text-lg font-bold">
-              Visitor Gate Pass
-            </DialogTitle>
+            <DialogTitle className="font-[family-name:var(--font-heading)] text-center text-lg font-bold">Visitor Gate Pass</DialogTitle>
             <DialogDescription className="text-center text-xs text-muted-foreground mt-0.5">
               Verifiable QR card. Share or download for entry.
             </DialogDescription>

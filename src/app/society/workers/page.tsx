@@ -198,7 +198,7 @@ export default function WorkersDirectoryPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-[family-name:var(--font-heading)]">Worker Directory 🛠️</h1>
+          <h1 className="text-3xl font-bold font-[family-name:var(--font-heading)]">Worker Directory</h1>
           <p className="text-muted-foreground mt-1">
             {isManager
               ? "Maintain verified workers, configure availability, set charges, and upload verification records."
@@ -440,9 +440,7 @@ export default function WorkersDirectoryPage() {
       <Dialog open={showWorkerModal} onOpenChange={setShowWorkerModal}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="font-[family-name:var(--font-heading)]">
-              {editingWorker ? "Edit Roster Details" : "Add Verified Static Worker"}
-            </DialogTitle>
+            <DialogTitle className="font-[family-name:var(--font-heading)]">{editingWorker ? "Edit Roster Details" : "Add Verified Static Worker"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSaveWorkerSubmit} className="space-y-4 mt-2 text-xs">
             <div className="grid grid-cols-2 gap-3">

@@ -108,9 +108,7 @@ export default function WorkerAvailabilityPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Work Availability & Shifts ⏰
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Work Availability & Shifts ⏰</h1>
         <p className="text-muted-foreground mt-1">
           Configure your daily work shifts, check off weekly rest holidays, and block dates when you are unavailable.
         </p>
@@ -131,7 +129,7 @@ export default function WorkerAvailabilityPage() {
             </div>
 
             <div className="text-center">
-              <h3 className="font-bold text-sm">{isOnline ? "🟢 Active & Available" : "🔴 Offline / Off Duty"}</h3>
+              <h3 className="font-bold text-sm">{isOnline ? " Active & Available" : " Offline / Off Duty"}</h3>
               <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed max-w-[200px] mx-auto">
                 {isOnline
                   ? "Residents can see you listed in the community services directory and send booking dispatches."
@@ -153,9 +151,7 @@ export default function WorkerAvailabilityPage() {
         {/* Schedule & Shifts Info */}
         <Card className="md:col-span-8 border-border/50 bg-card shadow-sm flex flex-col justify-between">
           <CardHeader>
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Clock className="w-5 h-5 text-primary" /> Shift Schedule Configuration
-            </CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Shift Schedule Configuration</CardTitle>
             <CardDescription>Customize working days, shift timings, and block calendar leaves</CardDescription>
           </CardHeader>
           

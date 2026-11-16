@@ -101,9 +101,7 @@ export default function SecurityParcelManagementPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Parcel Management 📦
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Parcel Management</h1>
         <p className="text-muted-foreground mt-1">
           Record inbound deliveries, dispatch release codes, and verify resident OTP collections
         </p>
@@ -115,10 +113,8 @@ export default function SecurityParcelManagementPage() {
           {/* Record Inbound Package */}
           <Card className="border-border/50">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-bold flex items-center gap-1.5">
-                <Plus className="w-4 h-4 text-primary" />
-                Log Inbound Courier Parcel
-              </CardTitle>
+              <CardTitle className="text-base font-bold flex items-center gap-1.5"><Plus className="w-4 h-4 text-primary" />
+                Log Inbound Courier Parcel</CardTitle>
               <CardDescription>Enter details to dispatch automated release OTP</CardDescription>
             </CardHeader>
             <CardContent>
@@ -168,10 +164,8 @@ export default function SecurityParcelManagementPage() {
           {/* Release Package with OTP */}
           <Card className="border-border/50">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-bold flex items-center gap-1.5">
-                <Key className="w-4 h-4 text-primary" />
-                Release Parcel (OTP Verification)
-              </CardTitle>
+              <CardTitle className="text-base font-bold flex items-center gap-1.5"><Key className="w-4 h-4 text-primary" />
+                Release Parcel (OTP Verification)</CardTitle>
               <CardDescription>Enter the 4-digit code shown on Resident's app</CardDescription>
             </CardHeader>
             <CardContent>
@@ -218,9 +212,7 @@ export default function SecurityParcelManagementPage() {
         {/* Right Column: Pending Parcels Log list */}
         <Card className="lg:col-span-7 border-border/50 flex flex-col h-[520px] overflow-hidden">
           <CardHeader className="border-b border-border/20 pb-3">
-            <CardTitle className="text-base font-bold flex items-center gap-1.5">
-              <Package className="w-4.5 h-4.5 text-amber-500" /> Pending Gate Locker Parcels ({pendingParcels.length})
-            </CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-1.5"><Package className="w-4.5 h-4.5 text-amber-500" /> Pending Gate Locker Parcels ({pendingParcels.length})</CardTitle>
             <CardDescription>Parcels logged at Gate 1 holding locker</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto p-4 space-y-3">

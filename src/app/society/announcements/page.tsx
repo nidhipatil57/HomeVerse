@@ -75,7 +75,7 @@ export default function AnnouncementsPage() {
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">Announcements 📢</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)]">Announcements</h1>
           <p className="text-muted-foreground mt-1">Stay updated with community news and gate notices</p>
         </div>
         {(user.role === "security" || user.role === "worker" || user.role === "secretary") && (
@@ -156,10 +156,8 @@ export default function AnnouncementsPage() {
                 <X className="w-4 h-4" />
               </button>
 
-              <h2 className="text-xl font-bold font-[family-name:var(--font-heading)] mb-1 flex items-center gap-2">
-                <Megaphone className="w-5 h-5 text-red-500" />
-                Broadcast Gate Announcement
-              </h2>
+              <h2 className="text-xl font-bold font-[family-name:var(--font-heading)] mb-1 flex items-center gap-2"><Megaphone className="w-5 h-5 text-red-500" />
+                Broadcast Gate Announcement</h2>
               <p className="text-xs text-muted-foreground mb-4">
                 This notice will be published to the resident bulletin boards and notification feeds instantly.
               </p>

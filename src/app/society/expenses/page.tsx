@@ -62,9 +62,7 @@ export default function SecretaryExpensesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Expenses Ledger 💸
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Expenses Ledger</h1>
         <p className="text-muted-foreground mt-1">
           Record vendor invoice transactions, log operational payouts, and audit outgoing society expenses
         </p>
@@ -74,9 +72,7 @@ export default function SecretaryExpensesPage() {
         {/* Left Column: Form */}
         <Card className="lg:col-span-5 border-border/50 h-fit">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-bold flex items-center gap-1.5">
-              <Plus className="w-4 h-4 text-primary" /> Log Society Outflow Expense
-            </CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-1.5"><Plus className="w-4 h-4 text-primary" /> Log Society Outflow Expense</CardTitle>
             <CardDescription>Record Operational / Vendor Invoice payouts</CardDescription>
           </CardHeader>
           <CardContent>
@@ -130,9 +126,7 @@ export default function SecretaryExpensesPage() {
 
           <Card className="border-border/50 flex flex-col h-[400px] overflow-hidden">
             <CardHeader className="border-b border-border/20 pb-3">
-              <CardTitle className="text-base font-bold flex items-center gap-1.5">
-                <ArrowUpRight className="w-4.5 h-4.5 text-rose-500" /> Outflow ledger logs ({expenses.length})
-              </CardTitle>
+              <CardTitle className="text-base font-bold flex items-center gap-1.5"><ArrowUpRight className="w-4.5 h-4.5 text-rose-500" /> Outflow ledger logs ({expenses.length})</CardTitle>
               <CardDescription>Audited operational expense items</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 overflow-y-auto p-4 space-y-3">

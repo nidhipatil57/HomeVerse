@@ -644,12 +644,10 @@ export function SecretaryEventsView({ user }: { user: any }) {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-3xl md:max-w-4xl w-full p-6 md:p-8 max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pr-10 pb-2 border-b border-border/60">
-            <DialogTitle className="text-xl font-bold flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-primary/10 text-primary">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2.5"><div className="p-2 rounded-lg bg-primary/10 text-primary">
                 <CalendarIcon className="w-5 h-5" />
               </div>
-              <span>{editingEventId ? "Edit Society Event" : "Create New Society Event"}</span>
-            </DialogTitle>
+              <span>{editingEventId ? "Edit Society Event" : "Create New Society Event"}</span></DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground mt-1">
               Complete the event details. Only published events will become discoverable by residents and viewable by manager & security.
             </DialogDescription>
@@ -935,12 +933,10 @@ export function SecretaryEventsView({ user }: { user: any }) {
         <DialogContent className="sm:max-w-4xl md:max-w-5xl w-full p-6 md:p-8 max-h-[85vh] overflow-y-auto">
           <DialogHeader className="pr-16 pb-4 border-b border-border/60">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <DialogTitle className="text-xl font-bold flex items-center gap-2.5 min-w-0">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+              <DialogTitle className="text-xl font-bold flex items-center gap-2.5 min-w-0"><div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
                   <Users className="w-5 h-5" />
                 </div>
-                <span className="truncate">Registered Attendees: {viewingRegistrationsEvent?.title}</span>
-              </DialogTitle>
+                <span className="truncate">Registered Attendees: {viewingRegistrationsEvent?.title}</span></DialogTitle>
               <Badge variant="secondary" className="text-xs px-3 py-1 font-semibold w-fit shrink-0">
                 {(viewingRegistrationsEvent?.registrations || []).length} Flat{((viewingRegistrationsEvent?.registrations || []).length === 1) ? "" : "s"} Registered
               </Badge>
@@ -1060,10 +1056,8 @@ export function SecretaryEventsView({ user }: { user: any }) {
       <Dialog open={!!rescheduleEvent} onOpenChange={(open) => !open && setRescheduleEvent(null)}>
         <DialogContent className="sm:max-w-lg w-full p-6">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <Clock className="w-4 h-4 text-amber-600" />
-              Reschedule Event: {rescheduleEvent?.title}
-            </DialogTitle>
+            <DialogTitle className="text-base font-bold flex items-center gap-2"><Clock className="w-4 h-4 text-amber-600" />
+              Reschedule Event: {rescheduleEvent?.title}</DialogTitle>
             <DialogDescription className="text-xs">
               Updating event timing will automatically broadcast a notification to all registered attendees.
             </DialogDescription>
@@ -1636,10 +1630,8 @@ export function ResidentEventsView({ user }: { user: any }) {
       <Dialog open={!!checkoutEvent} onOpenChange={(open) => !open && setCheckoutEvent(null)}>
         <DialogContent className="sm:max-w-xl w-full p-6">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-primary" />
-              Event Registration: {checkoutEvent?.title}
-            </DialogTitle>
+            <DialogTitle className="text-base font-bold flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-primary" />
+              Event Registration: {checkoutEvent?.title}</DialogTitle>
             <DialogDescription className="text-xs">
               Confirm your registration details. A digital pass with QR code will be generated immediately.
             </DialogDescription>

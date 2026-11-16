@@ -62,9 +62,7 @@ export default function SecretaryFlatsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Flats Database 🏠
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Flats Database</h1>
         <p className="text-muted-foreground mt-1">
           Review complex flat registry, monitor vacancy levels, and provision new flats
         </p>
@@ -116,9 +114,7 @@ export default function SecretaryFlatsPage() {
         {/* Right: Add Flat Form */}
         <Card className="lg:col-span-4 border-border/50 h-fit">
           <CardHeader>
-            <CardTitle className="text-base font-bold flex items-center gap-1.5">
-              <Plus className="w-4 h-4 text-primary" /> Add New Apartment Flat
-            </CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-1.5"><Plus className="w-4 h-4 text-primary" /> Add New Apartment Flat</CardTitle>
             <CardDescription>Provision a new flat address in society</CardDescription>
           </CardHeader>
           <CardContent>

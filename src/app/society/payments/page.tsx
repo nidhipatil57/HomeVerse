@@ -146,17 +146,19 @@ export default function PaymentsPage() {
       return false;
     });
 
-    // Strictly allow ONLY ONE current pending maintenance bill for the resident (October 2026)
-    let hasPendingMaintenance = false;
+    // Strictly deduplicate pending maintenance bills so multiple copies of the exact same month cycle are merged
+    const seenPendingMaintenanceMonths = new Set<string>();
     const deduplicated: typeof filtered = [];
 
     for (const p of filtered) {
       const isMaint = p.paymentType === "Maintenance" || (p.description || "").toLowerCase().includes("maintenance");
       if (isMaint && p.status?.toLowerCase() === "pending") {
-        if (hasPendingMaintenance) {
-          continue; // Skip duplicate pending maintenance
+        const monthMatch = (p.description || "").match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/i);
+        const monthKey = monthMatch ? monthMatch[0].toLowerCase() : (p.dueDate || p.referenceId || p.id);
+        if (seenPendingMaintenanceMonths.has(monthKey)) {
+          continue; // Skip duplicate pending maintenance for the exact same billing cycle
         }
-        hasPendingMaintenance = true;
+        seenPendingMaintenanceMonths.add(monthKey);
       }
       deduplicated.push(p);
     }
@@ -580,9 +582,7 @@ export default function PaymentsPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl lg:text-3xl font-extrabold font-[family-name:var(--font-heading)] text-foreground tracking-tight">
-                  Society Treasury & Ledger
-                </h1>
+                <h1 className="text-2xl lg:text-3xl font-extrabold font-[family-name:var(--font-heading)] text-foreground tracking-tight">Society Treasury & Ledger</h1>
                 <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider">
                   Admin Central
                 </Badge>
@@ -713,9 +713,7 @@ export default function PaymentsPage() {
                 <CardHeader className="pb-3 border-b space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div>
-                      <CardTitle className="text-base font-bold flex items-center gap-2">
-                        <span>Society Master Ledger Records</span>
-                      </CardTitle>
+                      <CardTitle className="text-base font-bold flex items-center gap-2"><span>Society Master Ledger Records</span></CardTitle>
                       <CardDescription className="text-xs">
                         Audit roster of all dispatched monthly bills, settlement timestamps, and receipts
                       </CardDescription>
@@ -1014,10 +1012,8 @@ export default function PaymentsPage() {
             <div className="lg:col-span-5">
               <Card className="border-border/50 h-fit">
                 <CardHeader>
-                  <CardTitle className="text-base font-bold flex items-center gap-1.5">
-                    <Plus className="w-4 h-4 text-primary" /> 
-                    {editingColl ? "Edit Special Collection" : "Publish Special Collection"}
-                  </CardTitle>
+                  <CardTitle className="text-base font-bold flex items-center gap-1.5"><Plus className="w-4 h-4 text-primary" /> 
+                    {editingColl ? "Edit Special Collection" : "Publish Special Collection"}</CardTitle>
                   <CardDescription>Setup fund collection for festivals or building repairs</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1259,9 +1255,7 @@ export default function PaymentsPage() {
           <div className="grid lg:grid-cols-12 gap-6">
             <Card className="lg:col-span-8 border-border/50">
               <CardHeader>
-                <CardTitle className="text-base font-bold flex items-center gap-1.5">
-                  <TrendingUp className="w-4 h-4 text-primary" /> Monthly Maintenance Collection Trend
-                </CardTitle>
+                <CardTitle className="text-base font-bold flex items-center gap-1.5"><TrendingUp className="w-4 h-4 text-primary" /> Monthly Maintenance Collection Trend</CardTitle>
                 <CardDescription>Consolidated collections status track</CardDescription>
               </CardHeader>
               <CardContent className="h-80 pb-6">
@@ -1320,8 +1314,7 @@ export default function PaymentsPage() {
         <Dialog open={!!selectedLedgerCollection} onOpenChange={(open) => { if (!open) setSelectedLedgerCollection(null); }}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-card text-card-foreground border-border/50 rounded-2xl">
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold flex items-center justify-between pr-4">
-                <span>{selectedLedgerCollection?.title} – Participant Ledger</span>
+              <DialogTitle className="text-lg font-bold flex items-center justify-between pr-4"><span>{selectedLedgerCollection?.title} – Participant Ledger</span>
                 <Button
                   size="sm"
                   variant="outline"
@@ -1444,9 +1437,7 @@ export default function PaymentsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Payments & Dues 💳
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Payments & Dues</h1>
         <p className="text-muted-foreground mt-1 text-xs">
           View outstanding balance maintenance cycles, track festival collections, and download PDF receipts.
         </p>

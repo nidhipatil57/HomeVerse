@@ -28,9 +28,7 @@ export default function SecurityCctvPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-            CCTV Feeds 📹
-          </h1>
+          <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">CCTV Feeds</h1>
           <p className="text-muted-foreground mt-1">
             Monitor live Gated Complex CCTV feeds and camera health indices in real-time
           </p>

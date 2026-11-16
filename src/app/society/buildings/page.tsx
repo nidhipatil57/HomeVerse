@@ -24,9 +24,7 @@ export default function SecretaryBuildingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">
-          Buildings Database 🏢
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold font-[family-name:var(--font-heading)] flex items-center gap-2">Buildings Database</h1>
         <p className="text-muted-foreground mt-1">
           Monitor society towers, wings, structural safety indices, and assigned gatekeepers
         </p>
@@ -38,9 +36,7 @@ export default function SecretaryBuildingsPage() {
           <Card key={i} className="border-border/50 hover:shadow-lg transition-all duration-300">
             <CardHeader className="pb-3 border-b border-secondary/15 bg-secondary/5">
               <div className="flex justify-between items-start">
-                <CardTitle className="text-base font-bold flex items-center gap-1.5">
-                  <Building2 className="w-5 h-5 text-primary" /> {block.name}
-                </CardTitle>
+                <CardTitle className="text-base font-bold flex items-center gap-1.5"><Building2 className="w-5 h-5 text-primary" /> {block.name}</CardTitle>
                 <Badge variant={block.healthStatus === "Excellent" ? "outline" : "destructive"} className="text-[8px] font-bold uppercase py-0.5">
                   {block.healthStatus}
                 </Badge>
